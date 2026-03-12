@@ -1,0 +1,52 @@
+<div class="not-found-container">
+  <div class="error-content">
+    <div class="error-code">
+      <span class="code-digit">4</span>
+      <span class="code-digit">0</span>
+      <span class="code-digit">4</span>
+    </div>
+    
+    <h1 class="error-title">{{ errorMessage }}</h1>
+    
+    <p class="error-description">
+      {{ suggestion }}
+    </p>
+    
+    <div class="error-actions">
+      <button class="btn btn-primary btn-lg" routerLink="/">
+        <i class="fas fa-home me-2"></i>Go to Homepage
+      </button>
+      <button class="btn btn-outline-secondary btn-lg" (click)="goBack()">
+        <i class="fas fa-arrow-left me-2"></i>Go Back
+      </button>
+    </div>
+    
+    <div class="error-search mt-4">
+      <p class="text-muted mb-2">Or try searching for what you need:</p>
+      <div class="input-group search-box">
+        <input type="text" class="form-control form-control-lg" placeholder="Search...">
+        <button class="btn btn-primary" type="button">
+          <i class="fas fa-search"></i>
+        </button>
+      </div>
+    </div>
+    
+    <div class="error-links mt-4">
+      <p class="text-muted">Here are some helpful links instead:</p>
+      <div class="links-list">
+        <a routerLink="/dashboard" class="link-item">
+          <i class="fas fa-tachometer-alt"></i> Dashboard
+        </a>
+        <a routerLink="/projects" class="link-item">
+          <i class="fas fa-project-diagram"></i> Projects
+        </a>
+        <a routerLink="/profile" class="link-item">
+          <i class="fas fa-user"></i> Profile
+        </a>
+        <a routerLink="/help" class="link-item">
+          <i class="fas fa-question-circle"></i> Help Center
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

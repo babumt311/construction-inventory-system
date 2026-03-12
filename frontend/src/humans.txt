@@ -1,0 +1,29 @@
+/* TEAM */
+  Your Name: Developer
+  Site: https://example.com
+  Twitter: @yourusername
+  Contact: your.email@example.com
+  Location: City, Country
+
+/* THANKS */
+  Angular Team: https://angular.io
+  Bootstrap Team: https://getbootstrap.com
+  Material Design: https://material.angular.io
+  Font Awesome: https://fontawesome.com
+  Chart.js: https://www.chartjs.org
+
+/* TECHNOLOGY */
+  Frontend: Angular 16, TypeScript, Bootstrap 5, Angular Material
+  Build Tool: Angular CLI
+  Package Manager: npm
+  CSS Preprocessor: SCSS
+  Icons: Font Awesome 6
+  Charts: Chart.js 4
+  Testing: Jasmine, Karma
+
+/* SITE */
+  Last update: 2024
+  Language: English
+  Doctype: HTML5
+  Components: Material Design
+  IDE: VS Code

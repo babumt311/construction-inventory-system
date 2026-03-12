@@ -1,0 +1,14 @@
+# Angular
+.angular/
+frontend/.angular/
+
+# Node
+node_modules/
+dist/
+build/
+
+minikube*
+node_modules/
+*.exe
+*.zip
+*.iso

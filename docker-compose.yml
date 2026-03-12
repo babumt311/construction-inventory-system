@@ -1,0 +1,203 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: construction_db
+    environment:
+      POSTGRES_DB: construction_inventory
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Admin123
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - construction_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: construction_redis
+    command: redis-server --appendonly yes --requirepass RedisPass123
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - construction_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "RedisPass123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Application
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production-backend
+    container_name: construction_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:Admin123@postgres:5432/construction_inventory
+      REDIS_URL: redis://:RedisPass123@redis:6379/0
+      SECRET_KEY: your-super-secret-jwt-token-key-change-in-production
+      DEBUG: "false"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    ports:
+      - "8000:8000"
+    networks:
+      - construction_network
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.cli.commands init-db &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery-worker
+    container_name: construction_celery_worker
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://postgres:Admin123@postgres:5432/construction_inventory
+      REDIS_URL: redis://:RedisPass123@redis:6379/0
+      CELERY_BROKER_URL: redis://:RedisPass123@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:RedisPass123@redis:6379/0
+      CELERY_WORKER_CONCURRENCY: 4
+      CELERY_WORKER_MAX_TASKS_PER_CHILD: 100
+      CELERY_WORKER_AUTOSCALE: "10,3"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+      - ./backend/backups:/app/backups
+    networks:
+      - construction_network
+    # Command is in Dockerfile
+    #    healthcheck:
+    # test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping", "-d", "celery@$$HOSTNAME"]
+    # interval: 30s
+    # timeout: 10s
+    # retries: 3
+    restart: unless-stopped
+
+  # Celery Beat
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery-beat
+    container_name: construction_celery_beat
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://postgres:Admin123@postgres:5432/construction_inventory
+      REDIS_URL: redis://:RedisPass123@redis:6379/0
+      CELERY_BROKER_URL: redis://:RedisPass123@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:RedisPass123@redis:6379/0
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+      - celery_beat_data:/tmp
+    networks:
+      - construction_network
+    # Command is in Dockerfile
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/celerybeat-schedule"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Flower - Celery Monitoring (optional)
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production-celery-worker
+    container_name: construction_flower
+    depends_on:
+      - redis
+      - celery-worker
+    environment:
+      CELERY_BROKER_URL: redis://:RedisPass123@redis:6379/0
+      FLOWER_PORT: 5555
+      FLOWER_BASIC_AUTH: "admin:Admin@123"
+    ports:
+      - "5555:5555"
+    networks:
+      - construction_network
+    command: celery -A app.tasks.celery_app flower --port=5555 --basic_auth=admin:Admin@123
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Frontend 
+#  frontend:
+#    build: ./frontend
+#    container_name: construction_frontend
+#    depends_on:
+#      - backend
+#    ports:
+#      - "80:80"
+#    networks:
+#     - construction_network */
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: construction_frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:8080"
+      - "443:443"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./logs:/var/log/nginx
+      - ./ssl:/etc/nginx/ssl:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - construction_network
+
+
+networks:
+  construction_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  celery_beat_data:

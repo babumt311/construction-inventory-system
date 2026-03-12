@@ -1,0 +1,134 @@
+worker_processes auto;
+pid /tmp/nginx.pid;
+
+error_log  /dev/stderr warn;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Logging
+    access_log /dev/stdout;
+
+    # 3. TEMP PATHS: Move these to /tmp to avoid permission issues
+    client_body_temp_path /tmp/client_temp;
+    proxy_temp_path       /tmp/proxy_temp_path;
+    fastcgi_temp_path     /tmp/fastcgi_temp;
+    uwsgi_temp_path       /tmp/uwsgi_temp;
+    scgi_temp_path        /tmp/scgi_temp;
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=one:10m rate=10r/s;
+    
+    sendfile        on;
+    tcp_nopush      on;
+
+    # Gzip Compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied expired no-cache no-store private auth;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json application/vnd.ms-fontobject application/x-font-ttf font/opentype image/svg+xml image/x-icon;
+    gzip_disable "MSIE [1-6]\.";
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' http://localhost:8000 ws://localhost:8000;" always;
+
+    # Angular App
+    server {
+        listen 8080;
+        server_name localhost;
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+
+        # Rate limiting
+        limit_req zone=one burst=20 nodelay;
+
+        # Angular routes - serve index.html for all routes
+        location / {
+            try_files $uri $uri/ /index.html;
+            expires -1;
+            add_header Cache-Control 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
+        }
+
+	# Cache static assets
+	location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, no-transform";
+            access_log off;
+        }
+
+        # API Proxy
+       location /api/ {
+    # Docker's internal DNS server
+    resolver 127.0.0.11 valid=30s;
+    set $backend_upstream http://backend:8000;
+
+    proxy_pass $backend_upstream$request_uri;
+    
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_cache_bypass $http_upgrade;
+
+    # Timeouts
+    proxy_connect_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+
+    # Buffer settings
+    proxy_buffers 8 16k;
+    proxy_buffer_size 32k;
+         } 
+
+        # Static files with cache
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            add_header Access-Control-Allow-Origin "*";
+            try_files $uri =404;
+        }
+
+        # Uploads proxy
+        location /uploads/ {
+            proxy_pass http://backend:8000/uploads/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Error pages
+        error_page 404 /index.html;
+        error_page 500 502 503 504 /50x.html;
+        location = /50x.html {
+            root /usr/share/nginx/html;
+        }
+
+        # Deny access to hidden files
+        location ~ /\. {
+            deny all;
+            access_log off;
+            log_not_found off;
+        }
+
+        # Deny access to specific files
+        location ~* (\.git|\.env|composer\.json|composer\.lock|package\.json|package-lock\.json) {
+            deny all;
+            access_log off;
+            log_not_found off;
+        }
+    }
+}

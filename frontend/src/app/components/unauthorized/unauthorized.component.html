@@ -1,0 +1,129 @@
+<div class="unauthorized-container">
+  <div class="error-content">
+    <!-- Animated Lock Icon -->
+    <div class="lock-container">
+      <div class="lock-body">
+        <div class="lock-top"></div>
+        <div class="lock-bottom"></div>
+      </div>
+      <div class="lock-hole"></div>
+      <div class="lock-shackle">
+        <div class="shackle-left"></div>
+        <div class="shackle-right"></div>
+      </div>
+    </div>
+    
+    <!-- Error Code -->
+    <div class="error-code">
+      <span class="code-digit">4</span>
+      <span class="code-digit">0</span>
+      <span class="code-digit">3</span>
+    </div>
+    
+    <!-- Error Message -->
+    <h1 class="error-title">{{ errorMessage }}</h1>
+    
+    <!-- Error Description -->
+    <p class="error-description">
+      {{ suggestion }}
+    </p>
+    
+    <!-- Permission Details -->
+    <div class="permission-details card">
+      <div class="card-body">
+        <h5 class="card-title">
+          <i class="fas fa-user-shield me-2"></i>Permission Details
+        </h5>
+        <div class="permission-info">
+          <div class="permission-item">
+            <span class="permission-label">Your Role:</span>
+            <span class="permission-value badge bg-info">
+              {{ getRoleDisplayName(userRole) }}
+            </span>
+          </div>
+          <div class="permission-item">
+            <span class="permission-label">Required Role:</span>
+            <span class="permission-value badge bg-danger">
+              {{ getRoleDisplayName(requiredRole) }}
+            </span>
+          </div>
+          <div class="permission-item">
+            <span class="permission-label">Access Level:</span>
+            <span class="permission-value">
+              <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+              Insufficient Permissions
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="error-actions">
+      <button class="btn btn-primary btn-lg" routerLink="/dashboard">
+        <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+      </button>
+      <button class="btn btn-outline-secondary btn-lg" (click)="goBack()">
+        <i class="fas fa-arrow-left me-2"></i>Go Back
+      </button>
+      <button class="btn btn-warning btn-lg" (click)="requestAccess()">
+        <i class="fas fa-key me-2"></i>Request Access
+      </button>
+    </div>
+    
+    <!-- Contact Support -->
+    <div class="support-section">
+      <p class="text-muted">If you believe this is an error, please contact support:</p>
+      <button class="btn btn-outline-primary" (click)="contactSupport()">
+        <i class="fas fa-headset me-2"></i>Contact Support
+      </button>
+    </div>
+    
+    <!-- Available Pages -->
+    <div class="available-pages">
+      <h6>
+        <i class="fas fa-folder-open me-2"></i>
+        Pages You Can Access:
+      </h6>
+      <div class="pages-grid">
+        <a routerLink="/dashboard" class="page-card">
+          <div class="page-icon">
+            <i class="fas fa-tachometer-alt"></i>
+          </div>
+          <div class="page-info">
+            <div class="page-title">Dashboard</div>
+            <div class="page-description">View your dashboard</div>
+          </div>
+        </a>
+        <a *ngIf="['USER', 'DEVELOPER', 'TEAM_LEAD', 'PROJECT_MANAGER', 'ADMIN'].includes(userRole)" 
+           routerLink="/projects" class="page-card">
+          <div class="page-icon">
+            <i class="fas fa-project-diagram"></i>
+          </div>
+          <div class="page-info">
+            <div class="page-title">Projects</div>
+            <div class="page-description">Manage your projects</div>
+          </div>
+        </a>
+        <a routerLink="/profile" class="page-card">
+          <div class="page-icon">
+            <i class="fas fa-user"></i>
+          </div>
+          <div class="page-info">
+            <div class="page-title">Profile</div>
+            <div class="page-description">Update your profile</div>
+          </div>
+        </a>
+        <a routerLink="/settings" class="page-card">
+          <div class="page-icon">
+            <i class="fas fa-cog"></i>
+          </div>
+          <div class="page-info">
+            <div class="page-title">Settings</div>
+            <div class="page-description">App preferences</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

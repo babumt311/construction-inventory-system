@@ -1,0 +1,258 @@
+<!-- audit-logs.component.html -->
+<div class="audit-logs-container">
+  <!-- Header Section -->
+  <div class="audit-logs-header">
+    <h1>Audit Logs</h1>
+    <div class="header-controls">
+      <button mat-raised-button color="primary" (click)="refreshLogs()" [disabled]="loading">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+      <button mat-raised-button color="accent" (click)="exportLogs()" [disabled]="!dataSource.data.length">
+        <mat-icon>download</mat-icon>
+        Export CSV
+      </button>
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search logs...</mat-label>
+        <input matInput [(ngModel)]="searchTerm" (ngModelChange)="applyFilter()" placeholder="Search by user, action, or entity">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <mat-card class="filters-card">
+    <div class="filters-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>User</mat-label>
+        <mat-select [(value)]="selectedUser" (selectionChange)="applyFilters()" multiple>
+          <mat-option [value]="null">All Users</mat-option>
+          <mat-option *ngFor="let user of uniqueUsers" [value]="user">{{ user }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Action Type</mat-label>
+        <mat-select [(value)]="selectedAction" (selectionChange)="applyFilters()" multiple>
+          <mat-option [value]="null">All Actions</mat-option>
+          <mat-option *ngFor="let action of actionTypes" [value]="action">{{ action }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Entity Type</mat-label>
+        <mat-select [(value)]="selectedEntity" (selectionChange)="applyFilters()" multiple>
+          <mat-option [value]="null">All Entities</mat-option>
+          <mat-option *ngFor="let entity of entityTypes" [value]="entity">{{ entity }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Date Range</mat-label>
+        <mat-date-range-input [rangePicker]="dateRangePicker">
+          <input matStartDate [(ngModel)]="dateRange.start" (dateChange)="applyFilters()" placeholder="Start date">
+          <input matEndDate [(ngModel)]="dateRange.end" (dateChange)="applyFilters()" placeholder="End date">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matSuffix [for]="dateRangePicker"></mat-datepicker-toggle>
+        <mat-date-range-picker #dateRangePicker></mat-date-range-picker>
+        <button mat-icon-button matSuffix *ngIf="dateRange.start || dateRange.end" (click)="clearDateFilter()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+    </div>
+
+    <div class="filter-actions">
+      <button mat-button (click)="clearAllFilters()">
+        <mat-icon>clear_all</mat-icon>
+        Clear All Filters
+      </button>
+      <span class="filter-count" *ngIf="filteredCount !== totalCount">
+        Showing {{ filteredCount }} of {{ totalCount }} logs
+      </span>
+    </div>
+  </mat-card>
+
+  <!-- Loading Indicator -->
+  <div class="loading-container" *ngIf="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+    <span>Loading audit logs...</span>
+  </div>
+
+  <!-- Error Message -->
+  <div class="error-container" *ngIf="error">
+    <mat-card class="error-card">
+      <mat-icon color="warn">error</mat-icon>
+      <h3>Failed to load audit logs</h3>
+      <p>{{ error }}</p>
+      <button mat-raised-button color="primary" (click)="loadAuditLogs()">
+        Retry
+      </button>
+    </mat-card>
+  </div>
+
+  <!-- No Data Message -->
+  <div class="no-data-container" *ngIf="!loading && !error && dataSource.filteredData.length === 0">
+    <mat-card class="no-data-card">
+      <mat-icon>info</mat-icon>
+      <h3>No audit logs found</h3>
+      <p *ngIf="hasActiveFilters">Try adjusting your filters or clear them to see all logs.</p>
+      <p *ngIf="!hasActiveFilters">No audit logs have been recorded yet.</p>
+      <button mat-button *ngIf="hasActiveFilters" (click)="clearAllFilters()">
+        Clear Filters
+      </button>
+    </mat-card>
+  </div>
+
+  <!-- Audit Logs Table -->
+  <div class="audit-logs-table-container" *ngIf="!loading && !error && dataSource.filteredData.length > 0">
+    <div class="table-actions">
+      <mat-form-field appearance="outline" class="page-size-selector">
+        <mat-label>Items per page</mat-label>
+        <mat-select [(value)]="pageSize" (selectionChange)="onPageSizeChange($event.value)">
+          <mat-option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <span class="table-info">
+        Showing {{ getDisplayRange() }} of {{ dataSource.filteredData.length }} entries
+      </span>
+    </div>
+
+    <div class="table-responsive">
+      <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z1">
+        <!-- Timestamp Column -->
+        <ng-container matColumnDef="timestamp">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>
+            <mat-icon>schedule</mat-icon>
+            Timestamp
+          </th>
+          <td mat-cell *matCellDef="let log">
+            <div class="timestamp-cell">
+              <span class="date">{{ log.timestamp | date:'mediumDate' }}</span>
+              <span class="time">{{ log.timestamp | date:'shortTime' }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- User Column -->
+        <ng-container matColumnDef="user">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>
+            <mat-icon>person</mat-icon>
+            User
+          </th>
+          <td mat-cell *matCellDef="let log">
+            <div class="user-cell">
+              <mat-icon class="user-icon">account_circle</mat-icon>
+              <div class="user-info">
+                <span class="username">{{ log.username || 'System' }}</span>
+                <span class="user-role" *ngIf="log.userRole">{{ log.userRole }}</span>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Action Column -->
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>
+            <mat-icon>play_arrow</mat-icon>
+            Action
+          </th>
+          <td mat-cell *matCellDef="let log">
+            <span class="action-badge" [ngClass]="getActionClass(log.action)">
+              {{ log.action }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Entity Column -->
+        <ng-container matColumnDef="entity">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>
+            <mat-icon>category</mat-icon>
+            Entity
+          </th>
+          <td mat-cell *matCellDef="let log">
+            <div class="entity-cell">
+              <mat-icon class="entity-icon">{{ getEntityIcon(log.entityType) }}</mat-icon>
+              <span>{{ log.entityType }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Entity ID Column -->
+        <ng-container matColumnDef="entityId">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-icon>fingerprint</mat-icon>
+            Entity ID
+          </th>
+          <td mat-cell *matCellDef="let log">
+            <code class="entity-id">{{ log.entityId || 'N/A' }}</code>
+          </td>
+        </ng-container>
+
+        <!-- Details Column -->
+        <ng-container matColumnDef="details">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-icon>info</mat-icon>
+            Details
+          </th>
+          <td mat-cell *matCellDef="let log">
+            <div class="details-cell" [title]="log.details">
+              {{ log.details | truncate:50 }}
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>
+            <mat-icon>check_circle</mat-icon>
+            Status
+          </th>
+          <td mat-cell *matCellDef="let log">
+            <span class="status-badge" [ngClass]="log.success ? 'success' : 'error'">
+              <mat-icon>{{ log.success ? 'check_circle' : 'error' }}</mat-icon>
+              {{ log.success ? 'Success' : 'Failed' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- IP Address Column -->
+        <ng-container matColumnDef="ipAddress">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-icon>language</mat-icon>
+            IP Address
+          </th>
+          <td mat-cell *matCellDef="let log">
+            <code class="ip-address">{{ log.ipAddress || 'N/A' }}</code>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let log">
+            <button mat-icon-button color="primary" (click)="viewLogDetails(log)" matTooltip="View Details">
+              <mat-icon>visibility</mat-icon>
+            </button>
+            <button mat-icon-button color="accent" (click)="copyLogDetails(log)" matTooltip="Copy Details">
+              <mat-icon>content_copy</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
+
+    <!-- Paginator -->
+    <mat-paginator [length]="dataSource.filteredData.length"
+                   [pageSize]="pageSize"
+                   [pageSizeOptions]="pageSizeOptions"
+                   (page)="onPageChange($event)"
+                   aria-label="Select page of audit logs">
+    </mat-paginator>
+  </div>
+
+  <!-- Details Dialog will be opened via component -->
+</div>

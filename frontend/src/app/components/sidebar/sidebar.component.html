@@ -1,0 +1,22 @@
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h5>Menu</h5>
+  </div>
+  
+  <nav class="sidebar-nav">
+    <ul class="nav flex-column">
+      <li class="nav-item" *ngFor="let item of menuItems">
+        <a 
+          *ngIf="hasAccess(item.roles)"
+          class="nav-link" 
+          [routerLink]="item.route"
+          [class.active]="isActive(item.route)"
+          routerLinkActive="active">
+          <i class="bi" [ngClass]="item.icon"></i>
+          <span>{{ item.title }}</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+</div>
+

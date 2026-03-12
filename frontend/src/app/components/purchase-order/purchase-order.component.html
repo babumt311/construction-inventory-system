@@ -1,0 +1,421 @@
+<div class="purchase-order-container">
+  <div class="header-section mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h2><i class="fas fa-file-invoice-dollar me-2 text-primary"></i>Purchase Orders</h2>
+        <p class="text-muted mb-0">Manage material purchases and supplier invoices</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" (click)="openPODialog()">
+          <i class="fas fa-plus me-2"></i>New Purchase Order
+        </button>
+        <button class="btn btn-success" (click)="openSupplierDialog()">
+          <i class="fas fa-truck me-2"></i>Add Supplier
+        </button>
+        <button class="btn btn-outline-secondary" (click)="exportPOReport()">
+          <i class="fas fa-file-export me-2"></i>Export
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <form [formGroup]="filterForm">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Project</label>
+            <select class="form-control" formControlName="project_id">
+              <option value="">All Projects</option>
+              <option *ngFor="let project of projects" [value]="project.id">
+                {{ project.name }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="col-md-3">
+            <label class="form-label">Supplier</label>
+            <select class="form-control" formControlName="supplier_name">
+              <option value="">All Suppliers</option>
+              <option *ngFor="let supplier of suppliers" [value]="supplier">
+                {{ supplier }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="col-md-2">
+            <label class="form-label">Start Date</label>
+            <input type="date" class="form-control" formControlName="start_date">
+          </div>
+          
+          <div class="col-md-2">
+            <label class="form-label">End Date</label>
+            <input type="date" class="form-control" formControlName="end_date">
+          </div>
+          
+          <div class="col-md-2 d-flex align-items-end">
+            <div class="w-100">
+              <button class="btn btn-primary w-100 me-2" (click)="applyFilters()" [disabled]="loading">
+                <i class="fas fa-filter"></i> Filter
+              </button>
+              <button class="btn btn-outline-secondary w-100 mt-2" (click)="clearFilters()">
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card summary-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted mb-1">Total Orders</h6>
+              <h3 class="mb-0">{{ poEntries.length }}</h3>
+            </div>
+            <div class="avatar bg-primary">
+              <i class="fas fa-file-invoice fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3">
+      <div class="card summary-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted mb-1">Total Cost</h6>
+              <h3 class="mb-0">₹{{ getTotalCost() | number:'1.2-2' }}</h3>
+            </div>
+            <div class="avatar bg-success">
+              <i class="fas fa-rupee-sign fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3">
+      <div class="card summary-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted mb-1">Pending Delivery</h6>
+              <h3 class="mb-0">{{ getPendingDeliveryCount() }}</h3>
+            </div>
+            <div class="avatar bg-warning">
+              <i class="fas fa-clock fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3">
+      <div class="card summary-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted mb-1">Suppliers</h6>
+              <h3 class="mb-0">{{ suppliers.length }}</h3>
+            </div>
+            <div class="avatar bg-info">
+              <i class="fas fa-truck fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table mat-table [dataSource]="dataSource" matSort class="w-100">
+          
+          <ng-container matColumnDef="po_date">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
+            <td mat-cell *matCellDef="let po">
+              {{ po.po_date | date:'shortDate' }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="invoice_no">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Invoice No</th>
+            <td mat-cell *matCellDef="let po">
+              <strong>{{ po.invoice_no }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="project">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Project</th>
+            <td mat-cell *matCellDef="let po">
+              <span class="badge bg-secondary">
+                {{ getProjectName(po.project_id) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="material">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Material</th>
+            <td mat-cell *matCellDef="let po">
+              {{ getMaterialName(po.material_id) }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="quantity">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Quantity</th>
+            <td mat-cell *matCellDef="let po">
+              {{ po.quantity }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="unit_price">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Unit Price</th>
+            <td mat-cell *matCellDef="let po">
+              ₹{{ po.unit_price | number:'1.2-2' }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_cost">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Total Cost</th>
+            <td mat-cell *matCellDef="let po">
+              <strong class="text-success">₹{{ po.total_cost | number:'1.2-2' }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="supplier">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Supplier</th>
+            <td mat-cell *matCellDef="let po">
+              {{ po.supplier_name }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="text-end">Actions</th>
+            <td mat-cell *matCellDef="let po" class="text-end">
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-info" (click)="viewPODetails(po)" title="View">
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-outline-primary" (click)="editPO(po)" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-outline-success" *ngIf="!po.delivery_date" 
+                        (click)="markAsReceived(po.id)" title="Mark as Received">
+                  <i class="fas fa-check"></i>
+                </button>
+                <button class="btn btn-outline-danger" (click)="deletePO(po.id)" title="Delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+
+        <div class="text-center py-5" *ngIf="dataSource.data.length === 0">
+          <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+          <h5>No Purchase Orders Found</h5>
+          <p class="text-muted">Create your first purchase order to get started.</p>
+          <button class="btn btn-primary" (click)="openPODialog()">
+            <i class="fas fa-plus me-2"></i>Create Purchase Order
+          </button>
+        </div>
+
+        <div class="text-center py-5" *ngIf="loading">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2">Loading purchase orders...</p>
+        </div>
+      </div>
+
+      <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons 
+                     aria-label="Select page of purchase orders" *ngIf="dataSource.data.length > 0">
+      </mat-paginator>
+    </div>
+  </div>
+</div>
+
+<ng-template #poDialog>
+  <div class="modal-header">
+    <h5 class="modal-title">
+      <i class="fas fa-file-invoice-dollar me-2"></i>
+      {{ isEditing ? 'Edit Purchase Order' : 'New Purchase Order' }}
+    </h5>
+    <button type="button" class="btn-close" (click)="dialog.closeAll(); resetForm()"></button>
+  </div>
+  <div class="modal-body">
+    <form [formGroup]="poForm" (ngSubmit)="isEditing ? updatePO() : createPO()">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Project *</label>
+          <select class="form-control" formControlName="project_id"
+                  [class.is-invalid]="poForm.get('project_id')?.invalid && poForm.get('project_id')?.touched">
+            <option value="">Select Project</option>
+            <option *ngFor="let project of projects" [value]="project.id">
+              {{ project.name }} ({{ project.code }})
+            </option>
+          </select>
+          <div class="invalid-feedback" *ngIf="poForm.get('project_id')?.errors?.['required']">
+            Project is required
+          </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Material *</label>
+          <select class="form-control" formControlName="material_id" (change)="onMaterialChange($any($event.target).value)"
+                  [class.is-invalid]="poForm.get('material_id')?.invalid && poForm.get('material_id')?.touched">
+            <option value="">Select Material</option>
+            <option *ngFor="let material of materials" [value]="material.id">
+              {{ material.name }} ({{ material.unit }})
+            </option>
+          </select>
+          <div class="invalid-feedback" *ngIf="poForm.get('material_id')?.errors?.['required']">
+            Material is required
+          </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Supplier Name *</label>
+          <input type="text" class="form-control" formControlName="supplier_name"
+                 [class.is-invalid]="poForm.get('supplier_name')?.invalid && poForm.get('supplier_name')?.touched">
+          <div class="invalid-feedback" *ngIf="poForm.get('supplier_name')?.errors?.['required']">
+            Supplier name is required
+          </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Invoice No *</label>
+          <input type="text" class="form-control" formControlName="invoice_no"
+                 [class.is-invalid]="poForm.get('invoice_no')?.invalid && poForm.get('invoice_no')?.touched">
+          <div class="invalid-feedback" *ngIf="poForm.get('invoice_no')?.errors?.['required']">
+            Invoice number is required
+          </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Quantity *</label>
+          <input type="number" step="0.01" class="form-control" formControlName="quantity"
+                 [class.is-invalid]="poForm.get('quantity')?.invalid && poForm.get('quantity')?.touched">
+          <div class="invalid-feedback" *ngIf="poForm.get('quantity')?.errors?.['required']">
+            Quantity is required
+          </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Unit Price (₹) *</label>
+          <input type="number" step="0.01" class="form-control" formControlName="unit_price"
+                 [class.is-invalid]="poForm.get('unit_price')?.invalid && poForm.get('unit_price')?.touched">
+          <div class="invalid-feedback" *ngIf="poForm.get('unit_price')?.errors?.['required']">
+            Unit price is required
+          </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Total Cost (₹)</label>
+          <input type="text" class="form-control" formControlName="total_cost" readonly>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">PO Date</label>
+          <input type="date" class="form-control" formControlName="po_date">
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Delivery Date</label>
+          <input type="date" class="form-control" formControlName="delivery_date">
+        </div>
+
+        <div class="col-md-12 mb-3">
+          <label class="form-label">Remarks</label>
+          <textarea class="form-control" formControlName="remarks" rows="3"></textarea>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-secondary" (click)="dialog.closeAll(); resetForm()">
+          Cancel
+        </button>
+        <button type="submit" class="btn btn-primary" [disabled]="poForm.invalid || loading">
+          <span *ngIf="!loading">
+            {{ isEditing ? 'Update Purchase Order' : 'Create Purchase Order' }}
+          </span>
+          <span *ngIf="loading">
+            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+            Processing...
+          </span>
+        </button>
+      </div>
+    </form>
+  </div>
+</ng-template>
+
+<ng-template #supplierDialog>
+  <div class="modal-header">
+    <h5 class="modal-title">
+      <i class="fas fa-truck me-2"></i>
+      Add New Supplier
+    </h5>
+    <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
+  </div>
+  <div class="modal-body">
+    <form [formGroup]="supplierForm">
+      <div class="row">
+        <div class="col-md-12 mb-3">
+          <label class="form-label">Supplier Name *</label>
+          <input type="text" class="form-control" formControlName="name"
+                 [class.is-invalid]="supplierForm.get('name')?.invalid && supplierForm.get('name')?.touched">
+          <div class="invalid-feedback" *ngIf="supplierForm.get('name')?.errors?.['required']">
+            Supplier name is required
+          </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Contact Person</label>
+          <input type="text" class="form-control" formControlName="contact_person">
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Phone</label>
+          <input type="tel" class="form-control" formControlName="phone">
+        </div>
+
+        <div class="col-md-12 mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-control" formControlName="email"
+                 [class.is-invalid]="supplierForm.get('email')?.invalid && supplierForm.get('email')?.touched">
+          <div class="invalid-feedback" *ngIf="supplierForm.get('email')?.errors?.['email']">
+            Please enter a valid email
+          </div>
+        </div>
+
+        <div class="col-md-12 mb-3">
+          <label class="form-label">Address</label>
+          <textarea class="form-control" formControlName="address" rows="2"></textarea>
+        </div>
+
+        <div class="col-md-12 mb-3">
+          <label class="form-label">Tax ID</label>
+          <input type="text" class="form-control" formControlName="tax_id">
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="dialog.closeAll()">Cancel</button>
+    <button type="button" class="btn btn-primary" (click)="addSupplier()" 
+            [disabled]="supplierForm.invalid">
+      Add Supplier
+    </button>
+  </div>
+</ng-template>

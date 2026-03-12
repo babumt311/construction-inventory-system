@@ -1,0 +1,63 @@
+# ============================================
+# Dedicated Dockerfile for Celery Worker
+# ============================================
+
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    CELERY_BROKER_URL=redis://redis:6379/0 \
+    CELERY_RESULT_BACKEND=redis://redis:6379/0 \
+    C_FORCE_ROOT=false
+
+# Prevent Python from writing .pyc files
+ENV PYTHONPATH=/app
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt requirements-celery.txt ./
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-celery.txt
+
+# Copy application code
+COPY . .
+
+# Create directories
+RUN mkdir -p /app/logs /app/backups && \
+    chmod 755 /app/logs /app/backups
+
+# Create non-root user
+RUN groupadd -g 1000 celery && \
+    useradd -u 1000 -g celery -m -d /home/celery -s /bin/bash celery && \
+    chown -R celery:celery /app
+
+USER celery
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
+    CMD celery -A app.tasks.celery_app inspect ping -d celery@$HOSTNAME || exit 1
+
+# Default command
+CMD ["celery", \
+     "-A", "app.tasks.celery_app", \
+     "worker", \
+     "--loglevel=info", \
+     "--concurrency=4", \
+     "--max-tasks-per-child=100", \
+     "--autoscale=10,3", \
+     "--queues=default,reports,daily", \
+     "-E", \
+     "--hostname=celery@%h"]

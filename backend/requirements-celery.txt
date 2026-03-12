@@ -1,0 +1,20 @@
+# Celery and related dependencies
+celery==5.3.4
+redis==5.0.1
+flower==2.0.1  # Optional: for monitoring
+
+# Database drivers for Celery
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+
+# Task serialization
+msgpack==1.0.7
+
+# Optional: for better monitoring
+celery-prometheus-exporter==1.7.0
+
+# Optional: for task result backend
+django-celery-results==2.5.1
+
+# Optional: for database as result backend
+django-celery-beat==2.5.0

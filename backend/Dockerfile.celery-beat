@@ -1,0 +1,53 @@
+# ============================================
+# Dedicated Dockerfile for Celery Beat
+# ============================================
+
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    CELERY_BROKER_URL=redis://redis:6379/0 \
+    CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt requirements-celery.txt ./
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-celery.txt
+
+# Copy application code
+COPY . .
+
+# Create directories
+RUN mkdir -p /app/logs /tmp/celery && \
+    chmod 755 /app/logs /tmp/celery
+
+# Create non-root user
+RUN groupadd -g 1000 celery && \
+    useradd -u 1000 -g celery -m -d /home/celery -s /bin/bash celery && \
+    chown -R celery:celery /app
+
+USER celery
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
+    CMD [ -f /tmp/celerybeat-schedule ] || exit 1
+
+# Default command
+CMD ["celery", "-A", "app.tasks.celery_app", "beat", \
+     "--loglevel=info", \
+     "--schedule=/tmp/celerybeat-schedule", \
+     "--pidfile=/tmp/celerybeat.pid"]

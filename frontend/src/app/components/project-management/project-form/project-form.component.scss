@@ -1,0 +1,292 @@
+.project-form-container {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+  .form-header {
+    margin-bottom: 24px;
+
+    h2 {
+      margin: 0;
+      color: #1e293b;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .form-subtitle {
+      color: #64748b;
+      font-size: 0.875rem;
+      margin-top: 4px;
+    }
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+
+    .form-group {
+      &.full-width {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 6px;
+        color: #475569;
+        font-size: 0.875rem;
+        font-weight: 500;
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+
+        &:focus {
+          outline: none;
+          border-color: #667eea;
+          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        &.invalid {
+          border-color: #ef4444;
+        }
+
+        &.invalid:focus {
+          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        &[type="date"] {
+          cursor: pointer;
+        }
+
+        &[type="number"] {
+          &::-webkit-inner-spin-button,
+          &::-webkit-outer-spin-button {
+            opacity: 1;
+          }
+        }
+
+        &.select {
+          background: white;
+          cursor: pointer;
+        }
+
+        textarea {
+          resize: vertical;
+          min-height: 80px;
+          font-family: inherit;
+        }
+      }
+
+      .error-message {
+        color: #ef4444;
+        font-size: 0.75rem;
+        margin-top: 4px;
+        min-height: 16px;
+      }
+
+      .team-members-selector {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+
+        .member-checkbox {
+          display: flex;
+          align-items: center;
+          padding: 8px;
+          border-radius: 4px;
+          transition: background-color 0.2s;
+
+          &:hover {
+            background: #f1f5f9;
+          }
+
+          input[type="checkbox"] {
+            margin-right: 12px;
+            cursor: pointer;
+          }
+
+          label {
+            flex: 1;
+            cursor: pointer;
+            margin: 0;
+
+            .member-name {
+              display: block;
+              font-weight: 500;
+              color: #1e293b;
+            }
+
+            .member-role {
+              display: block;
+              font-size: 0.75rem;
+              color: #64748b;
+              margin-top: 2px;
+            }
+          }
+        }
+      }
+
+      .no-members-message {
+        background: #f8fafc;
+        border: 1px dashed #e2e8f0;
+        border-radius: 6px;
+        padding: 24px;
+        text-align: center;
+        color: #64748b;
+
+        .material-icons {
+          font-size: 32px;
+          margin-bottom: 12px;
+          color: #cbd5e1;
+        }
+
+        p {
+          margin: 0;
+          font-size: 0.875rem;
+        }
+      }
+
+      .tags-container {
+        .tags-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-bottom: 12px;
+
+          .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #e0e7ff;
+            color: #4f46e5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+
+            .tag-remove {
+              background: none;
+              border: none;
+              color: #4f46e5;
+              cursor: pointer;
+              padding: 0;
+              width: 16px;
+              height: 16px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border-radius: 50%;
+              transition: background-color 0.2s;
+
+              &:hover {
+                background: rgba(79, 70, 229, 0.1);
+              }
+
+              .material-icons {
+                font-size: 14px;
+              }
+            }
+          }
+        }
+
+        .tags-suggestions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+
+          .tag-suggestion {
+            background: #f8fafc;
+            color: #64748b;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+
+            &:hover {
+              background: #e2e8f0;
+              color: #475569;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 24px;
+    border-top: 1px solid #e2e8f0;
+
+    .btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      &.btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+
+        &:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+      }
+
+      &.btn-secondary {
+        background: white;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+
+        &:hover {
+          background: #f8fafc;
+          border-color: #cbd5e1;
+        }
+      }
+    }
+  }
+}
+
+// Scrollbar styling for team members selector
+.team-members-selector::-webkit-scrollbar {
+  width: 6px;
+}
+
+.team-members-selector::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.team-members-selector::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.team-members-selector::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

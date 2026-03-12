@@ -1,0 +1,303 @@
+<div class="material-management-container">
+  <!-- Header Section -->
+  <div class="header-section mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h2><i class="fas fa-boxes me-2 text-primary"></i>Material Management</h2>
+        <p class="text-muted mb-0">Manage construction materials and categories</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" (click)="openUploadDialog()">
+          <i class="fas fa-file-excel me-2"></i>Upload Excel
+        </button>
+        <button class="btn btn-success" (click)="openCategoryDialog()">
+          <i class="fas fa-plus me-2"></i>Add Category
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Material Form -->
+  <div class="card mb-4">
+    <div class="card-header bg-light">
+      <h5 class="mb-0">
+        <i class="fas" [class.fa-edit]="isEditing" [class.fa-plus]="!isEditing"></i>
+        {{ isEditing ? 'Edit Material' : 'Add New Material' }}
+      </h5>
+    </div>
+    <div class="card-body">
+      <form [formGroup]="materialForm" (ngSubmit)="isEditing ? updateMaterial() : createMaterial()">
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Material Name *</label>
+            <input type="text" class="form-control" formControlName="name" 
+                   [class.is-invalid]="materialForm.get('name')?.invalid && materialForm.get('name')?.touched">
+            <div class="invalid-feedback" *ngIf="materialForm.get('name')?.errors?.['required']">
+              Material name is required
+            </div>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Category *</label>
+            <select class="form-control" formControlName="category_id"
+                    [class.is-invalid]="materialForm.get('category_id')?.invalid && materialForm.get('category_id')?.touched">
+              <option value="">Select Category</option>
+              <option *ngFor="let category of categories" [value]="category.id">
+                {{ category.name }}
+              </option>
+            </select>
+            <div class="invalid-feedback" *ngIf="materialForm.get('category_id')?.errors?.['required']">
+              Category is required
+            </div>
+          </div>
+
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Unit</label>
+            <input type="text" class="form-control" formControlName="unit" 
+                   placeholder="e.g., kg, meter, piece">
+          </div>
+
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Standard Cost (₹)</label>
+            <input type="number" step="0.01" class="form-control" formControlName="standard_cost"
+                   [class.is-invalid]="materialForm.get('standard_cost')?.invalid && materialForm.get('standard_cost')?.touched">
+            <div class="invalid-feedback" *ngIf="materialForm.get('standard_cost')?.errors?.['min']">
+              Cost must be 0 or greater
+            </div>
+          </div>
+
+          <div class="col-md-12 mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" formControlName="description" rows="3"></textarea>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-secondary" (click)="resetForm()" *ngIf="isEditing">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="materialForm.invalid || loading">
+            <span *ngIf="!loading">
+              {{ isEditing ? 'Update Material' : 'Create Material' }}
+            </span>
+            <span *ngIf="loading">
+              <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              Processing...
+            </span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Search and Filters -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="fas fa-search"></i>
+            </span>
+            <input type="text" class="form-control" placeholder="Search materials..." 
+                   [(ngModel)]="searchTerm" (input)="applyFilter()">
+          </div>
+        </div>
+        <div class="col-md-6 text-end">
+          <button class="btn btn-outline-secondary" (click)="loadMaterials()" [disabled]="loading">
+            <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i> Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Materials Table -->
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table mat-table [dataSource]="dataSource" matSort class="w-100">
+          
+          <!-- ID Column -->
+          <ng-container matColumnDef="id">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>ID</th>
+            <td mat-cell *matCellDef="let material">
+              <span class="badge bg-secondary">#{{ material.id }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Name Column -->
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Material Name</th>
+            <td mat-cell *matCellDef="let material">
+              <strong>{{ material.name }}</strong>
+              <small class="d-block text-muted" *ngIf="material.description">
+                {{ material.description | truncate:50 }}
+              </small>
+            </td>
+          </ng-container>
+
+          <!-- Category Column -->
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+            <td mat-cell *matCellDef="let material">
+              <span class="badge bg-info">
+                {{ getCategoryName(material.category_id) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Unit Column -->
+          <ng-container matColumnDef="unit">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Unit</th>
+            <td mat-cell *matCellDef="let material">
+              {{ material.unit || 'N/A' }}
+            </td>
+          </ng-container>
+
+          <!-- Cost Column -->
+          <ng-container matColumnDef="standard_cost">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Standard Cost</th>
+            <td mat-cell *matCellDef="let material">
+              ₹{{ material.standard_cost | number:'1.2-2' }}
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="text-end">Actions</th>
+            <td mat-cell *matCellDef="let material" class="text-end">
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary" (click)="editMaterial(material)" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-outline-danger" (click)="deleteMaterial(material.id)" title="Delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+
+        <!-- Empty State -->
+        <div class="text-center py-5" *ngIf="dataSource.data.length === 0">
+          <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+          <h5>No Materials Found</h5>
+          <p class="text-muted">Start by adding your first material or upload an Excel file.</p>
+          <button class="btn btn-primary" (click)="openUploadDialog()">
+            <i class="fas fa-file-excel me-2"></i>Upload Materials
+          </button>
+        </div>
+
+        <!-- Loading State -->
+        <div class="text-center py-5" *ngIf="loading && dataSource.data.length === 0">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2">Loading materials...</p>
+        </div>
+      </div>
+
+      <!-- Paginator -->
+      <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons 
+                     aria-label="Select page of materials" *ngIf="dataSource.data.length > 0">
+      </mat-paginator>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Dialog -->
+<ng-template #uploadDialog>
+  <div class="modal-header">
+    <h5 class="modal-title">
+      <i class="fas fa-file-excel me-2 text-success"></i>Upload Materials
+    </h5>
+    <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
+  </div>
+  <div class="modal-body">
+    <div class="mb-3">
+      <label class="form-label">Select Excel/CSV File</label>
+      <div class="input-group">
+        <input type="file" class="form-control" accept=".xlsx,.xls,.csv" (change)="onFileSelected($event)">
+        <button class="btn btn-outline-secondary" type="button" (click)="downloadTemplate()">
+          <i class="fas fa-download"></i> Template
+        </button>
+      </div>
+      <small class="form-text text-muted">
+        Supported formats: .xlsx, .xls, .csv. Max file size: 10MB
+      </small>
+    </div>
+
+    <div *ngIf="selectedFile" class="alert alert-info">
+      <i class="fas fa-file me-2"></i>
+      Selected: {{ selectedFile.name }} ({{ selectedFile.size | filesize }})
+    </div>
+
+    <div class="mb-3" *ngIf="uploadProgress > 0">
+      <label class="form-label">Upload Progress</label>
+      <div class="progress">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+             role="progressbar" [style.width.%]="uploadProgress">
+          {{ uploadProgress }}%
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-light">
+      <h6><i class="fas fa-info-circle me-2"></i>Excel Format</h6>
+      <p class="mb-1">Required columns: <code>category</code>, <code>material_name</code>, <code>unit</code></p>
+      <p class="mb-0">Optional columns: <code>description</code>, <code>standard_cost</code></p>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="dialog.closeAll()">Cancel</button>
+    <button type="button" class="btn btn-primary" (click)="uploadFile()" [disabled]="!selectedFile || loading">
+      <span *ngIf="!loading">Upload</span>
+      <span *ngIf="loading">
+        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+        Uploading...
+      </span>
+    </button>
+  </div>
+</ng-template>
+
+<!-- Category Dialog -->
+<ng-template #categoryDialog>
+  <div class="modal-header">
+    <h5 class="modal-title">
+      <i class="fas fa-tag me-2 text-primary"></i>Add New Category
+    </h5>
+    <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
+  </div>
+  <div class="modal-body">
+    <form [formGroup]="categoryForm">
+      <div class="mb-3">
+        <label class="form-label">Category Name *</label>
+        <input type="text" class="form-control" formControlName="name"
+               [class.is-invalid]="categoryForm.get('name')?.invalid && categoryForm.get('name')?.touched">
+        <div class="invalid-feedback" *ngIf="categoryForm.get('name')?.errors?.['required']">
+          Category name is required
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" formControlName="description" rows="3"></textarea>
+      </div>
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="dialog.closeAll()">Cancel</button>
+    <button type="button" class="btn btn-primary" (click)="createCategory()" 
+            [disabled]="categoryForm.invalid || loading">
+      <span *ngIf="!loading">Create Category</span>
+      <span *ngIf="loading">
+        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+        Creating...
+      </span>
+    </button>
+  </div>
+</ng-template>

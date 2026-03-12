@@ -1,0 +1,427 @@
+<div class="stock-balance-container">
+  <!-- Header Section -->
+  <div class="header-section mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h2><i class="fas fa-balance-scale me-2 text-primary"></i>Stock Balance</h2>
+        <p class="text-muted mb-0">View and analyze current stock levels across sites</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline-secondary" (click)="toggleViewMode()">
+          <i class="fas" [class.fa-table]="viewMode === 'cards'" [class.fa-th-large]="viewMode === 'table'"></i>
+          {{ viewMode === 'table' ? 'Card View' : 'Table View' }}
+        </button>
+        <button class="btn btn-primary" (click)="exportStockReport()">
+          <i class="fas fa-file-export me-2"></i>Export Report
+        </button>
+        <button class="btn btn-success" (click)="refreshData()" [disabled]="loading">
+          <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i> Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <form [formGroup]="filterForm">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Project</label>
+            <select class="form-control" formControlName="project_id" (change)="onProjectChange($event)">
+              <option value="">All Projects</option>
+              <option *ngFor="let project of projects" [value]="project.id">
+                {{ project.name }} ({{ project.code }})
+              </option>
+            </select>
+          </div>
+          
+          <div class="col-md-3">
+            <label class="form-label">Site</label>
+            <select class="form-control" formControlName="site_id" (change)="onSiteChange($event)">
+              <option value="">Select Site</option>
+              <option *ngFor="let site of sites" [value]="site.id">
+                {{ site.name }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="col-md-3">
+            <label class="form-label">Material</label>
+            <select class="form-control" formControlName="material_id">
+              <option value="">All Materials</option>
+              <option *ngFor="let material of materials" [value]="material.id">
+                {{ material.name }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="col-md-3 d-flex align-items-end">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="negativeOnly" formControlName="show_negative_only">
+              <label class="form-check-label" for="negativeOnly">
+                Show Negative Only
+              </label>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card summary-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted mb-1">Total Materials</h6>
+              <h3 class="mb-0">{{ stockBalances.length }}</h3>
+            </div>
+            <div class="avatar bg-primary">
+              <i class="fas fa-boxes fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3">
+      <div class="card summary-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted mb-1">In Stock</h6>
+               <h3 class="mb-0">{{ getHealthyStockCount() }}</h3>
+            </div>
+            <div class="avatar bg-success">
+              <i class="fas fa-check-circle fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3">
+      <div class="card summary-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted mb-1">Low Stock</h6>
+              <h3 class="mb-0">{{ getLowStockCount() }}</h3>
+            </div>
+            <div class="avatar bg-warning">
+              <i class="fas fa-exclamation-triangle fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-3">
+      <div class="card summary-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted mb-1">Stock Value</h6>
+              <h3 class="mb-0">₹{{ calculateStockValue() | number:'1.2-2' }}</h3>
+            </div>
+            <div class="avatar bg-info">
+              <i class="fas fa-rupee-sign fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock Chart -->
+  <div class="card mb-4" *ngIf="selectedSiteId && stockBalances.length > 0">
+    <div class="card-body">
+      <h5 class="card-title">
+        <i class="fas fa-chart-bar me-2"></i>
+        Stock Balance Overview
+      </h5>
+      <div class="chart-container">
+        <canvas id="stockChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock Balance Table -->
+  <div class="card" *ngIf="viewMode === 'table'">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table mat-table [dataSource]="dataSource" matSort class="w-100">
+          
+          <!-- Material Column -->
+          <ng-container matColumnDef="material">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Material</th>
+            <td mat-cell *matCellDef="let balance">
+              <div class="d-flex align-items-center">
+                <div class="material-icon me-2">
+                  <i class="fas fa-box"></i>
+                </div>
+                <div>
+                  <strong>{{ balance.material_name }}</strong>
+                  <div class="text-muted small">
+                    ID: {{ balance.material_id }}
+                  </div>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Category Column -->
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+            <td mat-cell *matCellDef="let balance">
+              <span class="badge bg-info">
+                {{ getCategoryName(balance.material_id) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Current Balance Column -->
+          <ng-container matColumnDef="current_balance">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Current Balance</th>
+            <td mat-cell *matCellDef="let balance">
+              <div class="d-flex align-items-center">
+                <span class="me-2">{{ balance.current_balance }}</span>
+                <span class="badge" [ngClass]="'bg-' + getStockStatus(balance)">
+                  {{ getStockStatusText(balance) }}
+                </span>
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- Opening Balance Column -->
+          <ng-container matColumnDef="opening_balance">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Opening Balance</th>
+            <td mat-cell *matCellDef="let balance">
+              {{ balance.opening_balance }}
+            </td>
+          </ng-container>
+
+          <!-- Total Received Column -->
+          <ng-container matColumnDef="total_received">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Total Received</th>
+            <td mat-cell *matCellDef="let balance">
+              <span class="text-success">
+                <i class="fas fa-arrow-down me-1"></i>
+                {{ balance.total_received }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Total Used Column -->
+          <ng-container matColumnDef="total_used">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Total Used</th>
+            <td mat-cell *matCellDef="let balance">
+              <span class="text-danger">
+                <i class="fas fa-arrow-up me-1"></i>
+                {{ balance.total_used }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+            <td mat-cell *matCellDef="let balance">
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-info" 
+                        (click)="showMaterialDetails(getMaterial(balance.material_id))">
+                  <i class="fas fa-chart-line"></i> History
+                </button>
+                <button class="btn btn-sm btn-outline-primary" 
+                        *ngIf="balance.has_negative_balance || balance.current_balance < 10">
+                  <i class="fas fa-shopping-cart"></i> Reorder
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+
+        <!-- Empty State -->
+        <div class="text-center py-5" *ngIf="dataSource.data.length === 0">
+          <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+          <h5>No Stock Data Available</h5>
+          <p class="text-muted" *ngIf="!selectedSiteId">
+            Please select a site to view stock balances.
+          </p>
+          <p class="text-muted" *ngIf="selectedSiteId">
+            No stock entries found for this site.
+          </p>
+          <button class="btn btn-primary" *ngIf="!selectedSiteId" (click)="loadProjects()">
+            <i class="fas fa-map-marker-alt me-2"></i>Select Site
+          </button>
+        </div>
+
+        <!-- Loading State -->
+        <div class="text-center py-5" *ngIf="loading">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2">Loading stock balances...</p>
+        </div>
+      </div>
+
+      <!-- Paginator -->
+      <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons 
+                     aria-label="Select page of stock balances" *ngIf="dataSource.data.length > 0">
+      </mat-paginator>
+    </div>
+  </div>
+
+  <!-- Card View -->
+  <div class="row" *ngIf="viewMode === 'cards' && dataSource.data.length > 0">
+    <div class="col-md-4 mb-3" *ngFor="let balance of dataSource.data">
+      <div class="card stock-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+              <h5 class="card-title mb-1">{{ balance.material_name }}</h5>
+              <span class="badge bg-info">{{ getCategoryName(balance.material_id) }}</span>
+            </div>
+            <span class="badge" [ngClass]="'bg-' + getStockStatus(balance)">
+              {{ getStockStatusText(balance) }}
+            </span>
+          </div>
+          
+          <div class="stock-stats mb-3">
+            <div class="row text-center">
+              <div class="col-4">
+                <div class="stat-value">{{ balance.current_balance }}</div>
+                <div class="stat-label">Current</div>
+              </div>
+              <div class="col-4">
+                <div class="stat-value text-success">{{ balance.total_received }}</div>
+                <div class="stat-label">Received</div>
+              </div>
+              <div class="col-4">
+                <div class="stat-value text-danger">{{ balance.total_used }}</div>
+                <div class="stat-label">Used</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="d-grid gap-2">
+            <button class="btn btn-outline-info" 
+                    (click)="showMaterialDetails(getMaterial(balance.material_id))">
+              <i class="fas fa-chart-line me-2"></i>View History
+            </button>
+            <button class="btn btn-outline-primary" 
+                    *ngIf="balance.has_negative_balance || balance.current_balance < 10">
+              <i class="fas fa-shopping-cart me-2"></i>Create Reorder
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Material Details Dialog -->
+<ng-template #materialDetails>
+  <div class="modal-header">
+    <h5 class="modal-title">
+      <i class="fas fa-box me-2"></i>
+      {{ selectedMaterial?.name }} - Stock History
+    </h5>
+    <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
+  </div>
+  <div class="modal-body">
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="info-card">
+          <h6>Material Information</h6>
+          <div class="info-item">
+            <span class="label">Name:</span>
+            <span class="value">{{ selectedMaterial?.name }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Category:</span>
+            <span class="value">{{ getCategoryName(selectedMaterial?.id) }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Unit:</span>
+            <span class="value">{{ selectedMaterial?.unit || 'N/A' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Standard Cost:</span>
+            <span class="value">₹{{ selectedMaterial?.standard_cost | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="info-card">
+          <h6>Current Stock</h6>
+          <div *ngIf="selectedSiteId && selectedMaterial">
+            <div class="current-stock-value">
+              {{ getCurrentStock(selectedMaterial.id) }}
+            </div>
+            <div class="stock-status">
+              <span class="badge" [ngClass]="'bg-' + getStockStatus(getBalance(selectedMaterial.id))">
+                {{ getStockStatusText(getBalance(selectedMaterial.id)) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="chart-section">
+      <h6>Stock History (Last 30 Days)</h6>
+      <div class="chart-container">
+        <canvas id="materialChart"></canvas>
+      </div>
+    </div>
+    
+    <div class="history-table mt-4">
+      <h6>Recent Transactions</h6>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Quantity</th>
+              <th>Supplier</th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let entry of materialStockHistory.slice(0, 10)">
+              <td>{{ entry.entry_date | date:'short' }}</td>
+              <td>
+                <span class="badge" [ngClass]="{
+                  'bg-success': entry.entry_type === 'received',
+                  'bg-danger': entry.entry_type === 'used',
+                  'bg-warning': entry.entry_type === 'returned_received',
+                  'bg-secondary': entry.entry_type === 'returned_supplier'
+                }">
+                  {{ entry.entry_type }}
+                </span>
+              </td>
+              <td>{{ entry.quantity }}</td>
+              <td>{{ entry.supplier_name || 'N/A' }}</td>
+              <td>{{ entry.reference || 'N/A' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="dialog.closeAll()">Close</button>
+    <button type="button" class="btn btn-primary" 
+            *ngIf="selectedMaterial && (getCurrentStock(selectedMaterial.id) < 10)">
+      <i class="fas fa-shopping-cart me-2"></i>Create Purchase Order
+    </button>
+  </div>
+</ng-template>

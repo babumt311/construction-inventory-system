@@ -1,0 +1,171 @@
+<div class="project-form-container">
+  <form [formGroup]="projectForm" (ngSubmit)="onSubmit()">
+    <div class="form-header">
+      <h2>{{ isEditMode ? 'Edit Project' : 'Create New Project' }}</h2>
+      <p class="form-subtitle">Fill in the details to {{ isEditMode ? 'update' : 'create' }} the project</p>
+    </div>
+
+    <div class="form-grid">
+      <!-- Project Name -->
+      <div class="form-group full-width">
+        <label for="name">Project Name *</label>
+        <input
+          type="text"
+          id="name"
+          formControlName="name"
+          class="form-control"
+          placeholder="Enter project name"
+          [class.invalid]="projectForm.get('name')?.invalid && projectForm.get('name')?.touched"
+        >
+        <div class="error-message" *ngIf="projectForm.get('name')?.invalid && projectForm.get('name')?.touched">
+          <span *ngIf="projectForm.get('name')?.errors?.['required']">Project name is required</span>
+          <span *ngIf="projectForm.get('name')?.errors?.['minlength']">Minimum 3 characters required</span>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="form-group full-width">
+        <label for="description">Description *</label>
+        <textarea
+          id="description"
+          formControlName="description"
+          class="form-control"
+          rows="3"
+          placeholder="Describe the project..."
+          [class.invalid]="projectForm.get('description')?.invalid && projectForm.get('description')?.touched"
+        ></textarea>
+        <div class="error-message" *ngIf="projectForm.get('description')?.invalid && projectForm.get('description')?.touched">
+          <span *ngIf="projectForm.get('description')?.errors?.['required']">Description is required</span>
+          <span *ngIf="projectForm.get('description')?.errors?.['minlength']">Minimum 10 characters required</span>
+        </div>
+      </div>
+
+      <!-- Status & Priority -->
+      <div class="form-group">
+        <label for="status">Status *</label>
+        <select id="status" formControlName="status" class="form-control">
+          <option *ngFor="let option of statusOptions" [value]="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="priority">Priority *</label>
+        <select id="priority" formControlName="priority" class="form-control">
+          <option *ngFor="let option of priorityOptions" [value]="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Dates -->
+      <div class="form-group">
+        <label for="startDate">Start Date *</label>
+        <input
+          type="date"
+          id="startDate"
+          formControlName="startDate"
+          class="form-control"
+          [class.invalid]="projectForm.get('startDate')?.invalid && projectForm.get('startDate')?.touched"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="endDate">End Date *</label>
+        <input
+          type="date"
+          id="endDate"
+          formControlName="endDate"
+          class="form-control"
+          [class.invalid]="projectForm.get('endDate')?.invalid && projectForm.get('endDate')?.touched"
+        >
+      </div>
+
+      <!-- Budget -->
+      <div class="form-group">
+        <label for="budget">Budget ($) *</label>
+        <input
+          type="number"
+          id="budget"
+          formControlName="budget"
+          class="form-control"
+          min="0"
+          step="1000"
+          [class.invalid]="projectForm.get('budget')?.invalid && projectForm.get('budget')?.touched"
+        >
+      </div>
+
+      <!-- Project Manager -->
+      <div class="form-group">
+        <label for="manager">Project Manager *</label>
+        <select id="manager" formControlName="manager" class="form-control">
+          <option value="">Select manager</option>
+          <option *ngFor="let member of teamMembers" [value]="member.id">
+            {{ member.name }} - {{ member.role || member.title || 'Team Member' }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Team Members -->
+      <div class="form-group full-width" *ngIf="teamMembers.length > 0">
+        <label>Team Members</label>
+        <div class="team-members-selector">
+          <div *ngFor="let member of teamMembers" class="member-checkbox">
+            <input
+              type="checkbox"
+              [id]="'member-' + member.id"
+              [value]="member.id"
+              (change)="onMemberToggle(member.id, $event)"
+              [checked]="isMemberSelected(member.id)"
+            >
+            <label [for]="'member-' + member.id">
+              <span class="member-name">{{ member.name }}</span>
+              <span class="member-role">{{ member.role || member.title || 'Team Member' }}</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Show message if no team members available -->
+      <div class="form-group full-width" *ngIf="teamMembers.length === 0">
+        <label>Team Members</label>
+        <div class="no-members-message">
+          <i class="material-icons">group</i>
+          <p>No team members available. Please add team members first.</p>
+        </div>
+      </div>
+
+      <!-- Tags -->
+      <div class="form-group full-width">
+        <label>Tags</label>
+        <div class="tags-container">
+          <div class="tags-list">
+            <span *ngFor="let tag of projectForm.get('tags')?.value" class="tag">
+              {{ tag }}
+              <button type="button" class="tag-remove" (click)="removeTag(tag)">
+                <i class="material-icons">close</i>
+              </button>
+            </span>
+          </div>
+          <div class="tags-suggestions">
+            <span *ngFor="let tag of availableTags" 
+                  class="tag-suggestion"
+                  (click)="addTag(tag)">
+              {{ tag }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" (click)="onCancel()">
+        Cancel
+      </button>
+      <button type="submit" class="btn btn-primary" [disabled]="projectForm.invalid">
+        {{ isEditMode ? 'Update Project' : 'Create Project' }}
+      </button>
+    </div>
+  </form>
+</div>

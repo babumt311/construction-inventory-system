@@ -1,0 +1,317 @@
+<div class="project-management-container">
+  <!-- Header Section -->
+  <div class="header-section">
+    <h1>Project Management</h1>
+    <div class="header-actions">
+      <button 
+        *ngIf="canEditProject()" 
+        class="btn btn-primary" 
+        routerLink="/projects/new"
+      >
+        <i class="fas fa-plus"></i> Create New Project
+      </button>
+      <div class="header-stats">
+        <div class="stat-item">
+          <span class="stat-label">Total Projects:</span>
+          <span class="stat-value">{{ getProjectStats().total }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Active:</span>
+          <span class="stat-value text-success">{{ getProjectStats().active }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Delayed:</span>
+          <span class="stat-value text-danger">{{ getProjectStats().delayed }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filters-section card">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <input 
+            type="text" 
+            class="form-control" 
+            placeholder="Search projects..." 
+            [(ngModel)]="searchTerm"
+            (input)="applyFilters()"
+          />
+        </div>
+        <div class="col-md-2">
+          <select 
+            class="form-select" 
+            [(ngModel)]="statusFilter"
+            (change)="applyFilters()"
+          >
+            <option value="ALL">All Status</option>
+            <option value="PLANNING">Planning</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="ON_HOLD">On Hold</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <div class="input-group">
+            <span class="input-group-text">From</span>
+            <input 
+              type="date" 
+              class="form-control" 
+              [(ngModel)]="dateRange.start"
+              (change)="applyFilters()"
+            />
+            <span class="input-group-text">To</span>
+            <input 
+              type="date" 
+              class="form-control" 
+              [(ngModel)]="dateRange.end"
+              (change)="applyFilters()"
+            />
+          </div>
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-outline-secondary w-100" (click)="clearFilters()">
+            Clear Filters
+          </button>
+        </div>
+        <div class="col-md-2">
+          <select 
+            class="form-select" 
+            [(ngModel)]="itemsPerPage"
+            (change)="applyFilters()"
+          >
+            <option value="5">5 per page</option>
+            <option value="10">10 per page</option>
+            <option value="25">25 per page</option>
+            <option value="50">50 per page</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-section">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+
+  <!-- Error Message -->
+  <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{ errorMessage }}
+    <button type="button" class="btn-close" (click)="errorMessage = ''"></button>
+  </div>
+
+  <!-- Projects Grid -->
+  <div *ngIf="!isLoading && filteredProjects.length > 0" class="projects-grid">
+    <div class="row">
+      <div class="col-md-8">
+        <!-- Project List -->
+        <div class="project-list card">
+          <div class="card-header">
+            <h5 class="mb-0">Projects ({{ filteredProjects.length }})</h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Project Name</th>
+                    <th>Client</th>
+                    <th>Status</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Progress</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let project of paginatedProjects" 
+                      [class.table-active]="selectedProject?.id === project.id"
+                      (click)="selectProject(project)"
+                      style="cursor: pointer;">
+                    <td>
+                      <strong>{{ project.name }}</strong>
+                      <div class="text-muted small">{{ (project.description || '') | truncate:50 }}</div>
+                    </td>
+                    <td>{{ project.client || 'N/A' }}</td>
+                    <td>
+                      <span class="badge" [ngClass]="{
+                        'bg-secondary': project.status === 'PLANNING',
+                        'bg-primary': project.status === 'IN_PROGRESS',
+                        'bg-warning': project.status === 'ON_HOLD',
+                        'bg-success': project.status === 'COMPLETED',
+                        'bg-danger': project.status === 'CANCELLED'
+                      }">
+                        {{ project.status | titlecase }}
+                      </span>
+                    </td>
+                    <td>{{ project.start_date | date:'mediumDate' }}</td>
+                    <td>{{ project.end_date | date:'mediumDate' }}</td>
+                    <td>
+                      <div class="progress" style="height: 8px;">
+                        <div class="progress-bar" 
+                             [ngClass]="{
+                               'bg-success': (project.progress || 0) >= 80,
+                               'bg-warning': (project.progress || 0) >= 50 && (project.progress || 0) < 80,
+                               'bg-danger': (project.progress || 0) < 50
+                             }"
+                             [style.width]="(project.progress || 0) + '%'">
+                        </div>
+                      </div>
+                      <small class="text-muted">{{ project.progress }}%</small>
+                    </td>
+                    <td>
+                      <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" 
+                                [routerLink]="['/projects', project.id]">
+                          <i class="fas fa-eye"></i>
+                        </button>
+                        <button *ngIf="canEditProject()" 
+                                class="btn btn-outline-warning"
+                                [routerLink]="['/projects', project.id, 'edit']">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button *ngIf="canDeleteProject()" 
+                                class="btn btn-outline-danger"
+                                (click)="deleteProject(project.id); $event.stopPropagation()">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="text-muted">
+                Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to 
+                {{ Math.min(currentPage * itemsPerPage, totalItems) }} of {{ totalItems }} projects
+              </div>
+              <nav>
+                <ul class="pagination">
+                  <li class="page-item" [class.disabled]="currentPage === 1">
+                    <button class="page-link" (click)="changePage(currentPage - 1)">
+                      Previous
+                    </button>
+                  </li>
+                  <li *ngFor="let page of [1, 2, 3]" 
+                      class="page-item" 
+                      [class.active]="currentPage === page">
+                    <button class="page-link" (click)="changePage(page)">
+                      {{ page }}
+                    </button>
+                  </li>
+                  <li class="page-item" [class.disabled]="currentPage * itemsPerPage >= totalItems">
+                    <button class="page-link" (click)="changePage(currentPage + 1)">
+                      Next
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project Details Sidebar -->
+      <div class="col-md-4">
+        <div class="project-details card">
+          <div class="card-header">
+            <h5 class="mb-0">Project Details</h5>
+          </div>
+          <div class="card-body">
+            <div *ngIf="selectedProject; else noProjectSelected">
+              <h4>{{ selectedProject.name }}</h4>
+              <p class="text-muted">{{ selectedProject.description }}</p>
+              
+              <div class="details-grid">
+                <div class="detail-item">
+                  <strong>Client:</strong>
+                  <span>{{ selectedProject.client || 'N/A' }}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Status:</strong>
+                  <span class="badge" [ngClass]="{
+                    'bg-secondary': selectedProject.status === 'PLANNING',
+                    'bg-primary': selectedProject.status === 'IN_PROGRESS',
+                    'bg-warning': selectedProject.status === 'ON_HOLD',
+                    'bg-success': selectedProject.status === 'COMPLETED',
+                    'bg-danger': selectedProject.status === 'CANCELLED'
+                  }">
+                    {{ selectedProject.status | titlecase }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <strong>Timeline:</strong>
+                  <span>{{ selectedProject.start_date | date:'shortDate' }} - {{ selectedProject.end_date | date:'shortDate' }}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Budget:</strong>
+                  <span>{{ selectedProject.budget | currency }}</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Progress:</strong>
+                  <span>{{ selectedProject.progress }}%</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Team Members:</strong>
+                  <span>{{ selectedProject.team_members?.length || 0 }}</span>
+                </div>
+              </div>
+
+              <!-- Project Actions -->
+              <div class="project-actions mt-4">
+                <button class="btn btn-outline-primary btn-sm me-2"
+                        [routerLink]="['/projects', selectedProject.id, 'tasks']">
+                  <i class="fas fa-tasks"></i> View Tasks
+                </button>
+                <button class="btn btn-outline-success btn-sm me-2"
+                        [routerLink]="['/projects', selectedProject.id, 'team']">
+                  <i class="fas fa-users"></i> Manage Team
+                </button>
+                <button *ngIf="canEditProject()" 
+                        class="btn btn-outline-warning btn-sm"
+                        [routerLink]="['/projects', selectedProject.id, 'edit']">
+                  <i class="fas fa-edit"></i> Edit
+                </button>
+              </div>
+            </div>
+
+            <ng-template #noProjectSelected>
+              <div class="text-center text-muted py-5">
+                <i class="fas fa-folder-open fa-3x mb-3"></i>
+                <p>Select a project to view details</p>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats card mt-3">
+          <div class="card-header">
+            <h6 class="mb-0">Project Statistics</h6>
+          </div>
+          <div class="card-body">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && filteredProjects.length === 0" class="empty-state text-center py-5">
+    <i class="fas fa-folder fa-4x text-muted mb-3"></i>
+    <h4>No projects found</h4>
+    <p class="text-muted">Try adjusting your filters or create a new project</p>
+    <button *ngIf="canEditProject()" class="btn btn-primary" routerLink="/projects/new">
+      <i class="fas fa-plus"></i> Create First Project
+    </button>
+  </div>
+</div>

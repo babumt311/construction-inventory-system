@@ -1,0 +1,190 @@
+<div class="project-dashboard">
+  <!-- Header -->
+  <div class="dashboard-header">
+    <h1>Project Dashboard</h1>
+    <p class="subtitle">Overview of all projects and activities</p>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon primary">
+        <i class="material-icons">folder</i>
+      </div>
+      <div class="stat-content">
+        <h3>Total Projects</h3>
+        <div class="stat-value">{{ stats.totalProjects }}</div>
+        <div class="stat-trend">
+          <i class="material-icons trend-up">arrow_upward</i>
+          <span>+2 from last month</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon success">
+        <i class="material-icons">play_circle</i>
+      </div>
+      <div class="stat-content">
+        <h3>Active Projects</h3>
+        <div class="stat-value">{{ stats.activeProjects }}</div>
+        <div class="stat-progress">
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width]="(stats.activeProjects / stats.totalProjects) * 100 + '%'"></div>
+          </div>
+          <span>{{ stats.totalProjects > 0 ? ((stats.activeProjects / stats.totalProjects) * 100).toFixed(0) : 0 }}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon warning">
+        <i class="material-icons">pending</i>
+      </div>
+      <div class="stat-content">
+        <h3>Delayed Projects</h3>
+        <div class="stat-value">{{ stats.delayedProjects }}</div>
+        <div class="stat-change">
+          <span class="change-badge" [class.negative]="stats.delayedProjects > 0">
+            {{ stats.delayedProjects > 0 ? 'Needs attention' : 'On track' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon info">
+        <i class="material-icons">attach_money</i>
+      </div>
+      <div class="stat-content">
+        <h3>Budget Utilization</h3>
+        <div class="stat-value">${{ stats.spentBudget.toLocaleString() }}</div>
+        <div class="stat-progress">
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width]="getBudgetUtilizationPercentage() + '%'"></div>
+          </div>
+          <span>{{ getBudgetUtilizationPercentage() }}%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="dashboard-content">
+    <!-- Left Column -->
+    <div class="left-column">
+      <!-- Project Status Chart -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>Project Status Distribution</h3>
+          <button class="chart-action">
+            <i class="material-icons">more_vert</i>
+          </button>
+        </div>
+        <div class="chart-container">
+          <div class="status-chart">
+            <div *ngFor="let item of projectStatusData" class="status-item">
+              <div class="status-info">
+                <div class="status-color" [style.background]="item.color"></div>
+                <span class="status-label">{{ item.status }}</span>
+                <span class="status-count">{{ item.count }}</span>
+              </div>
+              <div class="status-bar">
+                <div class="bar-fill" 
+                     [style.width]="getStatusPercentage(item.status) + '%'"
+                     [style.background]="item.color"></div>
+              </div>
+              <span class="status-percentage">{{ getStatusPercentage(item.status) }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activities -->
+      <div class="activities-card">
+        <div class="activities-header">
+          <h3>Recent Activities</h3>
+          <button class="view-all">View All</button>
+        </div>
+        <div class="activities-list">
+          <div *ngFor="let activity of recentActivities" class="activity-item">
+            <div class="activity-icon" [style.background]="getActivityColor(activity.type)">
+              <i class="material-icons">{{ getActivityIcon(activity.type) }}</i>
+            </div>
+            <div class="activity-content">
+              <div class="activity-title">
+                <strong>{{ activity.projectName }}</strong>
+                <span class="activity-text">{{ activity.activity }}</span>
+              </div>
+              <div class="activity-meta">
+                <span class="activity-user">{{ activity.user }}</span>
+                <span class="activity-time">{{ getTimeAgo(activity.timestamp) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="right-column">
+      <!-- Resource Allocation -->
+      <div class="resource-card">
+        <div class="resource-header">
+          <h3>Resource Allocation</h3>
+          <button class="resource-action">
+            <i class="material-icons">filter_list</i>
+          </button>
+        </div>
+        <div class="resource-list">
+          <div *ngFor="let resource of resourceAllocations" class="resource-item">
+            <div class="resource-info">
+              <div class="resource-avatar">{{ getResourceInitials(resource.name) }}</div>
+              <div class="resource-details">
+                <h4>{{ resource.name }}</h4>
+                <p class="resource-role">{{ resource.role }}</p>
+                <p class="resource-projects">{{ resource.projects.join(', ') }}</p>
+              </div>
+            </div>
+            <div class="resource-utilization">
+              <div class="utilization-bar">
+                <div class="bar-fill" [style.width]="getUtilizationPercentage(resource) + '%'"></div>
+              </div>
+              <span class="utilization-text">{{ getUtilizationPercentage(resource) }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Budget Overview -->
+      <div class="budget-card">
+        <div class="budget-header">
+          <h3>Budget Overview</h3>
+          <div class="budget-total">
+            <span class="budget-label">Total Budget</span>
+            <span class="budget-amount">${{ stats.totalBudget.toLocaleString() }}</span>
+          </div>
+        </div>
+        <div class="budget-chart">
+          <div *ngFor="let item of budgetUtilizationData" class="budget-bar">
+            <div class="bar-container">
+              <div class="bar budget-bar" [style.height]="(item.budget / 70000) * 100 + '%'"></div>
+              <div class="bar spent-bar" [style.height]="(item.spent / 70000) * 100 + '%'"></div>
+            </div>
+            <span class="bar-label">{{ item.month }}</span>
+          </div>
+        </div>
+        <div class="budget-legend">
+          <div class="legend-item">
+            <div class="legend-color budget"></div>
+            <span>Budget</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color spent"></div>
+            <span>Spent</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,117 @@
+<div class="task-list-container">
+  <!-- Header -->
+  <div class="task-header">
+    <div class="header-left">
+      <h2>Tasks</h2>
+      <p class="subtitle">Manage and track all project tasks</p>
+    </div>
+    <div class="header-right">
+      <button class="btn btn-primary" (click)="onAddTask()">
+        <i class="material-icons">add</i>
+        <span>New Task</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="task-filters">
+    <div class="search-box">
+      <i class="material-icons">search</i>
+      <input
+        type="text"
+        [(ngModel)]="searchQuery"
+        (ngModelChange)="onSearchChange()"
+        placeholder="Search tasks..."
+        class="search-input"
+      >
+    </div>
+
+    <div class="filter-controls">
+      <select *ngIf="showProjectFilter && projects.length > 0" [(ngModel)]="selectedProject" (ngModelChange)="onFilterChange()" class="filter-select">
+        <option value="all">All Projects</option>
+        <option *ngFor="let project of projects" [value]="project.id">{{ project.name }}</option>
+      </select>
+
+      <select *ngIf="showAssigneeFilter && assignees.length > 0" [(ngModel)]="selectedAssignee" (ngModelChange)="onFilterChange()" class="filter-select">
+        <option value="all">All Assignees</option>
+        <option *ngFor="let assignee of assignees" [value]="assignee.id">{{ assignee.name }}</option>
+      </select>
+
+      <select *ngIf="showStatusFilter" [(ngModel)]="selectedStatus" (ngModelChange)="onFilterChange()" class="filter-select">
+        <option value="all">All Status</option>
+        <option *ngFor="let status of statusOptions" [value]="status.value">{{ status.label }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Kanban Board -->
+  <div class="kanban-board">
+    <div *ngFor="let status of statusOptions" class="kanban-column">
+      <div class="column-header">
+        <div class="column-title">
+          <div class="status-indicator" [style.background]="status.color"></div>
+          <h3>{{ status.label }}</h3>
+          <span class="task-count">{{ getFilteredTasksByStatus(status.value).length }}</span>
+        </div>
+      </div>
+
+      <div class="column-content" [style.border-top-color]="status.color">
+        <div *ngFor="let task of getFilteredTasksByStatus(status.value)" 
+             class="task-card"
+             (click)="onTaskClick(task)">
+          
+          <div class="task-header">
+            <div class="task-priority">
+              <div class="priority-dot" [style.background]="getPriorityColor(task.priority)"></div>
+              <span class="priority-label">{{ task.priority }}</span>
+            </div>
+            <div class="task-actions">
+              <button class="action-btn" (click)="$event.stopPropagation(); onDeleteTask(task.id)">
+                <i class="material-icons">delete</i>
+              </button>
+            </div>
+          </div>
+
+          <h4 class="task-title">{{ task.title }}</h4>
+          <p class="task-description">{{ task.description | truncate:80 }}</p>
+
+          <div class="task-meta">
+            <div class="assignee">
+              <div class="assignee-avatar">{{ getAssigneeInitials(task.assignee) }}</div>
+              <span class="assignee-name">{{ task.assignee.name }}</span>
+            </div>
+            <div class="due-date">
+              <i class="material-icons">event</i>
+              <span>{{ getDaysUntilDue(task.dueDate) }} days</span>
+            </div>
+          </div>
+
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width]="getProgressPercentage(task) + '%'"></div>
+            <span class="progress-text">{{ getProgressPercentage(task) }}%</span>
+          </div>
+
+          <div class="task-tags">
+            <span *ngFor="let tag of task.tags" class="tag">{{ tag }}</span>
+          </div>
+
+          <div class="task-footer">
+            <div class="hours">
+              <i class="material-icons">schedule</i>
+              <span>{{ task.actualHours }}/{{ task.estimatedHours }}h</span>
+            </div>
+            <div class="subtasks">
+              <i class="material-icons">checklist</i>
+              <span>{{ task.subtasks.filter(st => st.completed).length }}/{{ task.subtasks.length }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="getFilteredTasksByStatus(status.value).length === 0" class="empty-column">
+          <i class="material-icons">inbox</i>
+          <p>No tasks</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

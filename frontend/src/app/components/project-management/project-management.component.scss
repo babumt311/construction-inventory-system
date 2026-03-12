@@ -1,0 +1,303 @@
+.project-management-container {
+  padding: 20px;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+}
+
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+  h1 {
+    margin: 0;
+    color: #2c3e50;
+    font-weight: 600;
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header-stats {
+  display: flex;
+  gap: 20px;
+  background: #f8f9fa;
+  padding: 12px 20px;
+  border-radius: 6px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.filters-section {
+  margin-bottom: 24px;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+
+  .card-body {
+    padding: 20px;
+  }
+}
+
+.loading-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.projects-grid {
+  .project-list {
+    margin-bottom: 20px;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+
+    .card-header {
+      background-color: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+      padding: 16px 20px;
+    }
+
+    .table {
+      margin-bottom: 0;
+
+      tbody tr:hover {
+        background-color: #f8f9fa;
+      }
+
+      th {
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+        padding: 16px 12px;
+      }
+
+      td {
+        padding: 16px 12px;
+        vertical-align: middle;
+      }
+
+      .badge {
+        font-size: 0.75em;
+        padding: 4px 8px;
+        border-radius: 12px;
+      }
+
+      .progress {
+        background-color: #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+
+        .progress-bar {
+          border-radius: 10px;
+          transition: width 0.3s ease;
+        }
+      }
+    }
+  }
+}
+
+.project-details {
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  height: 100%;
+
+  .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 16px 20px;
+  }
+
+  .card-body {
+    padding: 24px;
+  }
+
+  .details-grid {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    strong {
+      color: #495057;
+      font-weight: 600;
+    }
+
+    span {
+      color: #6c757d;
+    }
+  }
+
+  .project-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+.quick-stats {
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+
+  .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 12px 20px;
+  }
+}
+
+.empty-state {
+  background: white;
+  border-radius: 8px;
+  padding: 60px 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+
+  i {
+    opacity: 0.5;
+  }
+
+  h4 {
+    color: #2c3e50;
+    margin-bottom: 8px;
+  }
+
+  p {
+    margin-bottom: 24px;
+  }
+}
+
+// Pagination styles
+.pagination {
+  margin-bottom: 0;
+
+  .page-item {
+    .page-link {
+      color: #495057;
+      border: 1px solid #dee2e6;
+      padding: 8px 16px;
+
+      &:hover {
+        background-color: #f8f9fa;
+        color: #007bff;
+      }
+    }
+
+    &.active .page-link {
+      background-color: #007bff;
+      border-color: #007bff;
+      color: white;
+    }
+
+    &.disabled .page-link {
+      color: #6c757d;
+      background-color: #f8f9fa;
+      border-color: #dee2e6;
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .header-section {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .header-stats {
+    width: 100%;
+    justify-content: space-around;
+  }
+
+  .projects-grid {
+    .row {
+      flex-direction: column;
+    }
+
+    .col-md-8, .col-md-4 {
+      width: 100%;
+    }
+
+    .project-details {
+      margin-top: 20px;
+    }
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .filters-section {
+    .row {
+      > div {
+        margin-bottom: 10px;
+      }
+    }
+  }
+}
+
+// Animation for row selection
+.table-active {
+  background-color: #e3f2fd !important;
+  transition: background-color 0.2s ease;
+}
+
+// Text truncation utility
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Status badge colors
+.bg-secondary { background-color: #6c757d !important; }
+.bg-primary { background-color: #007bff !important; }
+.bg-warning { background-color: #ffc107 !important; }
+.bg-success { background-color: #28a745 !important; }
+.bg-danger { background-color: #dc3545 !important; }
+
+.text-success { color: #28a745 !important; }
+.text-danger { color: #dc3545 !important; }
+.text-muted { color: #6c757d !important; }

@@ -1,0 +1,91 @@
+<div class="login-container">
+  <div class="row justify-content-center align-items-center min-vh-100">
+    <div class="col-12 col-lg-10">
+      <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white text-center">
+          <h4 class="mb-0">
+            <i class="fas fa-hard-hat me-2"></i>
+            Construction Inventory System
+          </h4>
+        </div>
+        
+        <div class="card-body p-4">
+          <h5 class="card-title text-center mb-4">Login to Your Account15:57</h5>
+          
+          <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+            <div class="mb-3">
+              <label for="username" class="form-label">Username or Email</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="fas fa-user"></i>
+                </span>
+                <input
+                  type="text"
+                  id="username"
+                  formControlName="username"
+                  class="form-control"
+                  placeholder="Enter username or email"
+                  [class.is-invalid]="formControls['username'].invalid && formControls['username'].touched"
+                >
+              </div>
+              <div *ngIf="formControls['username'].invalid && formControls['username'].touched" 
+                   class="invalid-feedback d-block">
+                Username is required
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="password" class="form-label">Password</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="fas fa-lock"></i>
+                </span>
+                <input
+                  [type]="showPassword ? 'text' : 'password'"
+                  id="password"
+                  formControlName="password"
+                  class="form-control"
+                  placeholder="Enter password"
+                  [class.is-invalid]="formControls['password'].invalid && formControls['password'].touched"
+                >
+                <button class="btn btn-outline-secondary" type="button" (click)="togglePasswordVisibility()">
+                  <i class="fas" [class.fa-eye]="!showPassword" [class.fa-eye-slash]="showPassword"></i>
+                </button>
+              </div>
+              <div *ngIf="formControls['password'].invalid && formControls['password'].touched" 
+                   class="invalid-feedback d-block">
+                Password is required
+              </div>
+            </div>
+
+            <div class="d-grid gap-2 mb-3">
+              <button 
+                type="submit" 
+                class="btn btn-primary btn-lg"
+                [disabled]="loginForm.invalid || loading"
+              >
+                <span *ngIf="!loading">Login</span>
+                <span *ngIf="loading">
+                  <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Logging in...
+                </span>
+              </button>
+            </div>
+
+            <div class="text-center">
+              <small class="text-muted">
+                Default admin: <strong>admin</strong> / <strong>Admin@123</strong>
+              </small>
+            </div>
+          </form>
+        </div>
+
+        <div class="card-footer text-center bg-light">
+          <small class="text-muted">
+            © 2024 Construction Inventory System v1.0.0
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

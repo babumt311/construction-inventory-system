@@ -1,0 +1,9 @@
+# robots.txt for Construction Inventory System
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /uploads/
+Disallow: /admin/
+
+# Sitemap
+Sitemap: https://construction-inventory.example.com/sitemap.xml

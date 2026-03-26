@@ -1,5 +1,4 @@
 <div class="dashboard-container">
-  <!-- Welcome Section -->
   <div class="row mb-4">
     <div class="col-12">
       <div class="card shadow-sm">
@@ -25,11 +24,12 @@
     </div>
   </div>
 
-  <!-- Statistics Cards -->
   <div class="row mb-4">
-    <!-- User Statistics -->
     <div class="col-md-3 mb-3" *ngIf="isAdmin()">
-      <div class="card shadow-sm h-100">
+      <div class="card shadow-sm h-100 border-primary" style="cursor: pointer; transition: transform 0.2s;" 
+           routerLink="/users" 
+           onmouseover="this.style.transform='translateY(-5px)'" 
+           onmouseout="this.style.transform='translateY(0)'">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <div>
@@ -55,9 +55,11 @@
       </div>
     </div>
 
-    <!-- Project Statistics -->
     <div class="col-md-3 mb-3">
-      <div class="card shadow-sm h-100">
+      <div class="card shadow-sm h-100 border-success" style="cursor: pointer; transition: transform 0.2s;" 
+           routerLink="/projects"
+           onmouseover="this.style.transform='translateY(-5px)'" 
+           onmouseout="this.style.transform='translateY(0)'">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <div>
@@ -78,9 +80,11 @@
       </div>
     </div>
 
-    <!-- Stock Statistics -->
     <div class="col-md-3 mb-3">
-      <div class="card shadow-sm h-100">
+      <div class="card shadow-sm h-100 border-info" style="cursor: pointer; transition: transform 0.2s;" 
+           routerLink="/stock"
+           onmouseover="this.style.transform='translateY(-5px)'" 
+           onmouseout="this.style.transform='translateY(0)'">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <div>
@@ -101,9 +105,11 @@
       </div>
     </div>
 
-    <!-- Recent Activity -->
     <div class="col-md-3 mb-3">
-      <div class="card shadow-sm h-100">
+      <div class="card shadow-sm h-100 border-warning" style="cursor: pointer; transition: transform 0.2s;" 
+           routerLink="/activity"
+           onmouseover="this.style.transform='translateY(-5px)'" 
+           onmouseout="this.style.transform='translateY(0)'">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <div>
@@ -125,7 +131,6 @@
     </div>
   </div>
 
-  <!-- Charts Section -->
   <div class="row mb-4">
     <div class="col-md-6 mb-3">
       <div class="card shadow-sm h-100">
@@ -146,7 +151,6 @@
     </div>
   </div>
 
-  <!-- Recent Projects -->
   <div class="row">
     <div class="col-12">
       <div class="card shadow-sm">

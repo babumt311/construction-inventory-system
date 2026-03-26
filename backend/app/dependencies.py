@@ -1,20 +1,31 @@
 """
 Dependencies for FastAPI routes
 """
-from typing import Optional, List, Dict, Any
-from fastapi import Depends, HTTPException, status, Query
+from typing import Optional, Dict, Any
+from fastapi import Depends, HTTPException, status, Query, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import logging
 from datetime import datetime
+import jwt
+from jwt import PyJWTError
 
 from app.database import get_db
 from app import models, schemas
-from app.core.security import verify_token
 
 logger = logging.getLogger(__name__)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+# Try to get SECRET_KEY from config, with fallback
+try:
+    from app.config import settings
+    SECRET_KEY = settings.SECRET_KEY
+    ALGORITHM = settings.ALGORITHM
+except ImportError:
+    # Fallback values - should be overridden in production
+    SECRET_KEY = "your-secret-key-change-this-in-production"
+    ALGORITHM = "HS256"
 
 
 # ============================================
@@ -35,6 +46,25 @@ class PaginationParams:
 
 
 # ============================================
+# TOKEN VERIFICATION FUNCTION
+# ============================================
+def verify_token(token: str) -> dict:
+    """
+    Verify JWT token and return payload
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except PyJWTError as e:
+        logger.error(f"Token verification failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+# ============================================
 # AUTHENTICATION DEPENDENCIES
 # ============================================
 async def get_current_user(
@@ -49,6 +79,9 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    if not token:
+        raise credentials_exception
     
     try:
         payload = verify_token(token)
@@ -115,9 +148,8 @@ async def verify_user_ownership_or_admin(
     # Owners can access users they own (if relationship exists)
     if current_user.role == schemas.UserRole.OWNER:
         # Check if this owner has access to the requested user
-        # Adjust this logic based on your business rules
         user = db.query(models.User).filter(models.User.id == user_id).first()
-        if user and user.owner_id == current_user.id:
+        if user and getattr(user, 'owner_id', None) == current_user.id:
             return current_user
     
     # Regular users can only access their own data
@@ -156,3 +188,19 @@ async def log_audit_action(
     
     # Return the audit data so endpoints can add more details
     return audit_data
+
+
+# ============================================
+# SIMPLE TOKEN CREATE FUNCTION (for auth.py)
+# ============================================
+def create_access_token(data: dict) -> str:
+    """
+    Create JWT access token
+    """
+    from datetime import timedelta
+    
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=30)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt

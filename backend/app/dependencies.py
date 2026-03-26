@@ -27,13 +27,13 @@ def get_database() -> Generator:
         db.close()
 
 # User dependencies
-def get_current_user_dependency(
+async def get_current_user_dependency(
     request: Request,
     db: Session = Depends(get_db)
 ) -> models.User:
     """Dependency to get current user"""
     logger.debug(f"Getting current user for request: {request.method} {request.url.path}")
-    return get_current_user(request, db)
+    return await get_current_user(request, db)
 
 def get_current_active_user_dependency(
     current_user: models.User = Depends(get_current_user_dependency)

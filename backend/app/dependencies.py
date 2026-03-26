@@ -41,15 +41,39 @@ class PaginationParams:
 # ============================================
 # AUTHENTICATION DEPENDENCIES (Re-exported from auth.py)
 # ============================================
-# Re-export these so other files can import from dependencies.py
+
+# This is the missing dependency - get_current_user_dependency
+async def get_current_user_dependency(
+    token: str = Depends(oauth2_scheme) if 'oauth2_scheme' in dir() else None,
+    db: Session = Depends(get_db)
+) -> models.User:
+    """
+    Get current user - alias for get_current_user
+    """
+    return await get_current_user(token, db) if token else await get_current_user(None, db)
+
+
+async def get_current_active_user_dependency(
+    current_user: models.User = Depends(get_current_user)
+) -> models.User:
+    """
+    Get current active user - alias for get_current_active_user
+    """
+    return get_current_active_user(current_user)
+
+
 def get_owner_or_admin_user_dependency(
     current_user: models.User = Depends(get_current_active_user)
 ) -> models.User:
     """
     Require owner or admin role
-    Re-exported from auth.require_owner_or_admin
     """
-    return require_owner_or_admin(current_user)
+    if current_user.role.value not in ["owner", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires owner or admin role"
+        )
+    return current_user
 
 
 def check_project_access(
@@ -112,11 +136,6 @@ async def log_audit_action(
     
     logger.info(f"Audit: {audit_data}")
     
-    # You can optionally store this in a database table
-    # audit_log = models.AuditLog(**audit_data)
-    # db.add(audit_log)
-    # db.commit()
-    
     return audit_data
 
 
@@ -127,6 +146,8 @@ __all__ = [
     "PaginationParams",
     "get_current_user",
     "get_current_active_user",
+    "get_current_user_dependency",
+    "get_current_active_user_dependency",
     "get_admin_user_dependency",
     "get_owner_or_admin_user_dependency",
     "verify_user_ownership_or_admin",

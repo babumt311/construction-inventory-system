@@ -4,6 +4,7 @@ Dependency injection for the application
 from typing import Generator, Optional
 from sqlalchemy.orm import Session
 from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer
 import logging
 from app.database import SessionLocal, get_db
 from app import crud, schemas, models
@@ -26,14 +27,33 @@ def get_database() -> Generator:
     finally:
         db.close()
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 # User dependencies
 async def get_current_user_dependency(
     request: Request,
     db: Session = Depends(get_db)
 ) -> models.User:
     """Dependency to get current user"""
+    
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+    
+    # 2. Or try to get it from a cookie (if you use cookies)
+    # elif "access_token" in request.cookies:
+    #     token = request.cookies.get("access_token")
+        
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+        
     logger.debug(f"Getting current user for request: {request.method} {request.url.path}")
-    return await get_current_user(request, db)
+    
+    # ✨ Changed 'request' to 'token' right here:
+    return await get_current_user(token, db)
 
 def get_current_active_user_dependency(
     current_user: models.User = Depends(get_current_user_dependency)

@@ -2,21 +2,20 @@
 Dependencies for FastAPI routes
 Re-exports authentication functions from auth.py to avoid circular imports
 """
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi import Depends, HTTPException, status, Query, Request
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from datetime import datetime, date
 import logging
-from datetime import datetime
 
 from app.database import get_db
 from app import models
 from app.auth import (
     get_current_user,
     get_current_active_user,
-    get_admin_user_dependency as auth_get_admin,
-    require_owner_or_admin,
-    check_project_access as auth_check_project_access,
-    has_project_access
+    has_project_access,
+    oauth2_scheme
 )
 
 logger = logging.getLogger(__name__)
@@ -40,28 +39,53 @@ class PaginationParams:
 
 
 # ============================================
+# REPORT FILTER PARAMETERS
+# ============================================
+class ReportFilterParams:
+    def __init__(
+        self,
+        start_date: Optional[date] = Query(None, description="Start date for reports"),
+        end_date: Optional[date] = Query(None, description="End date for reports"),
+        project_id: Optional[int] = Query(None, description="Filter by project ID"),
+        material_id: Optional[int] = Query(None, description="Filter by material ID"),
+        category: Optional[str] = Query(None, description="Filter by category"),
+        report_type: Optional[str] = Query(None, description="Type of report"),
+        format: str = Query("json", regex="^(json|pdf|csv)$", description="Report format")
+    ):
+        self.start_date = start_date
+        self.end_date = end_date
+        self.project_id = project_id
+        self.material_id = material_id
+        self.category = category
+        self.report_type = report_type
+        self.format = format
+
+
+# ============================================
 # AUTHENTICATION DEPENDENCIES
 # ============================================
 
-def get_current_user_dependency(
-    token: str = Depends(oauth2_scheme) if 'oauth2_scheme' in dir() else None,
+async def get_current_user_dependency(
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> models.User:
     """
-    Get current user - alias for get_current_user
+    Get current user from token
     """
-    import asyncio
-    return asyncio.run(get_current_user(token, db)) if token else None
+    return await get_current_user(token, db)
 
 
 async def get_current_active_user_dependency(
     current_user: models.User = Depends(get_current_user)
 ) -> models.User:
     """
-    Get current active user - alias for get_current_active_user
+    Get current active user
     """
     if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
     return current_user
 
 
@@ -89,6 +113,20 @@ def get_owner_or_admin_user_dependency(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Requires owner or admin role"
+        )
+    return current_user
+
+
+def get_owner_admin_or_manager_dependency(
+    current_user: models.User = Depends(get_current_active_user)
+) -> models.User:
+    """
+    Require owner, admin, or manager role
+    """
+    if current_user.role.value not in ["owner", "admin", "manager"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires owner, admin, or manager role"
         )
     return current_user
 
@@ -159,6 +197,39 @@ def check_project_access(
 
 
 # ============================================
+# MATERIAL ACCESS DEPENDENCIES
+# ============================================
+
+def validate_material_access(
+    material_id: int,
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> models.Material:
+    """
+    Validate that user has access to a material
+    """
+    from app.models import Material
+    
+    material = db.query(Material).filter(Material.id == material_id).first()
+    
+    if not material:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Material not found"
+        )
+    
+    # Admin has access to all materials
+    if current_user.role.value == "admin":
+        return material
+    
+    # Check project access if material belongs to a project
+    if hasattr(material, 'project_id') and material.project_id:
+        validate_project_access(material.project_id, current_user, db)
+    
+    return material
+
+
+# ============================================
 # IDOR PREVENTION DEPENDENCY
 # ============================================
 async def verify_user_ownership_or_admin(
@@ -213,15 +284,27 @@ async def log_audit_action(
 # EXPORT LIST
 # ============================================
 __all__ = [
+    # Pagination
     "PaginationParams",
+    "ReportFilterParams",
+    
+    # Auth dependencies
     "get_current_user",
     "get_current_active_user",
     "get_current_user_dependency",
     "get_current_active_user_dependency",
     "get_admin_user_dependency",
     "get_owner_or_admin_user_dependency",
+    "get_owner_admin_or_manager_dependency",
+    
+    # Access validation
     "validate_project_access",
     "check_project_access",
+    "validate_material_access",
+    
+    # Security
     "verify_user_ownership_or_admin",
+    
+    # Audit
     "log_audit_action"
 ]

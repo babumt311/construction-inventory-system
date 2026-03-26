@@ -76,6 +76,30 @@ def get_owner_or_admin_user_dependency(
     logger.debug(f"Checking owner/admin role for: {current_user.username}")
     return require_owner_or_admin(current_user)
 
+def verify_user_ownership_or_admin(
+    user_id: int = Path(..., description="The ID of the user being accessed"),
+    current_user: models.User = Depends(get_current_user_dependency)
+) -> models.User:
+    """
+    Dependency to ensure the current user is either an admin 
+    OR is requesting their own specific user ID.
+    """
+    logger.debug(f"Verifying ownership: User {current_user.id} requesting access to ID {user_id}")
+    
+    # 1. Admins get an automatic pass
+    if current_user.role == schemas.UserRole.ADMIN:
+        return current_user
+        
+    # 2. Standard users must be requesting their own ID
+    if current_user.id != user_id:
+        logger.warning(f"Security Alert: User {current_user.id} attempted to access data for User {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to access this user's data"
+        )
+        
+    return current_user
+
 # Project access dependency
 def validate_project_access(
     project_id: int,

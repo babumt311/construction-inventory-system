@@ -3,7 +3,7 @@ Dependency injection for the application
 """
 from typing import Generator, Optional
 from sqlalchemy.orm import Session
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status, Request, Path
 from fastapi.security import OAuth2PasswordBearer
 import logging
 from app.database import SessionLocal, get_db

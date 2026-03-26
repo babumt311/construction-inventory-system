@@ -11,6 +11,7 @@ from app.dependencies import (
     get_admin_user_dependency,
     get_owner_or_admin_user_dependency,
     get_current_user_dependency,
+    verify_user_ownership_or_admin,  # <-- Our new security check
     PaginationParams,
     log_audit_action
 )
@@ -94,7 +95,7 @@ async def read_users(
 async def read_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_owner_or_admin_user_dependency)
+    current_user: models.User = Depends(verify_user_ownership_or_admin) # <-- Swapped dependency to fix IDOR
 ) -> Any:
     """
     Get user by ID (Owner/Admin only)
@@ -187,7 +188,8 @@ async def delete_user(
             detail="Cannot delete your own account"
         )
     
-    user = crud.crud_user.delete(db, id=user_id)
+    # FIX: Fetch user first to prevent 500 errors if ID doesn't exist
+    user = crud.crud_user.get(db, id=user_id)
     
     if not user:
         logger.warning(f"User not found for deletion: {user_id}")
@@ -195,6 +197,8 @@ async def delete_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
+        
+    crud.crud_user.delete(db, id=user_id)
     
     logger.info(f"User deleted successfully: ID {user_id}")
     
@@ -221,10 +225,9 @@ async def activate_user(
             detail="User not found"
         )
     
-    user.is_active = True
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    # FIX: Use the CRUD update method for consistency
+    user_in = schemas.UserUpdate(is_active=True)
+    user = crud.crud_user.update(db, db_obj=user, obj_in=user_in)
     
     logger.info(f"User activated: {user.username}")
     

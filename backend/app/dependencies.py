@@ -1,294 +1,158 @@
 """
-User management router
+Dependencies for FastAPI routes
 """
-from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Path
+from typing import Optional, List, Dict, Any
+from fastapi import Depends, HTTPException, status, Query
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 import logging
-from app import schemas, crud, models
-from app.database import get_db
-from app.dependencies import (
-    get_admin_user_dependency,
-    get_owner_or_admin_user_dependency,
-    get_current_user_dependency,
-    verify_user_ownership_or_admin,  # <-- Our new security check
-    PaginationParams,
-    log_audit_action
-)
+from datetime import datetime
 
-router = APIRouter(prefix="/users", tags=["users"])
+from app.database import get_db
+from app import models, schemas
+from app.core.security import verify_token
+
 logger = logging.getLogger(__name__)
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-@router.get("/stats")
-async def get_user_stats(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_owner_or_admin_user_dependency)
-) -> Any:
+
+# ============================================
+# PAGINATION PARAMETERS
+# ============================================
+class PaginationParams:
+    def __init__(
+        self,
+        skip: int = Query(0, ge=0, description="Number of records to skip"),
+        size: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+        sort_by: Optional[str] = Query(None, description="Field to sort by"),
+        sort_order: str = Query("asc", regex="^(asc|desc)$", description="Sort order")
+    ):
+        self.skip = skip
+        self.size = size
+        self.sort_by = sort_by
+        self.sort_order = sort_order
+
+
+# ============================================
+# AUTHENTICATION DEPENDENCIES
+# ============================================
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> models.User:
     """
-    Get user statistics (Owner/Admin only)
-    Returns counts for users, admins, owners, and active projects
+    Get current authenticated user from token
     """
-    logger.info(f"Fetching user stats by: {current_user.username}")
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     
     try:
-        # Get total users count
-        total_users = db.query(models.User).count()
-        
-        # Get admin users count
-        admins = db.query(models.User).filter(models.User.role == schemas.UserRole.ADMIN).count()
-        
-        # Get owner users count
-        owners = db.query(models.User).filter(models.User.role == schemas.UserRole.OWNER).count()
-        
-        # Get active projects count
-        # Assuming you have a Project model - adjust table name if different
-        active_projects = 0
-        try:
-            # Try to import Project model - if it exists
-            from app.models import Project
-            active_projects = db.query(Project).filter(Project.status == "active").count()
-        except ImportError:
-            # If Project model doesn't exist yet, return 0
-            logger.debug("Project model not found, returning 0 for active projects")
-            pass
-        
-        logger.info(f"Stats: total_users={total_users}, admins={admins}, owners={owners}, active_projects={active_projects}")
-        
-        return {
-            "total_users": total_users,
-            "admins": admins,
-            "owners": owners,
-            "active_projects": active_projects
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching user stats: {str(e)}")
-        # Return default values on error instead of failing
-        return {
-            "total_users": 0,
-            "admins": 0,
-            "owners": 0,
-            "active_projects": 0
-        }
-
-
-@router.post("/", response_model=schemas.UserInDB)
-async def create_user(
-    user_in: schemas.UserCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_admin_user_dependency),
-    audit_log: dict = Depends(log_audit_action)
-) -> Any:
-    """
-    Create new user (Admin only)
-    """
-    logger.info(f"Creating new user: {user_in.username} by admin: {current_user.username}")
+        payload = verify_token(token)
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except Exception:
+        raise credentials_exception
     
-    # Check if user already exists
-    db_user = crud.crud_user.get_by_username(db, username=user_in.username)
-    if db_user:
-        logger.warning(f"Username already exists: {user_in.username}")
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise credentials_exception
+    
+    if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
-        )
-    
-    db_user = crud.crud_user.get_by_email(db, email=user_in.email)
-    if db_user:
-        logger.warning(f"Email already exists: {user_in.email}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    # Create user
-    user = crud.crud_user.create(db, obj_in=user_in)
-    
-    logger.info(f"User created successfully: {user.username} (ID: {user.id})")
-    
-    return user
-
-
-@router.get("/", response_model=List[schemas.UserInDB])
-async def read_users(
-    pagination: PaginationParams = Depends(),
-    role: Optional[schemas.UserRole] = Query(None),
-    active_only: bool = Query(True),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_owner_or_admin_user_dependency)
-) -> Any:
-    """
-    Retrieve users (Owner/Admin only)
-    """
-    logger.debug(f"Reading users list by: {current_user.username}")
-    
-    query = db.query(models.User)
-    
-    # Apply filters
-    if role:
-        query = query.filter(models.User.role == role)
-    
-    if active_only:
-        query = query.filter(models.User.is_active == True)
-    
-    # Apply sorting
-    if pagination.sort_by:
-        if hasattr(models.User, pagination.sort_by):
-            if pagination.sort_order == "desc":
-                query = query.order_by(getattr(models.User, pagination.sort_by).desc())
-            else:
-                query = query.order_by(getattr(models.User, pagination.sort_by).asc())
-    
-    # Apply pagination
-    users = query.offset(pagination.skip).limit(pagination.size).all()
-    
-    logger.debug(f"Returning {len(users)} users")
-    return users
-
-
-@router.get("/{user_id}", response_model=schemas.UserWithProjects)
-async def read_user(
-    user_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(verify_user_ownership_or_admin) # <-- Swapped dependency to fix IDOR
-) -> Any:
-    """
-    Get user by ID (Owner/Admin only)
-    """
-    logger.debug(f"Reading user ID: {user_id} by: {current_user.username}")
-    
-    user = crud.crud_user.get(db, id=user_id)
-    
-    if not user:
-        logger.warning(f"User not found: {user_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
         )
     
     return user
 
 
-@router.put("/{user_id}", response_model=schemas.UserInDB)
-async def update_user(
+async def get_admin_user_dependency(
+    current_user: models.User = Depends(get_current_user)
+) -> models.User:
+    """
+    Ensure current user has ADMIN role
+    """
+    if current_user.role != schemas.UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
+
+
+async def get_owner_or_admin_user_dependency(
+    current_user: models.User = Depends(get_current_user)
+) -> models.User:
+    """
+    Ensure current user has OWNER or ADMIN role
+    """
+    if current_user.role not in [schemas.UserRole.ADMIN, schemas.UserRole.OWNER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Owner or Admin access required"
+        )
+    return current_user
+
+
+async def verify_user_ownership_or_admin(
     user_id: int,
-    user_in: schemas.UserUpdate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_admin_user_dependency),
-    audit_log: dict = Depends(log_audit_action)
-) -> Any:
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> models.User:
     """
-    Update user (Admin only)
+    Verify that the current user owns the requested resource or is admin
+    Used for IDOR prevention
     """
-    logger.info(f"Updating user ID: {user_id} by admin: {current_user.username}")
+    # Admin can access any user
+    if current_user.role == schemas.UserRole.ADMIN:
+        return current_user
     
-    user = crud.crud_user.get(db, id=user_id)
+    # Owners can access users they own (if relationship exists)
+    if current_user.role == schemas.UserRole.OWNER:
+        # Check if this owner has access to the requested user
+        # Adjust this logic based on your business rules
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if user and user.owner_id == current_user.id:
+            return current_user
     
-    if not user:
-        logger.warning(f"User not found for update: {user_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+    # Regular users can only access their own data
+    if current_user.id == user_id:
+        return current_user
     
-    # Prevent admin from demoting themselves
-    if user.id == current_user.id and user_in.role and user_in.role != schemas.UserRole.ADMIN:
-        logger.warning(f"Admin {current_user.username} attempted to demote themselves")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot change your own role from admin"
-        )
-    
-    # Check for duplicate email/username if changing
-    if user_in.email and user_in.email != user.email:
-        db_user = crud.crud_user.get_by_email(db, email=user_in.email)
-        if db_user:
-            logger.warning(f"Email already exists: {user_in.email}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
-    
-    if user_in.username and user_in.username != user.username:
-        db_user = crud.crud_user.get_by_username(db, username=user_in.username)
-        if db_user:
-            logger.warning(f"Username already exists: {user_in.username}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered"
-            )
-    
-    updated_user = crud.crud_user.update(db, db_obj=user, obj_in=user_in)
-    
-    logger.info(f"User updated successfully: {updated_user.username}")
-    
-    return updated_user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Not authorized to access this resource"
+    )
 
 
-@router.delete("/{user_id}")
-async def delete_user(
-    user_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_admin_user_dependency),
-    audit_log: dict = Depends(log_audit_action)
-) -> Any:
+# ============================================
+# AUDIT LOG DEPENDENCY
+# ============================================
+async def log_audit_action(
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """
-    Delete user (Admin only)
+    Log user actions for audit trail
+    Returns a dict with audit info that can be extended by endpoints
     """
-    logger.info(f"Deleting user ID: {user_id} by admin: {current_user.username}")
+    audit_data = {
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "timestamp": datetime.utcnow(),
+        "method": request.method,
+        "path": request.url.path,
+        "client_ip": request.client.host if request.client else None,
+    }
     
-    # Prevent self-deletion
-    if user_id == current_user.id:
-        logger.warning(f"Admin {current_user.username} attempted to delete themselves")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete your own account"
-        )
+    # You can optionally store this in a database table
+    logger.info(f"Audit: {audit_data}")
     
-    # FIX: Fetch user first to prevent 500 errors if ID doesn't exist
-    user = crud.crud_user.get(db, id=user_id)
-    
-    if not user:
-        logger.warning(f"User not found for deletion: {user_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-        
-    crud.crud_user.delete(db, id=user_id)
-    
-    logger.info(f"User deleted successfully: ID {user_id}")
-    
-    return {"message": "User deleted successfully"}
-
-
-@router.post("/{user_id}/activate")
-async def activate_user(
-    user_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_admin_user_dependency),
-    audit_log: dict = Depends(log_audit_action)
-) -> Any:
-    """
-    Activate user account (Admin only)
-    """
-    logger.info(f"Activating user ID: {user_id} by admin: {current_user.username}")
-    
-    user = crud.crud_user.get(db, id=user_id)
-    
-    if not user:
-        logger.warning(f"User not found for activation: {user_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # FIX: Use the CRUD update method for consistency
-    user_in = schemas.UserUpdate(is_active=True)
-    user = crud.crud_user.update(db, db_obj=user, obj_in=user_in)
-    
-    logger.info(f"User activated: {user.username}")
-    
-    return {"message": "User activated successfully"}
+    # Return the audit data so endpoints can add more details
+    return audit_data

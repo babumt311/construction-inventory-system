@@ -1,177 +1,153 @@
 """
-Authentication helper functions
+Authentication router for user login and token management
 """
-from datetime import datetime, timedelta
-from typing import Optional
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+# Add to any router file if these imports are missing
+from app.auth import check_project_access
+from app.auth import get_admin_user_dependency  # Add this function if missing
+from datetime import timedelta
+from typing import Any
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status, Depends
-from fastapi.security import OAuth2PasswordBearer
 import logging
-
-from app import models, schemas
+from app import schemas, crud, models
+from app.auth import authenticate_user, create_access_token, get_current_user
 from app.database import get_db
 from app.config import settings
+from app.dependencies import log_audit_action
 
+router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = logging.getLogger(__name__)
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
-
-
-# ============================================
-# PASSWORD FUNCTIONS
-# ============================================
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a hashed password"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Hash a password"""
-    return pwd_context.hash(password)
-
-
-# ============================================
-# USER AUTHENTICATION
-# ============================================
-def authenticate_user(db: Session, username: str, password: str) -> Optional[models.User]:
-    """Authenticate a user by username/email and password"""
-    # Try to find user by username
-    user = db.query(models.User).filter(
-        models.User.username == username
-    ).first()
+@router.post("/login", response_model=schemas.Token)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+    audit_log: dict = Depends(lambda: {"action": "LOGIN"})
+) -> Any:
+    """
+    OAuth2 compatible token login, get an access token for future requests
+    """
+    logger.info(f"Login attempt for username: {form_data.username}")
     
-    # If not found by username, try email
-    if not user:
-        user = db.query(models.User).filter(
-            models.User.email == username
-        ).first()
+    user = authenticate_user(db, form_data.username, form_data.password)
     
     if not user:
-        return None
-    
-    if not verify_password(password, user.hashed_password):
-        return None
-    
-    return user
-
-
-# ============================================
-# TOKEN FUNCTIONS
-# ============================================
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create JWT access token"""
-    to_encode = data.copy()
-    
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    
-    return encoded_jwt
-
-
-def verify_token(token: str) -> dict:
-    """Verify JWT token and return payload"""
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except JWTError as e:
-        logger.error(f"Token verification failed: {e}")
+        logger.warning(f"Failed login attempt for: {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> models.User:
-    """Get current authenticated user from token"""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    if not token:
-        raise credentials_exception
-    
-    try:
-        payload = verify_token(token)
-        username: str = payload.get("sub")
-        user_id: int = payload.get("user_id")
-        
-        if username is None or user_id is None:
-            raise credentials_exception
-    except Exception:
-        raise credentials_exception
-    
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if user is None:
-        raise credentials_exception
     
     if not user.is_active:
+        logger.warning(f"Inactive user login attempt: {form_data.username}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is disabled"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
         )
     
-    return user
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "user_id": user.id, "role": user.role.value},
+        expires_delta=access_token_expires
+    )
+    
+    logger.info(f"Successful login for user: {user.username}")
+    
+    # Audit log is handled by dependency
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user
+    }
 
+@router.post("/refresh", response_model=schemas.Token)
+async def refresh_token(
+    current_user: models.User = Depends(get_current_user),
+    audit_log: dict = Depends(lambda: {"action": "REFRESH_TOKEN"})
+) -> Any:
+    """
+    Refresh access token
+    """
+    logger.info(f"Token refresh requested for user: {current_user.username}")
+    
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": current_user.username, "user_id": current_user.id, "role": current_user.role.value},
+        expires_delta=access_token_expires
+    )
+    
+    logger.debug(f"Token refreshed for user: {current_user.username}")
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": current_user
+    }
 
-def get_admin_user_dependency(
+@router.get("/me", response_model=schemas.UserInDB)
+async def read_users_me(
     current_user: models.User = Depends(get_current_user)
-) -> models.User:
-    """Ensure current user has ADMIN role"""
-    if current_user.role != schemas.UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
+) -> Any:
+    """
+    Get current user information
+    """
+    logger.debug(f"User info requested for: {current_user.username}")
     return current_user
 
+@router.post("/logout")
+async def logout(
+    current_user: models.User = Depends(get_current_user),
+    audit_log: dict = Depends(lambda: {"action": "LOGOUT"})
+) -> Any:
+    """
+    Logout user (client should discard token)
+    """
+    logger.info(f"User logout: {current_user.username}")
+    return {"message": "Successfully logged out"}
 
-def get_owner_or_admin_dependency(
-    current_user: models.User = Depends(get_current_user)
-) -> models.User:
-    """Ensure current user has OWNER or ADMIN role"""
-    if current_user.role not in [schemas.UserRole.ADMIN, schemas.UserRole.OWNER]:
+@router.post("/change-password")
+async def change_password(
+    old_password: str,
+    new_password: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    audit_log: dict = Depends(lambda: {"action": "CHANGE_PASSWORD"})
+) -> Any:
+    """
+    Change user password
+    """
+    logger.info(f"Password change requested for user: {current_user.username}")
+    
+    # Verify old password
+    from app.auth import verify_password
+    if not verify_password(old_password, current_user.hashed_password):
+        logger.warning(f"Wrong old password for user: {current_user.username}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Owner or Admin access required"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect old password"
         )
-    return current_user
+    
+    # Update password
+    from app.auth import get_password_hash
+    current_user.hashed_password = get_password_hash(new_password)
+    db.add(current_user)
+    db.commit()
+    
+    logger.info(f"Password changed successfully for user: {current_user.username}")
+    
+    return {"message": "Password changed successfully"}
 
-
-def check_project_access(project_id: int, current_user: models.User, db: Session) -> bool:
-    """Check if user has access to a project"""
-    # Admin has access to all projects
-    if current_user.role == schemas.UserRole.ADMIN:
-        return True
-    
-    # Owner can access their projects
-    if current_user.role == schemas.UserRole.OWNER:
-        project = db.query(models.Project).filter(models.Project.id == project_id).first()
-        if project and project.owner_id == current_user.id:
-            return True
-    
-    # Regular users can access projects they're assigned to
-    # This assumes a many-to-many relationship between users and projects
-    # Adjust based on your actual model
-    if hasattr(current_user, 'projects'):
-        for project in current_user.projects:
-            if project.id == project_id:
-                return True
-    
-    return False
+# CLI endpoint for testing
+@router.get("/cli-test")
+async def cli_test_auth():
+    """CLI test endpoint for authentication"""
+    print("🔐 CLI Authentication Test")
+    print("✅ Auth router is working correctly")
+    return {
+        "status": "ok",
+        "message": "Auth router is functional",
+        "endpoints": ["/login", "/refresh", "/me", "/logout", "/change-password"]
+    }

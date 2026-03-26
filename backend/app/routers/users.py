@@ -4,15 +4,14 @@ User management router
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 import logging
 from app import schemas, crud, models
 from app.database import get_db
 from app.dependencies import (
     get_admin_user_dependency,
     get_owner_or_admin_user_dependency,
-    get_current_user_dependency,
-    verify_user_ownership_or_admin,  # <-- Added the new security dependency here
+    get_current_user_dependency,  # This is now available
+    verify_user_ownership_or_admin,
     PaginationParams,
     log_audit_action
 )
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================
-# ADD THIS STATS ENDPOINT - FIXES THE 422 ERROR
+# STATS ENDPOINT
 # ============================================
 @router.get("/stats")
 async def get_user_stats(
@@ -31,7 +30,6 @@ async def get_user_stats(
 ) -> Any:
     """
     Get user statistics (Owner/Admin only)
-    Returns counts for total users, admins, and owners
     """
     logger.info(f"Fetching user stats by: {current_user.username}")
     
@@ -55,12 +53,11 @@ async def get_user_stats(
             "total_users": total_users,
             "admins": admins,
             "owners": owners,
-            "active_projects": 0  # Placeholder - can be updated later
+            "active_projects": 0
         }
         
     except Exception as e:
         logger.error(f"Error fetching user stats: {str(e)}")
-        # Return default values on error
         return {
             "total_users": 0,
             "admins": 0,
@@ -112,7 +109,7 @@ async def read_users(
     role: Optional[schemas.UserRole] = Query(None),
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_owner_or_admin_user_dependency) # Kept the original here for the list view
+    current_user: models.User = Depends(get_owner_or_admin_user_dependency)
 ) -> Any:
     """
     Retrieve users (Owner/Admin only)
@@ -147,8 +144,7 @@ async def read_users(
 async def read_user(
     user_id: int,
     db: Session = Depends(get_db),
-    # Swapped dependency below to fix IDOR
-    current_user: models.User = Depends(verify_user_ownership_or_admin) 
+    current_user: models.User = Depends(verify_user_ownership_or_admin)
 ) -> Any:
     """
     Get user by ID (Owner/Admin only)
@@ -243,7 +239,6 @@ async def delete_user(
             detail="Cannot delete your own account"
         )
     
-    # FIX: Fetch the user FIRST before attempting to delete
     user = crud.crud_user.get(db, id=user_id)
     
     if not user:
@@ -281,7 +276,6 @@ async def activate_user(
             detail="User not found"
         )
     
-    # FIX: Use standard CRUD operations instead of raw db commands
     user_in = schemas.UserUpdate(is_active=True)
     user = crud.crud_user.update(db, db_obj=user, obj_in=user_in)
     

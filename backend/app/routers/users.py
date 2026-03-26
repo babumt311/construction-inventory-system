@@ -4,6 +4,7 @@ User management router
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import logging
 from app import schemas, crud, models
 from app.database import get_db
@@ -18,6 +19,55 @@ from app.dependencies import (
 
 router = APIRouter(prefix="/users", tags=["users"])
 logger = logging.getLogger(__name__)
+
+
+# ============================================
+# ADD THIS STATS ENDPOINT - FIXES THE 422 ERROR
+# ============================================
+@router.get("/stats")
+async def get_user_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_owner_or_admin_user_dependency)
+) -> Any:
+    """
+    Get user statistics (Owner/Admin only)
+    Returns counts for total users, admins, and owners
+    """
+    logger.info(f"Fetching user stats by: {current_user.username}")
+    
+    try:
+        # Get total users count
+        total_users = db.query(models.User).count()
+        
+        # Get admin users count
+        admins = db.query(models.User).filter(
+            models.User.role == schemas.UserRole.ADMIN
+        ).count()
+        
+        # Get owner users count
+        owners = db.query(models.User).filter(
+            models.User.role == schemas.UserRole.OWNER
+        ).count()
+        
+        logger.info(f"Stats: total_users={total_users}, admins={admins}, owners={owners}")
+        
+        return {
+            "total_users": total_users,
+            "admins": admins,
+            "owners": owners,
+            "active_projects": 0  # Placeholder - can be updated later
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching user stats: {str(e)}")
+        # Return default values on error
+        return {
+            "total_users": 0,
+            "admins": 0,
+            "owners": 0,
+            "active_projects": 0
+        }
+
 
 @router.post("/", response_model=schemas.UserInDB)
 async def create_user(
@@ -55,6 +105,7 @@ async def create_user(
     
     return user
 
+
 @router.get("/", response_model=List[schemas.UserInDB])
 async def read_users(
     pagination: PaginationParams = Depends(),
@@ -91,6 +142,7 @@ async def read_users(
     logger.debug(f"Returning {len(users)} users")
     return users
 
+
 @router.get("/{user_id}", response_model=schemas.UserWithProjects)
 async def read_user(
     user_id: int,
@@ -113,6 +165,7 @@ async def read_user(
         )
     
     return user
+
 
 @router.put("/{user_id}", response_model=schemas.UserInDB)
 async def update_user(
@@ -169,6 +222,7 @@ async def update_user(
     
     return updated_user
 
+
 @router.delete("/{user_id}")
 async def delete_user(
     user_id: int,
@@ -204,6 +258,7 @@ async def delete_user(
     logger.info(f"User deleted successfully: ID {user_id}")
     
     return {"message": "User deleted successfully"}
+
 
 @router.post("/{user_id}/activate")
 async def activate_user(

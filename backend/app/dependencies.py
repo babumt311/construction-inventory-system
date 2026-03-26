@@ -2,7 +2,7 @@
 User management router
 """
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Path
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import logging

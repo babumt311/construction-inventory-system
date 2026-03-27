@@ -104,6 +104,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         console.error('Stock entries error:', err);
         this.finishCall();
       }
+      complete: () => this.finishCall()
     });
     this.subscriptions.push(stockSub);
   }

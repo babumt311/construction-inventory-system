@@ -11,7 +11,7 @@ import { PurchaseOrderComponent } from './components/purchase-order/purchase-ord
 // New Components for Dashboard Links
 import { UserManagementComponent } from './components/user-management/user-management.component';
 import { ProjectManagementComponent } from './components/project-management/project-management.component';
-import { ActivityComponent } from './components/activity/activity.component';
+// import { ActivityComponent } from './components/activity/activity.component';
 
 // Guards
 import { AuthGuard } from './guards/auth.guard';

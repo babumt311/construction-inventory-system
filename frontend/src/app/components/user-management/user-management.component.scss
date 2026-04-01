@@ -1,0 +1,75 @@
+/* =========================================
+   User Management Styles
+   ========================================= */
+
+.card {
+  /* Soft transition if the card ever dynamically changes size */
+  transition: all 0.3s ease;
+  
+  .table-responsive {
+    /* Custom, slim scrollbar for Windows/Linux users */
+    &::-webkit-scrollbar {
+      height: 8px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #f8f9fa;
+      border-radius: 4px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #dee2e6;
+      border-radius: 4px;
+      
+      &:hover {
+        background: #adb5bd;
+      }
+    }
+  }
+
+  .table {
+    th {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background-color: #f8f9fa;
+    }
+
+    td {
+      vertical-align: middle;
+      font-size: 0.95rem;
+    }
+
+    /* Subtle row hover effect */
+    tbody tr {
+      transition: background-color 0.2s ease;
+      
+      &:hover {
+        background-color: rgba(13, 110, 253, 0.03); /* Very light Bootstrap primary blue */
+      }
+    }
+  }
+}
+
+/* Action Buttons (Edit/Delete) */
+.btn-outline-primary, .btn-outline-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+
+  /* Make them "pop" slightly when hovered */
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  &:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+}
+
+/* Make badges look slightly more crisp */
+.badge {
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}

@@ -42,11 +42,11 @@ const routes: Routes = [
     component: ProjectManagementComponent,
     canActivate: [AuthGuard]
   },
-  { 
-    path: 'activity', 
-    component: ActivityComponent,
-    canActivate: [AuthGuard]
-  },
+// { 
+// path: 'activity', 
+//   component: ActivityComponent,
+ //   canActivate: [AuthGuard]
+ // },
   // -----------------------------
   { 
     path: 'materials', 

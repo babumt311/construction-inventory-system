@@ -33,8 +33,10 @@ export class UserManagementComponent implements OnInit, OnDestroy {
   // Current user
   currentUser: User | null = null;
 
-  // Modal Control
+  // Modal Controls
   showAddModal = false;
+  showEditModal = false;
+  editingUser: User | null = null;
 
   private destroy$ = new Subject<void>();
 
@@ -87,7 +89,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
           this.users.push(newUser);
           this.filteredUsers = [...this.users];
           this.applyFilters();
-          this.closeAddModal(); // Instantly close modal on success
+          this.closeAddModal();
         },
         error: (error: any) => {
           this.errorMessage = 'Failed to create user';
@@ -106,6 +108,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
             this.users[index] = updatedUser;
             this.filteredUsers = [...this.users];
             this.applyFilters();
+            this.closeEditModal(); // Close modal on success
           }
         },
         error: (error: any) => {
@@ -205,7 +208,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     };
   }
 
-  // --- Modal & Form Controls ---
+  // --- Add User Methods ---
   openAddModal(): void {
     this.showAddModal = true;
   }
@@ -214,13 +217,11 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     this.showAddModal = false;
   }
 
-  // Updated to require a password!
   submitNewUser(username: string, email: string, role: string, password?: string): void {
     if (!username || !email || !password) {
       alert('Please fill in the username, email, and a password.');
       return;
     }
-
     const newUserPayload = {
       username: username,
       email: email,
@@ -228,8 +229,31 @@ export class UserManagementComponent implements OnInit, OnDestroy {
       role: role as UserRole,
       is_active: true
     };
-
     this.createUser(newUserPayload); 
+  }
+
+  // --- Edit User Methods ---
+  openEditModal(user: User): void {
+    this.editingUser = user;
+    this.showEditModal = true;
+  }
+
+  closeEditModal(): void {
+    this.showEditModal = false;
+    this.editingUser = null;
+  }
+
+  submitEditUser(username: string, email: string, role: string): void {
+    if (!this.editingUser || !username || !email) {
+      alert('Please fill in both the username and email.');
+      return;
+    }
+    const updates = {
+      username: username,
+      email: email,
+      role: role as UserRole
+    };
+    this.updateUser(this.editingUser.id, updates);
   }
 
   ngOnDestroy(): void {

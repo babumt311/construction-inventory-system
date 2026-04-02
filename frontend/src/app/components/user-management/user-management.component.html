@@ -120,33 +120,37 @@
         </h5>
         <button type="button" class="btn-close" (click)="closeEditModal()"></button>
       </div>
-      <div class="modal-body p-4" *ngIf="editingUser">
-        <form>
-          <div class="mb-3">
-            <label class="form-label text-secondary fw-semibold">Username</label>
-            <input #editUsername type="text" class="form-control" [value]="editingUser.username">
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-secondary fw-semibold">Email Address</label>
-            <input #editEmail type="email" class="form-control" [value]="editingUser.email">
-          </div>
-          <div class="mb-4">
-            <label class="form-label text-secondary fw-semibold">Role</label>
-            <select #editRole class="form-select" [value]="editingUser.role.toLowerCase()">
-              <option value="user">Standard User</option>
-              <option value="owner">Project Owner</option>
-              <option value="admin">Administrator</option>
-            </select>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer border-0 bg-light">
-        <button type="button" class="btn btn-outline-secondary" (click)="closeEditModal()">Cancel</button>
-        <button type="button" class="btn btn-primary px-4" 
-                (click)="submitEditUser(editUsername.value, editEmail.value, editRole.value)">
-          Update User
-        </button>
-      </div>
+      
+      <ng-container *ngIf="editingUser">
+        <div class="modal-body p-4">
+          <form>
+            <div class="mb-3">
+              <label class="form-label text-secondary fw-semibold">Username</label>
+              <input #editUsername type="text" class="form-control" [value]="editingUser.username">
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-secondary fw-semibold">Email Address</label>
+              <input #editEmail type="email" class="form-control" [value]="editingUser.email">
+            </div>
+            <div class="mb-4">
+              <label class="form-label text-secondary fw-semibold">Role</label>
+              <select #editRole class="form-select" [value]="editingUser.role.toLowerCase()">
+                <option value="user">Standard User</option>
+                <option value="owner">Project Owner</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer border-0 bg-light">
+          <button type="button" class="btn btn-outline-secondary" (click)="closeEditModal()">Cancel</button>
+          <button type="button" class="btn btn-primary px-4" 
+                  (click)="submitEditUser(editUsername.value, editEmail.value, editRole.value)">
+            Update User
+          </button>
+        </div>
+      </ng-container>
+
     </div>
   </div>
 </div>

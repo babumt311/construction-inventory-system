@@ -17,24 +17,27 @@ export interface Site {
 export class ProjectSitesComponent implements OnInit {
   projectId: string = '';
   sites: Site[] = [];
+  
+  // Modal Controls
   showAddModal = false;
+  showEditModal = false;
+  editingSite: Site | null = null;
 
   constructor(private route: ActivatedRoute) {}
 
   ngOnInit(): void {
-    // Grabs the project ID from the URL (e.g., /projects/123/sites)
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.loadMockSites();
   }
 
   loadMockSites(): void {
-    // Fake data so you can see it working immediately
     this.sites = [
       { id: '1', name: 'Main Foundation', location: 'North Wing', manager: 'John Doe', status: 'ACTIVE' },
       { id: '2', name: 'Electrical Hub', location: 'East Wing', manager: 'Jane Smith', status: 'INACTIVE' }
     ];
   }
 
+  // --- Add Modal Controls ---
   openAddModal(): void {
     this.showAddModal = true;
   }
@@ -59,6 +62,37 @@ export class ProjectSitesComponent implements OnInit {
 
     this.sites.push(newSite);
     this.closeAddModal();
+  }
+
+  // --- Edit Modal Controls ---
+  openEditModal(site: Site): void {
+    this.editingSite = { ...site }; // Clone it so we don't accidentally edit the table before hitting 'Save'
+    this.showEditModal = true;
+  }
+
+  closeEditModal(): void {
+    this.showEditModal = false;
+    this.editingSite = null;
+  }
+
+  submitEditSite(name: string, location: string, manager: string, status: string): void {
+    if (!this.editingSite || !name || !location) {
+      alert('Please provide a Site Name and Location.');
+      return;
+    }
+
+    const index = this.sites.findIndex(s => s.id === this.editingSite!.id);
+    if (index !== -1) {
+      this.sites[index] = {
+        ...this.editingSite,
+        name: name,
+        location: location,
+        manager: manager || 'Unassigned',
+        status: status as 'ACTIVE' | 'INACTIVE' | 'COMPLETED'
+      };
+    }
+
+    this.closeEditModal();
   }
 
   deleteSite(siteId: string): void {

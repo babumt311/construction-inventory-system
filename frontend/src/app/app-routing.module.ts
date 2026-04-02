@@ -8,6 +8,7 @@ import { MaterialManagementComponent } from './components/material-management/ma
 import { StockBalanceComponent } from './components/stock-balance/stock-balance.component';
 import { PurchaseOrderComponent } from './components/purchase-order/purchase-order.component';
 import { TaskListComponent } from './components/task-list/task-list.component';
+import { ProjectSitesComponent } from './components/project-sites/project-sites.component';
 
 // New Components for Dashboard Links
 import { UserManagementComponent } from './components/user-management/user-management.component';

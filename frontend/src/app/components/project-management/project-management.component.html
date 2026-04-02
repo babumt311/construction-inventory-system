@@ -2,11 +2,7 @@
   <div class="header-section">
     <div class="d-flex align-items-center">
       <h2 class="mb-0 me-4">Project Management</h2>
-      <button 
-        *ngIf="canEditProject()" 
-        class="btn btn-primary shadow-sm" 
-        (click)="openAddModal()"
-      >
+      <button *ngIf="canEditProject()" class="btn btn-primary shadow-sm" (click)="openAddModal()">
         <i class="fas fa-plus me-2"></i> Create New Project
       </button>
     </div>
@@ -32,20 +28,10 @@
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-3">
-          <input 
-            type="text" 
-            class="form-control" 
-            placeholder="Search projects..." 
-            [(ngModel)]="searchTerm"
-            (input)="applyFilters()"
-          />
+          <input type="text" class="form-control" placeholder="Search projects..." [(ngModel)]="searchTerm" (input)="applyFilters()"/>
         </div>
         <div class="col-md-2">
-          <select 
-            class="form-select" 
-            [(ngModel)]="statusFilter"
-            (change)="applyFilters()"
-          >
+          <select class="form-select" [(ngModel)]="statusFilter" (change)="applyFilters()">
             <option value="ALL">All Status</option>
             <option value="PLANNING">Planning</option>
             <option value="IN_PROGRESS">In Progress</option>
@@ -57,32 +43,16 @@
         <div class="col-md-3">
           <div class="input-group">
             <span class="input-group-text">From</span>
-            <input 
-              type="date" 
-              class="form-control" 
-              [(ngModel)]="dateRange.start"
-              (change)="applyFilters()"
-            />
+            <input type="date" class="form-control" [(ngModel)]="dateRange.start" (change)="applyFilters()"/>
             <span class="input-group-text">To</span>
-            <input 
-              type="date" 
-              class="form-control" 
-              [(ngModel)]="dateRange.end"
-              (change)="applyFilters()"
-            />
+            <input type="date" class="form-control" [(ngModel)]="dateRange.end" (change)="applyFilters()"/>
           </div>
         </div>
         <div class="col-md-2">
-          <button class="btn btn-outline-secondary w-100" (click)="clearFilters()">
-            Clear Filters
-          </button>
+          <button class="btn btn-outline-secondary w-100" (click)="clearFilters()">Clear Filters</button>
         </div>
         <div class="col-md-2">
-          <select 
-            class="form-select" 
-            [(ngModel)]="itemsPerPage"
-            (change)="applyFilters()"
-          >
+          <select class="form-select" [(ngModel)]="itemsPerPage" (change)="applyFilters()">
             <option value="5">5 per page</option>
             <option value="10">10 per page</option>
             <option value="25">25 per page</option>
@@ -94,11 +64,8 @@
   </div>
 
   <div *ngIf="isLoading" class="loading-section">
-    <div class="spinner-border text-primary" role="status">
-      <span class="visually-hidden">Loading...</span>
-    </div>
+    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
   </div>
-
   <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
     {{ errorMessage }}
     <button type="button" class="btn-close" (click)="errorMessage = ''"></button>
@@ -108,9 +75,7 @@
     <div class="row">
       <div class="col-md-8">
         <div class="project-list card">
-          <div class="card-header">
-            <h5 class="mb-0">Projects ({{ filteredProjects.length }})</h5>
-          </div>
+          <div class="card-header"><h5 class="mb-0">Projects ({{ filteredProjects.length }})</h5></div>
           <div class="card-body">
             <div class="table-responsive">
               <table class="table table-hover">
@@ -142,39 +107,25 @@
                         'bg-warning': project.status === 'ON_HOLD',
                         'bg-success': project.status === 'COMPLETED',
                         'bg-danger': project.status === 'CANCELLED'
-                      }">
-                        {{ project.status | titlecase }}
-                      </span>
+                      }">{{ project.status | titlecase }}</span>
                     </td>
                     <td>{{ project.start_date | date:'mediumDate' }}</td>
                     <td>{{ project.end_date | date:'mediumDate' }}</td>
                     <td>
                       <div class="progress" style="height: 8px;">
-                        <div class="progress-bar" 
-                             [ngClass]="{
-                               'bg-success': (project.progress || 0) >= 80,
-                               'bg-warning': (project.progress || 0) >= 50 && (project.progress || 0) < 80,
-                               'bg-danger': (project.progress || 0) < 50
-                             }"
-                             [style.width]="(project.progress || 0) + '%'">
-                        </div>
+                        <div class="progress-bar" [ngClass]="{'bg-success': (project.progress || 0) >= 80, 'bg-warning': (project.progress || 0) >= 50 && (project.progress || 0) < 80, 'bg-danger': (project.progress || 0) < 50 }" [style.width]="(project.progress || 0) + '%'"></div>
                       </div>
                       <small class="text-muted">{{ project.progress || 0 }}%</small>
                     </td>
                     <td>
                       <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-primary" 
-                                [routerLink]="['/projects', project.id]">
+                        <button class="btn btn-outline-primary" (click)="selectProject(project); $event.stopPropagation()">
                           <i class="fas fa-eye"></i>
                         </button>
-                        <button *ngIf="canEditProject()" 
-                                class="btn btn-outline-warning"
-                                [routerLink]="['/projects', project.id, 'edit']">
+                        <button *ngIf="canEditProject()" class="btn btn-outline-warning" (click)="openEditModal(project); $event.stopPropagation()">
                           <i class="fas fa-edit"></i>
                         </button>
-                        <button *ngIf="canDeleteProject()" 
-                                class="btn btn-outline-danger"
-                                (click)="deleteProject(project.id); $event.stopPropagation()">
+                        <button *ngIf="canDeleteProject()" class="btn btn-outline-danger" (click)="deleteProject(project.id); $event.stopPropagation()">
                           <i class="fas fa-trash"></i>
                         </button>
                       </div>
@@ -185,29 +136,12 @@
             </div>
 
             <div class="d-flex justify-content-between align-items-center">
-              <div class="text-muted">
-                Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to 
-                {{ Math.min(currentPage * itemsPerPage, totalItems) }} of {{ totalItems }} projects
-              </div>
+              <div class="text-muted">Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, totalItems) }} of {{ totalItems }} projects</div>
               <nav>
                 <ul class="pagination">
-                  <li class="page-item" [class.disabled]="currentPage === 1">
-                    <button class="page-link" (click)="changePage(currentPage - 1)">
-                      Previous
-                    </button>
-                  </li>
-                  <li *ngFor="let page of [1, 2, 3]" 
-                      class="page-item" 
-                      [class.active]="currentPage === page">
-                    <button class="page-link" (click)="changePage(page)">
-                      {{ page }}
-                    </button>
-                  </li>
-                  <li class="page-item" [class.disabled]="currentPage * itemsPerPage >= totalItems">
-                    <button class="page-link" (click)="changePage(currentPage + 1)">
-                      Next
-                    </button>
-                  </li>
+                  <li class="page-item" [class.disabled]="currentPage === 1"><button class="page-link" (click)="changePage(currentPage - 1)">Previous</button></li>
+                  <li *ngFor="let page of [1, 2, 3]" class="page-item" [class.active]="currentPage === page"><button class="page-link" (click)="changePage(page)">{{ page }}</button></li>
+                  <li class="page-item" [class.disabled]="currentPage * itemsPerPage >= totalItems"><button class="page-link" (click)="changePage(currentPage + 1)">Next</button></li>
                 </ul>
               </nav>
             </div>
@@ -217,89 +151,41 @@
 
       <div class="col-md-4">
         <div class="project-details card">
-          <div class="card-header">
-            <h5 class="mb-0">Project Details</h5>
-          </div>
+          <div class="card-header"><h5 class="mb-0">Project Details</h5></div>
           <div class="card-body">
             <div *ngIf="selectedProject; else noProjectSelected">
               <h4>{{ selectedProject.code ? selectedProject.code + ' - ' : '' }}{{ selectedProject.name }}</h4>
               <p class="text-muted">{{ selectedProject.description }}</p>
               
               <div class="details-grid">
-                <div class="detail-item">
-                  <strong>Client:</strong>
-                  <span>{{ selectedProject.client || 'N/A' }}</span>
-                </div>
+                <div class="detail-item"><strong>Client:</strong><span>{{ selectedProject.client || 'N/A' }}</span></div>
                 <div class="detail-item">
                   <strong>Status:</strong>
-                  <span class="badge" [ngClass]="{
-                    'bg-secondary': selectedProject.status === 'PLANNING',
-                    'bg-primary': selectedProject.status === 'IN_PROGRESS',
-                    'bg-warning': selectedProject.status === 'ON_HOLD',
-                    'bg-success': selectedProject.status === 'COMPLETED',
-                    'bg-danger': selectedProject.status === 'CANCELLED'
-                  }">
+                  <span class="badge" [ngClass]="{'bg-secondary': selectedProject.status === 'PLANNING', 'bg-primary': selectedProject.status === 'IN_PROGRESS', 'bg-warning': selectedProject.status === 'ON_HOLD', 'bg-success': selectedProject.status === 'COMPLETED', 'bg-danger': selectedProject.status === 'CANCELLED'}">
                     {{ selectedProject.status | titlecase }}
                   </span>
                 </div>
-                <div class="detail-item">
-                  <strong>Timeline:</strong>
-                  <span>{{ selectedProject.start_date | date:'shortDate' }} - {{ selectedProject.end_date | date:'shortDate' }}</span>
-                </div>
-                <div class="detail-item">
-                  <strong>Budget:</strong>
-                  <span>{{ selectedProject.budget | currency:'INR' }}</span>
-                </div>
-                <div class="detail-item">
-                  <strong>Progress:</strong>
-                  <span>{{ selectedProject.progress || 0 }}%</span>
-                </div>
-                <div class="detail-item">
-                  <strong>Team Members:</strong>
-                  <span>{{ selectedProject.team_members?.length || 0 }}</span>
-                </div>
+                <div class="detail-item"><strong>Timeline:</strong><span>{{ selectedProject.start_date | date:'shortDate' }} - {{ selectedProject.end_date | date:'shortDate' }}</span></div>
+                <div class="detail-item"><strong>Budget:</strong><span>{{ selectedProject.budget | currency:'INR' }}</span></div>
+                <div class="detail-item"><strong>Progress:</strong><span>{{ selectedProject.progress || 0 }}%</span></div>
+                <div class="detail-item"><strong>Team Members:</strong><span>{{ selectedProject.team_members?.length || 0 }}</span></div>
               </div>
 
               <div class="project-actions mt-4">
-                <button class="btn btn-outline-primary btn-sm me-2"
-                        [routerLink]="['/projects', selectedProject.id, 'tasks']">
-                  <i class="fas fa-tasks"></i> View Tasks
-                </button>
-                <button class="btn btn-outline-success btn-sm me-2"
-                        [routerLink]="['/projects', selectedProject.id, 'team']">
-                  <i class="fas fa-users"></i> Manage Team
-                </button>
-                <button class="btn btn-outline-info btn-sm me-2"
-                        [routerLink]="['/projects', selectedProject.id, 'sites']">
-                  <i class="fas fa-map-marker-alt"></i> Manage Sites
-                </button>
-                <button *ngIf="canEditProject()" 
-                        class="btn btn-outline-warning btn-sm"
-                        [routerLink]="['/projects', selectedProject.id, 'edit']">
-                  <i class="fas fa-edit"></i> Edit
-                </button>
+                <button class="btn btn-outline-info btn-sm me-2" [routerLink]="['/projects', selectedProject.id, 'sites']"><i class="fas fa-map-marker-alt"></i> Manage Sites</button>
+                <button class="btn btn-outline-primary btn-sm me-2" [routerLink]="['/projects', selectedProject.id, 'tasks']"><i class="fas fa-tasks"></i> View Tasks</button>
+                <button class="btn btn-outline-success btn-sm me-2" [routerLink]="['/projects', selectedProject.id, 'team']"><i class="fas fa-users"></i> Manage Team</button>
+                <button *ngIf="canEditProject()" class="btn btn-outline-warning btn-sm" (click)="openEditModal(selectedProject)"><i class="fas fa-edit"></i> Edit</button>
               </div>
             </div>
 
             <ng-template #noProjectSelected>
-              <div class="text-center text-muted py-5">
-                <i class="fas fa-folder-open fa-3x mb-3"></i>
-                <p>Select a project to view details</p>
-              </div>
+              <div class="text-center text-muted py-5"><i class="fas fa-folder-open fa-3x mb-3"></i><p>Select a project to view details</p></div>
             </ng-template>
           </div>
         </div>
       </div>
     </div>
-  </div>
-
-  <div *ngIf="!isLoading && filteredProjects.length === 0" class="empty-state text-center py-5">
-    <i class="fas fa-folder fa-4x text-muted mb-3"></i>
-    <h4>No projects found</h4>
-    <p class="text-muted">Try adjusting your filters or create a new project</p>
-    <button *ngIf="canEditProject()" class="btn btn-primary shadow-sm" (click)="openAddModal()">
-      <i class="fas fa-plus me-2"></i> Create First Project
-    </button>
   </div>
 </div>
 
@@ -307,9 +193,7 @@
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content border-0 shadow">
       <div class="modal-header bg-light border-0">
-        <h5 class="modal-title fw-bold">
-          <i class="fas fa-folder-plus text-primary me-2"></i>Create New Project
-        </h5>
+        <h5 class="modal-title fw-bold"><i class="fas fa-folder-plus text-primary me-2"></i>Create New Project</h5>
         <button type="button" class="btn-close" (click)="closeAddModal()"></button>
       </div>
       <div class="modal-body p-4">
@@ -356,14 +240,74 @@
       </div>
       <div class="modal-footer border-0 bg-light">
         <button type="button" class="btn btn-outline-secondary" (click)="closeAddModal()">Cancel</button>
-        <button type="button" class="btn btn-primary px-4" 
-                (click)="submitNewProject(newCode.value, newName.value, newClient.value, newStatus.value, newStartDate.value, newEndDate.value, newBudget.value, newDesc.value);
-                         newCode.value=''; newName.value=''; newClient.value=''; newStartDate.value=''; newEndDate.value=''; newBudget.value=''; newDesc.value=''">
-          Save Project
-        </button>
+        <button type="button" class="btn btn-primary px-4" (click)="submitNewProject(newCode.value, newName.value, newClient.value, newStatus.value, newStartDate.value, newEndDate.value, newBudget.value, newDesc.value); newCode.value=''; newName.value=''; newClient.value=''; newStartDate.value=''; newEndDate.value=''; newBudget.value=''; newDesc.value=''">Save Project</button>
       </div>
     </div>
   </div>
 </div>
 
-<div class="modal-backdrop fade show" *ngIf="showAddModal"></div>
+<div class="modal fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold"><i class="fas fa-edit text-warning me-2"></i>Edit Project</h5>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
+      </div>
+      <ng-container *ngIf="editingProject">
+        <div class="modal-body p-4">
+          <form>
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label text-secondary fw-semibold">Project Code *</label>
+                <input #editCode type="text" class="form-control" [value]="editingProject.code">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label text-secondary fw-semibold">Project Name *</label>
+                <input #editName type="text" class="form-control" [value]="editingProject.name">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label text-secondary fw-semibold">Client Name</label>
+                <input #editClient type="text" class="form-control" [value]="editingProject.client || ''">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label text-secondary fw-semibold">Status</label>
+                <select #editStatus class="form-select" [value]="editingProject.status">
+                  <option value="PLANNING">Planning</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="ON_HOLD">On Hold</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label text-secondary fw-semibold">Start Date</label>
+                <input #editStartDate type="date" class="form-control" [value]="formatDateForInput(editingProject.start_date)">
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label text-secondary fw-semibold">End Date</label>
+                <input #editEndDate type="date" class="form-control" [value]="formatDateForInput(editingProject.end_date)">
+              </div>
+              <div class="col-md-12 mb-3">
+                <label class="form-label text-secondary fw-semibold">Budget (₹)</label>
+                <input #editBudget type="number" class="form-control" [value]="editingProject.budget">
+              </div>
+              <div class="col-md-12 mb-4">
+                <label class="form-label text-secondary fw-semibold">Description / Notes</label>
+                <textarea #editDesc class="form-control" rows="3">{{ editingProject.description }}</textarea>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer border-0 bg-light">
+          <button type="button" class="btn btn-outline-secondary" (click)="closeEditModal()">Cancel</button>
+          <button type="button" class="btn btn-warning px-4 text-dark fw-bold" 
+                  (click)="submitEditProject(editCode.value, editName.value, editClient.value, editStatus.value, editStartDate.value, editEndDate.value, editBudget.value, editDesc.value)">
+            Update Project
+          </button>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="showAddModal || showEditModal"></div>

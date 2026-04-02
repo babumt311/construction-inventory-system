@@ -100,6 +100,12 @@ class Project(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), nullable=False, index=True)
     code = Column(String(50), unique=True, index=True)
+    
+    # --- ADDED FIELDS ---
+    client = Column(String(200))
+    budget = Column(Numeric(15, 2), default=0.00)
+    # --------------------
+    
     description = Column(Text)
     start_date = Column(DateTime(timezone=True))
     end_date = Column(DateTime(timezone=True))

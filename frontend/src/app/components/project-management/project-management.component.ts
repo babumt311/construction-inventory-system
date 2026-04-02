@@ -38,6 +38,9 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
   // User role
   userRole = '';
 
+  // Modal Control
+  showAddModal = false;
+
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -147,7 +150,6 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
   applyFilters(): void {
     let filtered = [...this.projects];
 
-    // Search filter
     if (this.searchTerm) {
       const term = this.searchTerm.toLowerCase();
       filtered = filtered.filter(project =>
@@ -156,29 +158,27 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       );
     }
 
-    // Status filter
     if (this.statusFilter !== 'ALL') {
       filtered = filtered.filter(
         project => project.status === this.statusFilter
       );
     }
 
-    // Date range filter
     if (this.dateRange.start) {
       const startDate = new Date(this.dateRange.start);
       filtered = filtered.filter(
-      project =>
-      project.start_date &&
-      new Date(project.start_date) >= startDate
+        project =>
+          project.start_date &&
+          new Date(project.start_date) >= startDate
       );
     }
 
     if (this.dateRange.end) {
       const endDate = new Date(this.dateRange.end);
       filtered = filtered.filter(
-      project =>
-      project.end_date &&
-      new Date(project.end_date) <= endDate
+        project =>
+          project.end_date &&
+          new Date(project.end_date) <= endDate
       );
     }
 
@@ -219,19 +219,53 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       completed: this.projects.filter(p => p.status === 'COMPLETED').length,
       delayed: this.projects.filter(
         p =>
-      p.status === 'IN_PROGRESS' &&
-      p.end_date &&
-      new Date(p.end_date) < now
+          p.status === 'IN_PROGRESS' &&
+          p.end_date &&
+          new Date(p.end_date) < now
       ).length
     };
   }
 
+  // FIXED: Made case-insensitive so the buttons actually appear!
   canEditProject(): boolean {
-    return ['ADMIN', 'PROJECT_MANAGER'].includes(this.userRole);
+    if (!this.userRole) return false;
+    const role = this.userRole.toLowerCase();
+    return ['admin', 'project_manager', 'owner'].includes(role);
   }
 
   canDeleteProject(): boolean {
-    return this.userRole === 'ADMIN';
+    if (!this.userRole) return false;
+    return this.userRole.toLowerCase() === 'admin';
+  }
+
+  // --- Modal & Form Controls ---
+  openAddModal(): void {
+    this.showAddModal = true;
+  }
+
+  closeAddModal(): void {
+    this.showAddModal = false;
+  }
+
+  submitNewProject(name: string, client: string, status: string, startDate: string, endDate: string, budget: string, description: string): void {
+    if (!name) {
+      alert('Please provide at least a Project Name.');
+      return;
+    }
+
+    const newProjectPayload = {
+      name: name,
+      client: client || '',
+      status: status,
+      start_date: startDate ? new Date(startDate).toISOString() : undefined,
+      end_date: endDate ? new Date(endDate).toISOString() : undefined,
+      budget: budget ? parseFloat(budget) : 0,
+      description: description || '',
+      progress: 0
+    };
+
+    this.createProject(newProjectPayload); 
+    this.closeAddModal();
   }
 
   ngOnDestroy(): void {

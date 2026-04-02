@@ -102,7 +102,7 @@
             </div>
             <div class="subtasks">
               <i class="material-icons">checklist</i>
-              <span>{{ task.subtasks.filter(st => st.completed).length }}/{{ task.subtasks.length }}</span>
+              <span>{{ getCompletedSubtasksCount(task) }}/{{ task.subtasks.length }}</span>
             </div>
           </div>
         </div>

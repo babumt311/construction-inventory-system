@@ -247,13 +247,14 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
     this.showAddModal = false;
   }
 
-  submitNewProject(name: string, client: string, status: string, startDate: string, endDate: string, budget: string, description: string): void {
-    if (!name) {
-      alert('Please provide at least a Project Name.');
+  submitNewProject(code: string, name: string, client: string, status: string, startDate: string, endDate: string, budget: string, description: string): void {
+    if (!code || !name) {
+      alert('Please provide both a Project Code and Project Name.');
       return;
     }
 
-      const newProjectPayload: Partial<Project> = {
+    const newProjectPayload: Partial<Project> = {
+      code: code, // <--- ADDED THE MISSING FIELD!
       name: name,
       client: client || '',
       status: status,

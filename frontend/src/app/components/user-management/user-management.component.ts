@@ -214,15 +214,17 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     this.showAddModal = false;
   }
 
-  submitNewUser(username: string, email: string, role: string): void {
-    if (!username || !email) {
-      alert('Please fill in both the username and email.');
+  // Updated to require a password!
+  submitNewUser(username: string, email: string, role: string, password?: string): void {
+    if (!username || !email || !password) {
+      alert('Please fill in the username, email, and a password.');
       return;
     }
 
     const newUserPayload = {
       username: username,
       email: email,
+      password: password,
       role: role as UserRole,
       is_active: true
     };

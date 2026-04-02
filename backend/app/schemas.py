@@ -105,6 +105,12 @@ class MaterialInDB(MaterialBase):
 class ProjectBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=200)
     code: str = Field(..., min_length=2, max_length=50)
+    
+    # --- ADDED FIELDS ---
+    client: Optional[str] = None
+    budget: Optional[Decimal] = Field(0.00, ge=0)
+    # --------------------
+    
     description: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
@@ -116,6 +122,12 @@ class ProjectCreate(ProjectBase):
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=200)
     code: Optional[str] = Field(None, min_length=2, max_length=50)
+    
+    # --- ADDED FIELDS ---
+    client: Optional[str] = None
+    budget: Optional[Decimal] = Field(None, ge=0)
+    # --------------------
+    
     description: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None

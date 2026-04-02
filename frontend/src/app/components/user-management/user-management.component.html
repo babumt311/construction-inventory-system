@@ -42,7 +42,7 @@
                 </span>
               </td>
               <td class="px-4 py-3 text-end">
-                <button *ngIf="canEditUser(user)" class="btn btn-sm btn-outline-primary me-2 rounded-circle" title="Edit User" style="width: 32px; height: 32px; padding: 0;">
+                <button *ngIf="canEditUser(user)" (click)="openEditModal(user)" class="btn btn-sm btn-outline-primary me-2 rounded-circle" title="Edit User" style="width: 32px; height: 32px; padding: 0;">
                   <i class="fas fa-edit"></i>
                 </button>
                 <button *ngIf="canDeleteUser(user)" (click)="deleteUser(user.id)" class="btn btn-sm btn-outline-danger rounded-circle" title="Delete User" style="width: 32px; height: 32px; padding: 0;">
@@ -111,4 +111,44 @@
   </div>
 </div>
 
-<div class="modal-backdrop fade show" *ngIf="showAddModal"></div>
+<div class="modal fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold">
+          <i class="fas fa-user-edit text-primary me-2"></i>Edit User
+        </h5>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
+      </div>
+      <div class="modal-body p-4" *ngIf="editingUser">
+        <form>
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Username</label>
+            <input #editUsername type="text" class="form-control" [value]="editingUser.username">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Email Address</label>
+            <input #editEmail type="email" class="form-control" [value]="editingUser.email">
+          </div>
+          <div class="mb-4">
+            <label class="form-label text-secondary fw-semibold">Role</label>
+            <select #editRole class="form-select" [value]="editingUser.role.toLowerCase()">
+              <option value="user">Standard User</option>
+              <option value="owner">Project Owner</option>
+              <option value="admin">Administrator</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeEditModal()">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" 
+                (click)="submitEditUser(editUsername.value, editEmail.value, editRole.value)">
+          Update User
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="showAddModal || showEditModal"></div>

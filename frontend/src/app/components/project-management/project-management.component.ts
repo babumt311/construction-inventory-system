@@ -38,8 +38,10 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
   // User role
   userRole = '';
 
-  // Modal Control
+  // Modal Controls
   showAddModal = false;
+  showEditModal = false;
+  editingProject: Project | null = null;
 
   private destroy$ = new Subject<void>();
 
@@ -117,6 +119,11 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
             this.projects[index] = updatedProject;
             this.filteredProjects = [...this.projects];
             this.applyFilters();
+            
+            // If the user was viewing this project in the sidebar, update it there too!
+            if (this.selectedProject?.id === projectId) {
+              this.selectedProject = updatedProject;
+            }
           }
         },
         error: (error: any) => {
@@ -138,7 +145,9 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
           this.projects = this.projects.filter(p => p.id !== projectId);
           this.filteredProjects = [...this.projects];
           this.applyFilters();
-          this.selectedProject = null;
+          if (this.selectedProject?.id === projectId) {
+            this.selectedProject = null;
+          }
         },
         error: (error: any) => {
           this.errorMessage = 'Failed to delete project';
@@ -154,7 +163,8 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       const term = this.searchTerm.toLowerCase();
       filtered = filtered.filter(project =>
         project.name.toLowerCase().includes(term) ||
-        project.description?.toLowerCase().includes(term)
+        project.description?.toLowerCase().includes(term) ||
+        project.code?.toLowerCase().includes(term)
       );
     }
 
@@ -226,7 +236,6 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
     };
   }
 
-  // FIXED: Made case-insensitive so the buttons actually appear!
   canEditProject(): boolean {
     if (!this.userRole) return false;
     const role = this.userRole.toLowerCase();
@@ -238,7 +247,7 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
     return this.userRole.toLowerCase() === 'admin';
   }
 
-  // --- Modal & Form Controls ---
+  // --- Add Project Controls ---
   openAddModal(): void {
     this.showAddModal = true;
   }
@@ -254,7 +263,7 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
     }
 
     const newProjectPayload: Partial<Project> = {
-      code: code, // <--- ADDED THE MISSING FIELD!
+      code: code,
       name: name,
       client: client || '',
       status: status,
@@ -267,6 +276,45 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
 
     this.createProject(newProjectPayload); 
     this.closeAddModal();
+  }
+
+  // --- Edit Project Controls ---
+  openEditModal(project: Project): void {
+    this.editingProject = project;
+    this.showEditModal = true;
+  }
+
+  closeEditModal(): void {
+    this.showEditModal = false;
+    this.editingProject = null;
+  }
+
+  submitEditProject(code: string, name: string, client: string, status: string, startDate: string, endDate: string, budget: string, description: string): void {
+    if (!this.editingProject || !code || !name) {
+      alert('Please provide both a Project Code and Project Name.');
+      return;
+    }
+
+    const updates: Partial<Project> = {
+      code: code,
+      name: name,
+      client: client || '',
+      status: status,
+      start_date: startDate ? new Date(startDate) : undefined,
+      end_date: endDate ? new Date(endDate) : undefined,
+      budget: budget ? parseFloat(budget) : 0,
+      description: description || ''
+    };
+
+    this.updateProject(this.editingProject.id, updates); 
+    this.closeEditModal();
+  }
+
+  // Format date helper for the edit HTML inputs
+  formatDateForInput(date: Date | string | undefined): string {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toISOString().split('T')[0];
   }
 
   ngOnDestroy(): void {

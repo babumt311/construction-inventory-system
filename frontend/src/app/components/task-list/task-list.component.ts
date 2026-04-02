@@ -66,7 +66,7 @@ export class TaskListComponent implements OnInit {
     { value: 'in-progress', label: 'In Progress', color: '#3b82f6', icon: 'refresh' },
     { value: 'review', label: 'Review', color: '#f59e0b', icon: 'visibility' },
     { value: 'completed', label: 'Completed', color: '#10b981', icon: 'check_circle' }
-  ];
+  ] as const;
 
   priorityOptions = [
     { value: 'low', label: 'Low', color: '#10b981' },
@@ -240,7 +240,12 @@ export class TaskListComponent implements OnInit {
     }
   }
 
-  getFilteredTasksByStatus(status: Task['status']): Task[] {
+  getCompletedSubtasksCount(task: Task): number {
+    if (!task.subtasks) return 0;
+    return task.subtasks.filter(st => st.completed).length;
+  }
+
+  getFilteredTasksByStatus(status: string): Task[] {
     return this.filteredTasks.filter(task => task.status === status);
   }
 }

@@ -56,6 +56,7 @@ import { UnauthorizedComponent } from './components/unauthorized/unauthorized.co
 import { PurchaseOrderComponent } from './components/purchase-order/purchase-order.component';
 import { StockBalanceComponent } from './components/stock-balance/stock-balance.component';
 import { AuditLogsComponent } from './components/audit-logs/audit-logs.component';
+import { TaskListComponent } from './components/task-list/task-list.component';
 
 // Pipes
 import { TruncatePipe } from './pipes/truncate.pipe';
@@ -94,6 +95,7 @@ export function tokenGetter() {
     ReportsComponent,
     ProjectManagementComponent,
     UserManagementComponent,
+    TaskListComponent,
   //  ProfileComponent,
     NotFoundComponent,
   //  UnauthorizedComponent,

@@ -87,7 +87,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
           this.users.push(newUser);
           this.filteredUsers = [...this.users];
           this.applyFilters();
-          this.closeAddModal(); // Close modal on success
+          this.closeAddModal(); // Instantly close modal on success
         },
         error: (error: any) => {
           this.errorMessage = 'Failed to create user';
@@ -205,13 +205,29 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     };
   }
 
-  // --- Modal Controls ---
+  // --- Modal & Form Controls ---
   openAddModal(): void {
     this.showAddModal = true;
   }
 
   closeAddModal(): void {
     this.showAddModal = false;
+  }
+
+  submitNewUser(username: string, email: string, role: string): void {
+    if (!username || !email) {
+      alert('Please fill in both the username and email.');
+      return;
+    }
+
+    const newUserPayload = {
+      username: username,
+      email: email,
+      role: role as UserRole,
+      is_active: true
+    };
+
+    this.createUser(newUserPayload); 
   }
 
   ngOnDestroy(): void {

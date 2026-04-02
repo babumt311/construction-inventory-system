@@ -1,14 +1,13 @@
 <div class="project-management-container">
-  <!-- Header Section -->
   <div class="header-section">
     <h1>Project Management</h1>
     <div class="header-actions">
       <button 
         *ngIf="canEditProject()" 
-        class="btn btn-primary" 
-        routerLink="/projects/new"
+        class="btn btn-primary shadow-sm" 
+        (click)="openAddModal()"
       >
-        <i class="fas fa-plus"></i> Create New Project
+        <i class="fas fa-plus me-2"></i> Create New Project
       </button>
       <div class="header-stats">
         <div class="stat-item">
@@ -27,7 +26,6 @@
     </div>
   </div>
 
-  <!-- Filters Section -->
   <div class="filters-section card">
     <div class="card-body">
       <div class="row g-3">
@@ -93,24 +91,20 @@
     </div>
   </div>
 
-  <!-- Loading State -->
   <div *ngIf="isLoading" class="loading-section">
     <div class="spinner-border text-primary" role="status">
       <span class="visually-hidden">Loading...</span>
     </div>
   </div>
 
-  <!-- Error Message -->
   <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
     {{ errorMessage }}
     <button type="button" class="btn-close" (click)="errorMessage = ''"></button>
   </div>
 
-  <!-- Projects Grid -->
   <div *ngIf="!isLoading && filteredProjects.length > 0" class="projects-grid">
     <div class="row">
       <div class="col-md-8">
-        <!-- Project List -->
         <div class="project-list card">
           <div class="card-header">
             <h5 class="mb-0">Projects ({{ filteredProjects.length }})</h5>
@@ -163,7 +157,7 @@
                              [style.width]="(project.progress || 0) + '%'">
                         </div>
                       </div>
-                      <small class="text-muted">{{ project.progress }}%</small>
+                      <small class="text-muted">{{ project.progress || 0 }}%</small>
                     </td>
                     <td>
                       <div class="btn-group btn-group-sm">
@@ -188,7 +182,6 @@
               </table>
             </div>
 
-            <!-- Pagination -->
             <div class="d-flex justify-content-between align-items-center">
               <div class="text-muted">
                 Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to 
@@ -220,7 +213,6 @@
         </div>
       </div>
 
-      <!-- Project Details Sidebar -->
       <div class="col-md-4">
         <div class="project-details card">
           <div class="card-header">
@@ -258,7 +250,7 @@
                 </div>
                 <div class="detail-item">
                   <strong>Progress:</strong>
-                  <span>{{ selectedProject.progress }}%</span>
+                  <span>{{ selectedProject.progress || 0 }}%</span>
                 </div>
                 <div class="detail-item">
                   <strong>Team Members:</strong>
@@ -266,7 +258,6 @@
                 </div>
               </div>
 
-              <!-- Project Actions -->
               <div class="project-actions mt-4">
                 <button class="btn btn-outline-primary btn-sm me-2"
                         [routerLink]="['/projects', selectedProject.id, 'tasks']">
@@ -292,26 +283,77 @@
             </ng-template>
           </div>
         </div>
-
-        <!-- Quick Stats -->
-        <div class="quick-stats card mt-3">
-          <div class="card-header">
-            <h6 class="mb-0">Project Statistics</h6>
-          </div>
-          <div class="card-body">
-          </div>
-        </div>
       </div>
     </div>
   </div>
 
-  <!-- Empty State -->
   <div *ngIf="!isLoading && filteredProjects.length === 0" class="empty-state text-center py-5">
     <i class="fas fa-folder fa-4x text-muted mb-3"></i>
     <h4>No projects found</h4>
     <p class="text-muted">Try adjusting your filters or create a new project</p>
-    <button *ngIf="canEditProject()" class="btn btn-primary" routerLink="/projects/new">
-      <i class="fas fa-plus"></i> Create First Project
+    <button *ngIf="canEditProject()" class="btn btn-primary shadow-sm" (click)="openAddModal()">
+      <i class="fas fa-plus me-2"></i> Create First Project
     </button>
   </div>
 </div>
+
+<div class="modal fade" [class.show]="showAddModal" [style.display]="showAddModal ? 'block' : 'none'" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold">
+          <i class="fas fa-folder-plus text-primary me-2"></i>Create New Project
+        </h5>
+        <button type="button" class="btn-close" (click)="closeAddModal()"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label text-secondary fw-semibold">Project Name *</label>
+              <input #newName type="text" class="form-control" placeholder="Enter project name">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label text-secondary fw-semibold">Client Name</label>
+              <input #newClient type="text" class="form-control" placeholder="Enter client name">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label text-secondary fw-semibold">Status</label>
+              <select #newStatus class="form-select">
+                <option value="PLANNING">Planning</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="ON_HOLD">On Hold</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label text-secondary fw-semibold">Start Date</label>
+              <input #newStartDate type="date" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label text-secondary fw-semibold">End Date</label>
+              <input #newEndDate type="date" class="form-control">
+            </div>
+            <div class="col-md-12 mb-3">
+              <label class="form-label text-secondary fw-semibold">Budget (₹)</label>
+              <input #newBudget type="number" class="form-control" placeholder="0.00">
+            </div>
+            <div class="col-md-12 mb-4">
+              <label class="form-label text-secondary fw-semibold">Description / Notes</label>
+              <textarea #newDesc class="form-control" rows="3" placeholder="Enter project details..."></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeAddModal()">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" 
+                (click)="submitNewProject(newName.value, newClient.value, newStatus.value, newStartDate.value, newEndDate.value, newBudget.value, newDesc.value);
+                         newName.value=''; newClient.value=''; newStartDate.value=''; newEndDate.value=''; newBudget.value=''; newDesc.value=''">
+          Save Project
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="showAddModal"></div>

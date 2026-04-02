@@ -33,6 +33,9 @@ export class UserManagementComponent implements OnInit, OnDestroy {
   // Current user
   currentUser: User | null = null;
 
+  // Modal Control
+  showAddModal = false;
+
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -84,6 +87,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
           this.users.push(newUser);
           this.filteredUsers = [...this.users];
           this.applyFilters();
+          this.closeAddModal(); // Close modal on success
         },
         error: (error: any) => {
           this.errorMessage = 'Failed to create user';
@@ -199,6 +203,15 @@ export class UserManagementComponent implements OnInit, OnDestroy {
       active: this.users.filter(u => u.is_active).length,
       admins: this.users.filter(u => u.role === UserRole.ADMIN).length
     };
+  }
+
+  // --- Modal Controls ---
+  openAddModal(): void {
+    this.showAddModal = true;
+  }
+
+  closeAddModal(): void {
+    this.showAddModal = false;
   }
 
   ngOnDestroy(): void {

@@ -57,6 +57,7 @@ import { PurchaseOrderComponent } from './components/purchase-order/purchase-ord
 import { StockBalanceComponent } from './components/stock-balance/stock-balance.component';
 import { AuditLogsComponent } from './components/audit-logs/audit-logs.component';
 import { TaskListComponent } from './components/task-list/task-list.component';
+import { ProjectSitesComponent } from './components/project-sites/project-sites.component';
 
 // Pipes
 import { TruncatePipe } from './pipes/truncate.pipe';
@@ -94,6 +95,7 @@ export function tokenGetter() {
     StockEntryComponent,
     ReportsComponent,
     ProjectManagementComponent,
+    ProjectSitesComponent,
     UserManagementComponent,
     TaskListComponent,
   //  ProfileComponent,

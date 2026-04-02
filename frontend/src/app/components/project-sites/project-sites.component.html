@@ -1,0 +1,82 @@
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1"><i class="fas fa-map-marker-alt text-info me-2"></i> Project Sites</h2>
+      <p class="text-muted mb-0">Manage physical locations and zones for Project ID: {{ projectId }}</p>
+    </div>
+    <button class="btn btn-primary shadow-sm" (click)="openAddModal()">
+      <i class="fas fa-plus me-2"></i> Add New Site
+    </button>
+  </div>
+
+  <div class="card shadow-sm border-0 rounded-lg">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="bg-light">
+            <tr>
+              <th class="border-0 px-4 py-3">Site Name</th>
+              <th class="border-0 px-4 py-3">Location</th>
+              <th class="border-0 px-4 py-3">Site Manager</th>
+              <th class="border-0 px-4 py-3">Status</th>
+              <th class="border-0 px-4 py-3 text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let site of sites">
+              <td class="px-4 py-3 fw-bold">{{ site.name }}</td>
+              <td class="px-4 py-3 text-muted"><i class="fas fa-map-pin me-2"></i>{{ site.location }}</td>
+              <td class="px-4 py-3">{{ site.manager }}</td>
+              <td class="px-4 py-3">
+                <span class="badge" [ngClass]="{'bg-success': site.status === 'ACTIVE', 'bg-secondary': site.status === 'INACTIVE', 'bg-info': site.status === 'COMPLETED'}">
+                  {{ site.status }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-end">
+                <button class="btn btn-sm btn-outline-danger rounded-circle" (click)="deleteSite(site.id)">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="sites.length === 0">
+              <td colspan="5" class="text-center py-5 text-muted">No sites added to this project yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" [class.show]="showAddModal" [style.display]="showAddModal ? 'block' : 'none'" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold"><i class="fas fa-plus-circle text-primary me-2"></i>Add Site to Project</h5>
+        <button type="button" class="btn-close" (click)="closeAddModal()"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="mb-3">
+          <label class="form-label text-secondary fw-semibold">Site Name / Zone *</label>
+          <input #siteName type="text" class="form-control" placeholder="e.g. Tower A">
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary fw-semibold">Physical Location / Address *</label>
+          <input #siteLocation type="text" class="form-control" placeholder="e.g. North Plot">
+        </div>
+        <div class="mb-4">
+          <label class="form-label text-secondary fw-semibold">Site Manager</label>
+          <input #siteManager type="text" class="form-control" placeholder="Assignee Name">
+        </div>
+      </div>
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeAddModal()">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" 
+                (click)="submitNewSite(siteName.value, siteLocation.value, siteManager.value); siteName.value=''; siteLocation.value=''; siteManager.value=''">
+          Save Site
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="showAddModal"></div>

@@ -33,9 +33,14 @@
                 </span>
               </td>
               <td class="px-4 py-3 text-end">
-                <button class="btn btn-sm btn-outline-danger rounded-circle" (click)="deleteSite(site.id)">
-                  <i class="fas fa-trash"></i>
-                </button>
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-warning rounded-circle me-2" (click)="openEditModal(site)" style="width: 32px; height: 32px; padding: 0;" title="Edit Site">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn btn-outline-danger rounded-circle" (click)="deleteSite(site.id)" style="width: 32px; height: 32px; padding: 0;" title="Delete Site">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
               </td>
             </tr>
             <tr *ngIf="sites.length === 0">
@@ -79,4 +84,48 @@
     </div>
   </div>
 </div>
-<div class="modal-backdrop fade show" *ngIf="showAddModal"></div>
+
+<div class="modal fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold"><i class="fas fa-edit text-warning me-2"></i>Edit Site</h5>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
+      </div>
+      
+      <ng-container *ngIf="editingSite">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Site Name / Zone *</label>
+            <input #editSiteName type="text" class="form-control" [value]="editingSite.name">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Physical Location / Address *</label>
+            <input #editSiteLocation type="text" class="form-control" [value]="editingSite.location">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Site Manager</label>
+            <input #editSiteManager type="text" class="form-control" [value]="editingSite.manager">
+          </div>
+          <div class="mb-4">
+            <label class="form-label text-secondary fw-semibold">Status</label>
+            <select #editSiteStatus class="form-select" [value]="editingSite.status">
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="INACTIVE">INACTIVE</option>
+              <option value="COMPLETED">COMPLETED</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer border-0 bg-light">
+          <button type="button" class="btn btn-outline-secondary" (click)="closeEditModal()">Cancel</button>
+          <button type="button" class="btn btn-warning px-4 text-dark fw-bold" 
+                  (click)="submitEditSite(editSiteName.value, editSiteLocation.value, editSiteManager.value, editSiteStatus.value)">
+            Update Site
+          </button>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="showAddModal || showEditModal"></div>

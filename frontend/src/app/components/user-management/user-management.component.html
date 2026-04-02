@@ -86,6 +86,10 @@
             <label class="form-label text-secondary fw-semibold">Email Address</label>
             <input #newEmail type="email" class="form-control" placeholder="name@company.com">
           </div>
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Password</label>
+            <input #newPassword type="password" class="form-control" placeholder="Create a password">
+          </div>
           <div class="mb-4">
             <label class="form-label text-secondary fw-semibold">Role</label>
             <select #newRole class="form-select">
@@ -99,7 +103,7 @@
       <div class="modal-footer border-0 bg-light">
         <button type="button" class="btn btn-outline-secondary" (click)="closeAddModal()">Cancel</button>
         <button type="button" class="btn btn-primary px-4" 
-                (click)="submitNewUser(newUsername.value, newEmail.value, newRole.value); newUsername.value=''; newEmail.value=''">
+                (click)="submitNewUser(newUsername.value, newEmail.value, newRole.value, newPassword.value); newUsername.value=''; newEmail.value=''; newPassword.value=''">
           Save User
         </button>
       </div>

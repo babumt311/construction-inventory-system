@@ -42,6 +42,10 @@ const routes: Routes = [
     component: ProjectManagementComponent,
     canActivate: [AuthGuard]
   },
+  { path: 'projects/:id/tasks',
+   component: TaskListComponent,
+   canActivate: [AuthGuard]
+  },
 // { 
 // path: 'activity', 
 //   component: ActivityComponent,

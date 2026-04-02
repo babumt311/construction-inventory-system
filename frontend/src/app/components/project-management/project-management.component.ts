@@ -253,12 +253,12 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const newProjectPayload = {
+      const newProjectPayload: Partial<Project> = {
       name: name,
       client: client || '',
       status: status,
-      start_date: startDate ? new Date(startDate).toISOString() : undefined,
-      end_date: endDate ? new Date(endDate).toISOString() : undefined,
+      start_date: startDate ? new Date(startDate) : undefined,
+      end_date: endDate ? new Date(endDate) : undefined,
       budget: budget ? parseFloat(budget) : 0,
       description: description || '',
       progress: 0

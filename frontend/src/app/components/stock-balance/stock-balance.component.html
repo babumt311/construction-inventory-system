@@ -2,7 +2,7 @@
   <div class="header-section mb-4">
     <div class="d-flex justify-content-between align-items-center">
       <div>
-        <h2><i class="fas fa-balance-scale me-2 text-primary"></i>Stock Balance</h2>
+        <h2><i class="fas fa-chart-line me-2 text-primary"></i>Stock Reports</h2>
         <p class="text-muted mb-0">View and analyze current stock levels across sites</p>
       </div>
       <div class="btn-group">
@@ -15,9 +15,6 @@
         </button>
         <button class="btn btn-success" (click)="refreshData()" [disabled]="loading">
           <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i> Refresh
-        </button>
-        <button class="btn btn-warning fw-bold" (click)="openEntryModal()">
-          <i class="fas fa-plus-circle me-2"></i> Record Entry
         </button>
       </div>
     </div>
@@ -241,7 +238,7 @@
             Please select a Project and Site from the dropdowns above.
           </p>
           <p class="text-muted" *ngIf="selectedSiteId">
-            No stock entries found for this site. Click "Record Entry" to add materials!
+            No stock entries found for this site. Record entries in the Inventory tab to see them here!
           </p>
         </div>
 
@@ -249,81 +246,6 @@
       <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons 
                      aria-label="Select page of stock balances" *ngIf="dataSource.data.length > 0">
       </mat-paginator>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" [class.show]="showEntryModal" [style.display]="showEntryModal ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content border-0 shadow">
-      <div class="modal-header bg-light border-0">
-        <h5 class="modal-title fw-bold"><i class="fas fa-truck-loading text-primary me-2"></i>Record Stock Transaction</h5>
-        <button type="button" class="btn-close" (click)="closeEntryModal()"></button>
-      </div>
-      <div class="modal-body p-4">
-        <form [formGroup]="entryForm">
-          <div class="row mb-3">
-            <div class="col-md-6">
-              <label class="form-label text-secondary fw-semibold">Project *</label>
-              <select class="form-select" formControlName="project_id" (change)="onEntryProjectChange($any($event.target).value)">
-                <option value="">Select Project</option>
-                <option *ngFor="let project of projects" [value]="project.id">{{ project.name }}</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label text-secondary fw-semibold">Site *</label>
-              <select class="form-select" formControlName="site_id">
-                <option value="">Select Site</option>
-                <option *ngFor="let site of entrySites" [value]="site.id">{{ site.name }}</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="row mb-3">
-            <div class="col-md-12">
-              <label class="form-label text-secondary fw-semibold">Material *</label>
-              <select class="form-select" formControlName="material_id">
-                <option value="">Select Material</option>
-                <option *ngFor="let material of materials" [value]="material.id">{{ material.name }}</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="row mb-3">
-            <div class="col-md-6">
-              <label class="form-label text-secondary fw-semibold">Transaction Type *</label>
-              <select class="form-select" formControlName="entry_type">
-                <option value="received">➕ Received (Delivery to Site)</option>
-                <option value="used">➖ Used (Consumed at Site)</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label text-secondary fw-semibold">Quantity *</label>
-              <input type="number" class="form-control" formControlName="quantity" placeholder="0.00" min="0.01" step="0.01">
-            </div>
-          </div>
-
-          <div class="row mb-3">
-            <div class="col-md-12">
-              <label class="form-label text-secondary fw-semibold">Reference / Invoice Number (Optional)</label>
-              <input type="text" class="form-control" formControlName="reference" placeholder="e.g. INV-2026-001 or Delivery Slip #">
-            </div>
-          </div>
-
-          <div class="row mb-2">
-            <div class="col-md-12">
-              <label class="form-label text-secondary fw-semibold">Remarks / Notes (Optional)</label>
-              <textarea class="form-control" formControlName="remarks" rows="2" placeholder="Any additional details..."></textarea>
-            </div>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer border-0 bg-light">
-        <button type="button" class="btn btn-outline-secondary" (click)="closeEntryModal()">Cancel</button>
-        <button type="button" class="btn btn-warning px-4 text-dark fw-bold" [disabled]="entryForm.invalid" (click)="submitStockEntry()">
-          <i class="fas fa-save me-2"></i>Save Entry
-        </button>
-      </div>
     </div>
   </div>
 </div>

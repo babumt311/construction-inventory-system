@@ -1,0 +1,95 @@
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1"><i class="fas fa-users text-success me-2"></i> Project Team</h2>
+      <p class="text-muted mb-0">Manage user access and roles for Project ID: {{ projectId }}</p>
+    </div>
+    <button class="btn btn-primary shadow-sm" (click)="openAddModal()">
+      <i class="fas fa-user-plus me-2"></i> Assign User
+    </button>
+  </div>
+
+  <div class="card shadow-sm border-0 rounded-lg">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="bg-light">
+            <tr>
+              <th class="border-0 px-4 py-3">Team Member</th>
+              <th class="border-0 px-4 py-3">Email Address</th>
+              <th class="border-0 px-4 py-3">Project Role</th>
+              <th class="border-0 px-4 py-3">Status</th>
+              <th class="border-0 px-4 py-3 text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let member of teamMembers">
+              <td class="px-4 py-3 fw-bold">
+                <div class="d-flex align-items-center">
+                  <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 35px; height: 35px; font-size: 14px;">
+                    {{ member.name.charAt(0) | uppercase }}
+                  </div>
+                  {{ member.name }}
+                </div>
+              </td>
+              <td class="px-4 py-3 text-muted">{{ member.email }}</td>
+              <td class="px-4 py-3 fw-semibold">{{ member.role }}</td>
+              <td class="px-4 py-3">
+                <span class="badge" [ngClass]="{'bg-success': member.status === 'ACTIVE', 'bg-secondary': member.status === 'INACTIVE'}">
+                  {{ member.status }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-end">
+                <button class="btn btn-sm btn-outline-danger rounded-circle" (click)="removeMember(member.id)" title="Remove from Project" style="width: 32px; height: 32px; padding: 0;">
+                  <i class="fas fa-user-minus"></i>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="teamMembers.length === 0">
+              <td colspan="5" class="text-center py-5 text-muted">No team members assigned to this project yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" [class.show]="showAddModal" [style.display]="showAddModal ? 'block' : 'none'" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold"><i class="fas fa-user-plus text-primary me-2"></i>Assign Team Member</h5>
+        <button type="button" class="btn-close" (click)="closeAddModal()"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="mb-3">
+          <label class="form-label text-secondary fw-semibold">Full Name *</label>
+          <input #memberName type="text" class="form-control" placeholder="e.g. John Doe">
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary fw-semibold">Email Address *</label>
+          <input #memberEmail type="email" class="form-control" placeholder="john@example.com">
+        </div>
+        <div class="mb-4">
+          <label class="form-label text-secondary fw-semibold">Project Role</label>
+          <select #memberRole class="form-select">
+            <option value="Project Manager">Project Manager</option>
+            <option value="Site Engineer">Site Engineer</option>
+            <option value="Safety Officer">Safety Officer</option>
+            <option value="Contractor">Contractor</option>
+            <option value="Team Member">Team Member</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeAddModal()">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" 
+                (click)="submitNewMember(memberName.value, memberEmail.value, memberRole.value); memberName.value=''; memberEmail.value=''">
+          Assign User
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="showAddModal"></div>

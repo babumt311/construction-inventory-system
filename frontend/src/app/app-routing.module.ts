@@ -14,6 +14,7 @@ import { ProjectTeamComponent } from './components/project-team/project-team.com
 // New Components for Dashboard Links
 import { UserManagementComponent } from './components/user-management/user-management.component';
 import { ProjectManagementComponent } from './components/project-management/project-management.component';
+import { StockManagementComponent } from './components/stock-management/stock-management.component'; // <-- ADDED THIS
 // import { ActivityComponent } from './components/activity/activity.component';
 
 // Guards
@@ -68,11 +69,19 @@ const routes: Routes = [
     component: MaterialManagementComponent,
     canActivate: [AuthGuard]
   },
+  
+  // --- UPDATED STOCK ROUTES ---
   { 
     path: 'stock', 
-    component: StockBalanceComponent,
+    component: StockManagementComponent, // <-- Changed to the new Management component
     canActivate: [AuthGuard]
   },
+  { 
+    path: 'stock-balance', 
+    component: StockBalanceComponent, // <-- Added for the Reports page
+    canActivate: [AuthGuard]
+  },
+  
   { 
     path: 'purchase-orders', 
     component: PurchaseOrderComponent,

@@ -1,5 +1,4 @@
-import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, Input } from '@angular/core';
 
 export interface Task {
   id: string;
@@ -40,8 +39,7 @@ export interface Assignee {
 @Component({
   selector: 'app-task-list',
   templateUrl: './task-list.component.html',
-  styleUrls: ['./task-list.component.scss'],
-  standalone: false
+  styleUrls: ['./task-list.component.scss']
 })
 export class TaskListComponent implements OnInit {
   @Input() tasks: Task[] = [];
@@ -50,10 +48,6 @@ export class TaskListComponent implements OnInit {
   @Input() showProjectFilter: boolean = true;
   @Input() showAssigneeFilter: boolean = true;
   @Input() showStatusFilter: boolean = true;
-  @Output() taskSelected = new EventEmitter<Task>();
-  @Output() taskStatusChange = new EventEmitter<{taskId: string, newStatus: Task['status']}>();
-  @Output() taskDelete = new EventEmitter<string>();
-  @Output() addTask = new EventEmitter<void>();
 
   filteredTasks: Task[] = [];
   searchQuery: string = '';
@@ -61,11 +55,16 @@ export class TaskListComponent implements OnInit {
   selectedAssignee: string = 'all';
   selectedStatus: string = 'all';
   
+  // Modal Controls
+  showAddModal = false;
+  showEditModal = false;
+  selectedTask: Task | null = null;
+  
   statusOptions = [
-    { value: 'todo', label: 'To Do', color: '#9ca3af', icon: 'radio_button_unchecked' },
-    { value: 'in-progress', label: 'In Progress', color: '#3b82f6', icon: 'refresh' },
-    { value: 'review', label: 'Review', color: '#f59e0b', icon: 'visibility' },
-    { value: 'completed', label: 'Completed', color: '#10b981', icon: 'check_circle' }
+    { value: 'todo', label: 'To Do', color: '#9ca3af' },
+    { value: 'in-progress', label: 'In Progress', color: '#3b82f6' },
+    { value: 'review', label: 'Review', color: '#f59e0b' },
+    { value: 'completed', label: 'Completed', color: '#10b981' }
   ] as const;
 
   priorityOptions = [
@@ -78,8 +77,8 @@ export class TaskListComponent implements OnInit {
   constructor() {}
 
   ngOnInit(): void {
-    this.filteredTasks = [...this.tasks];
     this.initializeMockTasks();
+    this.filterTasks();
   }
 
   private initializeMockTasks(): void {
@@ -92,7 +91,7 @@ export class TaskListComponent implements OnInit {
           status: 'in-progress',
           priority: 'high',
           assignee: { id: '2', name: 'Jane Smith', avatar: 'JS' },
-          dueDate: new Date('2024-12-20'),
+          dueDate: new Date('2026-12-20'),
           estimatedHours: 8,
           actualHours: 6,
           tags: ['Design', 'UI/UX'],
@@ -109,52 +108,15 @@ export class TaskListComponent implements OnInit {
           status: 'todo',
           priority: 'critical',
           assignee: { id: '3', name: 'Bob Johnson', avatar: 'BJ' },
-          dueDate: new Date('2024-12-15'),
+          dueDate: new Date('2026-12-15'),
           estimatedHours: 16,
           actualHours: 0,
           tags: ['Backend', 'Security'],
           subtasks: [
-            { id: '2-1', title: 'Setup JWT middleware', completed: false },
-            { id: '2-2', title: 'Create login endpoint', completed: false },
-            { id: '2-3', title: 'Implement refresh tokens', completed: false }
-          ]
-        },
-        {
-          id: '3',
-          title: 'Write Unit Tests',
-          description: 'Cover critical functionality with unit tests',
-          status: 'review',
-          priority: 'medium',
-          assignee: { id: '4', name: 'Alice Brown', avatar: 'AB' },
-          dueDate: new Date('2024-12-18'),
-          estimatedHours: 12,
-          actualHours: 14,
-          tags: ['Testing', 'Quality'],
-          subtasks: [
-            { id: '3-1', title: 'User service tests', completed: true },
-            { id: '3-2', title: 'API endpoint tests', completed: true },
-            { id: '3-3', title: 'Code review', completed: false }
-          ]
-        },
-        {
-          id: '4',
-          title: 'Database Optimization',
-          description: 'Optimize queries and add indexes',
-          status: 'completed',
-          priority: 'low',
-          assignee: { id: '1', name: 'John Doe', avatar: 'JD' },
-          dueDate: new Date('2024-12-10'),
-          estimatedHours: 10,
-          actualHours: 8,
-          tags: ['Database', 'Performance'],
-          subtasks: [
-            { id: '4-1', title: 'Query analysis', completed: true },
-            { id: '4-2', title: 'Index creation', completed: true },
-            { id: '4-3', title: 'Performance testing', completed: true }
+            { id: '2-1', title: 'Setup JWT middleware', completed: false }
           ]
         }
       ];
-      this.filteredTasks = [...this.tasks];
     }
   }
 
@@ -164,34 +126,84 @@ export class TaskListComponent implements OnInit {
         task.title.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
         task.description.toLowerCase().includes(this.searchQuery.toLowerCase());
       
-      const matchesProject = this.selectedProject === 'all' || true; // Implement project filtering if needed
-      const matchesAssignee = this.selectedAssignee === 'all' || task.assignee.id === this.selectedAssignee;
       const matchesStatus = this.selectedStatus === 'all' || task.status === this.selectedStatus;
-      
-      return matchesSearch && matchesProject && matchesAssignee && matchesStatus;
+      return matchesSearch && matchesStatus;
     });
   }
 
-  onSearchChange(): void {
-    this.filterTasks();
-  }
-
-  onFilterChange(): void {
-    this.filterTasks();
-  }
+  // --- Modal Logic ---
 
   onAddTask(): void {
-    this.addTask.emit();
+    this.showAddModal = true;
   }
 
-  getStatusColor(status: Task['status']): string {
-    const statusOption = this.statusOptions.find(opt => opt.value === status);
-    return statusOption?.color || '#9ca3af';
+  closeAddModal(): void {
+    this.showAddModal = false;
   }
 
-  getStatusLabel(status: Task['status']): string {
-    const statusOption = this.statusOptions.find(opt => opt.value === status);
-    return statusOption?.label || 'Unknown';
+  submitNewTask(title: string, description: string, priority: string, dueDate: string, estHours: string): void {
+    if (!title) return alert('Task title is required');
+
+    const newTask: Task = {
+      id: Math.random().toString(),
+      title: title,
+      description: description,
+      status: 'todo',
+      priority: priority as any,
+      assignee: { id: '0', name: 'Unassigned', avatar: 'UN' },
+      dueDate: dueDate ? new Date(dueDate) : new Date(),
+      estimatedHours: parseInt(estHours) || 0,
+      actualHours: 0,
+      tags: [],
+      subtasks: []
+    };
+
+    this.tasks.push(newTask);
+    this.filterTasks();
+    this.closeAddModal();
+  }
+
+  onTaskClick(task: Task): void {
+    this.selectedTask = { ...task }; // Clone it
+    this.showEditModal = true;
+  }
+
+  closeEditModal(): void {
+    this.showEditModal = false;
+    this.selectedTask = null;
+  }
+
+  submitEditTask(title: string, description: string, status: string, priority: string): void {
+    if (!this.selectedTask) return;
+    
+    const index = this.tasks.findIndex(t => t.id === this.selectedTask!.id);
+    if (index > -1) {
+      this.tasks[index].title = title;
+      this.tasks[index].description = description;
+      this.tasks[index].status = status as any;
+      this.tasks[index].priority = priority as any;
+    }
+    
+    this.filterTasks();
+    this.closeEditModal();
+  }
+
+  onDeleteTask(taskId: string): void {
+    if (confirm('Are you sure you want to delete this task?')) {
+      this.tasks = this.tasks.filter(t => t.id !== taskId);
+      this.filterTasks();
+    }
+  }
+
+  // --- Helpers ---
+
+  getFilteredTasksByStatus(status: string): Task[] {
+    return this.filteredTasks.filter(task => task.status === status);
+  }
+
+  getCompletedSubtasksCount(task: Task): number {
+    if (!task.subtasks) return 0;
+    return task.subtasks.filter(st => st.completed).length;
   }
 
   getPriorityColor(priority: Task['priority']): string {
@@ -217,35 +229,5 @@ export class TaskListComponent implements OnInit {
     if (!assignee.name) return '??';
     const names = assignee.name.split(' ');
     return (names[0].charAt(0) + (names[1]?.charAt(0) || '')).toUpperCase();
-  }
-
-  onTaskClick(task: Task): void {
-    this.taskSelected.emit(task);
-  }
-
-  onStatusChange(taskId: string, newStatus: Task['status']): void {
-    this.taskStatusChange.emit({ taskId, newStatus });
-    const task = this.tasks.find(t => t.id === taskId);
-    if (task) {
-      task.status = newStatus;
-    }
-    this.filterTasks();
-  }
-
-  onDeleteTask(taskId: string): void {
-    if (confirm('Are you sure you want to delete this task?')) {
-      this.taskDelete.emit(taskId);
-      this.tasks = this.tasks.filter(t => t.id !== taskId);
-      this.filterTasks();
-    }
-  }
-
-  getCompletedSubtasksCount(task: Task): number {
-    if (!task.subtasks) return 0;
-    return task.subtasks.filter(st => st.completed).length;
-  }
-
-  getFilteredTasksByStatus(status: string): Task[] {
-    return this.filteredTasks.filter(task => task.status === status);
   }
 }

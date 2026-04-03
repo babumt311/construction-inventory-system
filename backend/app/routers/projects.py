@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 import logging
 from app import schemas, crud, models
 from app.database import get_db
+from app.models import Site
+from app.schemas import SiteCreate, SiteInDB
 from app.dependencies import (
     get_owner_or_admin_user_dependency,
     get_current_user_dependency,

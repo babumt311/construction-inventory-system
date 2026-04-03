@@ -111,12 +111,21 @@
                     </td>
                     <td>{{ project.start_date | date:'mediumDate' }}</td>
                     <td>{{ project.end_date | date:'mediumDate' }}</td>
+                    
                     <td>
                       <div class="progress" style="height: 8px;">
-                        <div class="progress-bar" [ngClass]="{'bg-success': (project.progress || 0) >= 80, 'bg-warning': (project.progress || 0) >= 50 && (project.progress || 0) < 80, 'bg-danger': (project.progress || 0) < 50 }" [style.width]="(project.progress || 0) + '%'"></div>
+                        <div class="progress-bar" 
+                             [ngClass]="{
+                               'bg-success': getProjectProgress(project.id) >= 80,
+                               'bg-warning': getProjectProgress(project.id) >= 50 && getProjectProgress(project.id) < 80,
+                               'bg-danger': getProjectProgress(project.id) < 50
+                             }"
+                             [style.width]="getProjectProgress(project.id) + '%'">
+                        </div>
                       </div>
-                      <small class="text-muted">{{ project.progress || 0 }}%</small>
+                      <small class="text-muted">{{ getProjectProgress(project.id) }}%</small>
                     </td>
+
                     <td>
                       <div class="btn-group btn-group-sm">
                         <button class="btn btn-outline-primary" (click)="selectProject(project); $event.stopPropagation()">
@@ -167,14 +176,21 @@
                 </div>
                 <div class="detail-item"><strong>Timeline:</strong><span>{{ selectedProject.start_date | date:'shortDate' }} - {{ selectedProject.end_date | date:'shortDate' }}</span></div>
                 <div class="detail-item"><strong>Budget:</strong><span>{{ selectedProject.budget | currency:'INR' }}</span></div>
-                <div class="detail-item"><strong>Progress:</strong><span>{{ selectedProject.progress || 0 }}%</span></div>
-                <div class="detail-item"><strong>Team Members:</strong><span>{{ selectedProject.team_members?.length || 0 }}</span></div>
+                
+                <div class="detail-item">
+                  <strong>Progress:</strong>
+                  <span>{{ getProjectProgress(selectedProject.id) }}%</span>
+                </div>
+                <div class="detail-item">
+                  <strong>Team Members:</strong>
+                  <span>{{ selectedProject.users?.length || 0 }}</span>
+                </div>
               </div>
 
-              <div class="project-actions mt-4">
-                <button class="btn btn-outline-info btn-sm me-2" [routerLink]="['/projects', selectedProject.id, 'sites']"><i class="fas fa-map-marker-alt"></i> Manage Sites</button>
-                <button class="btn btn-outline-primary btn-sm me-2" [routerLink]="['/projects', selectedProject.id, 'tasks']"><i class="fas fa-tasks"></i> View Tasks</button>
-                <button class="btn btn-outline-success btn-sm me-2" [routerLink]="['/projects', selectedProject.id, 'team']"><i class="fas fa-users"></i> Manage Team</button>
+              <div class="project-actions mt-4 d-grid gap-2 d-md-flex flex-wrap">
+                <button class="btn btn-outline-info btn-sm" [routerLink]="['/projects', selectedProject.id, 'sites']"><i class="fas fa-map-marker-alt"></i> Manage Sites</button>
+                <button class="btn btn-outline-primary btn-sm" [routerLink]="['/projects', selectedProject.id, 'tasks']"><i class="fas fa-tasks"></i> View Tasks</button>
+                <button class="btn btn-outline-success btn-sm" [routerLink]="['/projects', selectedProject.id, 'team']"><i class="fas fa-users"></i> Manage Team</button>
                 <button *ngIf="canEditProject()" class="btn btn-outline-warning btn-sm" (click)="openEditModal(selectedProject)"><i class="fas fa-edit"></i> Edit</button>
               </div>
             </div>
@@ -289,7 +305,7 @@
               </div>
               <div class="col-md-12 mb-3">
                 <label class="form-label text-secondary fw-semibold">Budget (₹)</label>
-                <input #editBudget type="number" class="form-control" [value]="editingProject.budget">
+                <input #editBudget type="number" class="form-control" [value]="editingProject.budget || 0">
               </div>
               <div class="col-md-12 mb-4">
                 <label class="form-label text-secondary fw-semibold">Description / Notes</label>

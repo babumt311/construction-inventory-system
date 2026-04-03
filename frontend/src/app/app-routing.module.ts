@@ -9,6 +9,7 @@ import { StockBalanceComponent } from './components/stock-balance/stock-balance.
 import { PurchaseOrderComponent } from './components/purchase-order/purchase-order.component';
 import { TaskListComponent } from './components/task-list/task-list.component';
 import { ProjectSitesComponent } from './components/project-sites/project-sites.component';
+import { ProjectTeamComponent } from './components/project-team/project-team.component';
 
 // New Components for Dashboard Links
 import { UserManagementComponent } from './components/user-management/user-management.component';
@@ -51,6 +52,10 @@ const routes: Routes = [
   { path: 'projects/:id/sites',
    component: ProjectSitesComponent, 
    canActivate: [AuthGuard]
+  },
+  { path: 'projects/:id/team', 
+   component: ProjectTeamComponent, 
+   canActivate: [AuthGuard] 
   },
 // { 
 // path: 'activity', 

@@ -109,15 +109,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.subscriptions.push(stockSub);
   }
 
-  // ===============================
+// ===============================
   // PROJECT STATS + CHART
   // ===============================
   calculateProjectStats(projects: Project[]): void {
     this.projectStats = {
       total_projects: projects.length,
-      active_projects: projects.filter(p => p.status === 'active').length,
-      completed_projects: projects.filter(p => p.status === 'completed').length,
-      on_hold_projects: projects.filter(p => p.status === 'on-hold').length,
+      // FIX: Updated to match the exact uppercase strings from your FastAPI backend
+      active_projects: projects.filter(p => p.status === 'IN_PROGRESS' || p.status === 'PLANNING').length,
+      completed_projects: projects.filter(p => p.status === 'COMPLETED').length,
+      on_hold_projects: projects.filter(p => p.status === 'ON_HOLD').length,
       total_sites: projects.reduce(
         (sum, p) => sum + (p.sites?.length || 0), 0
       )

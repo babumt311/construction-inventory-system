@@ -83,10 +83,15 @@
             
             <div class="mb-3">
               <label class="form-label small fw-bold">Category</label>
-              <select class="form-select" formControlName="category_id">
-                <option value="">Select Category</option>
-                <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
-              </select>
+              <div class="input-group">
+                <select class="form-select" formControlName="category_id">
+                  <option value="">Select Category</option>
+                  <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
+                </select>
+                <button class="btn btn-outline-info bg-white" type="button" (click)="openCategoryModal()" title="Add New Category">
+                  <i class="fas fa-plus"></i>
+                </button>
+              </div>
             </div>
 
             <div class="row mb-3">
@@ -116,6 +121,35 @@
             </button>
           </form>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade shadow" [class.show]="showCategoryModal" [style.display]="showCategoryModal ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0">
+      <div class="modal-header bg-light">
+        <h6 class="fw-bold mb-0"><i class="fas fa-tags text-info me-2"></i>Create New Category</h6>
+        <button type="button" class="btn-close" (click)="showCategoryModal = false"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form [formGroup]="categoryForm">
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Category Name *</label>
+            <input type="text" class="form-control" formControlName="name" placeholder="e.g. Electrical, Plumbing">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-bold">Description (Optional)</label>
+            <textarea class="form-control" formControlName="description" rows="2"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 bg-light">
+        <button class="btn btn-secondary btn-sm" (click)="showCategoryModal = false">Cancel</button>
+        <button class="btn btn-info text-white btn-sm fw-bold" [disabled]="categoryForm.invalid || loading" (click)="submitCategory()">
+          Save Category
+        </button>
       </div>
     </div>
   </div>

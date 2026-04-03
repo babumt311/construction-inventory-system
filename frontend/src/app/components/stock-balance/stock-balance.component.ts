@@ -433,4 +433,13 @@ export class StockBalanceComponent implements OnInit {
     this.loadStockBalances();
     this.toastr.info('Stock data refreshed', 'Success');
   }
+  // --- Reorder Logic ---
+  createReorder(materialId: number | undefined): void {
+    if (!materialId) return;
+    
+    // For now, show a toast. Later, you can route this to your PO creation page!
+    // Example: this.router.navigate(['/purchase-orders/create'], { queryParams: { material: materialId } });
+    
+    this.toastr.info(`Redirecting to Purchase Order for Material ID: ${materialId}...`, 'Reorder Initiated');
+  }
 }

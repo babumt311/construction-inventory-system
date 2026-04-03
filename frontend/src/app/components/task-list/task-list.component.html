@@ -1,5 +1,4 @@
 <div class="task-list-container">
-  <!-- Header -->
   <div class="task-header">
     <div class="header-left">
       <h2>Tasks</h2>
@@ -7,44 +6,33 @@
     </div>
     <div class="header-right">
       <button class="btn btn-primary" (click)="onAddTask()">
-        <i class="material-icons">add</i>
+        <i class="fas fa-plus me-2"></i>
         <span>New Task</span>
       </button>
     </div>
   </div>
 
-  <!-- Filters -->
   <div class="task-filters">
     <div class="search-box">
-      <i class="material-icons">search</i>
+      <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
       <input
         type="text"
         [(ngModel)]="searchQuery"
-        (ngModelChange)="onSearchChange()"
+        (ngModelChange)="filterTasks()"
         placeholder="Search tasks..."
         class="search-input"
+        style="padding-left: 35px;"
       >
     </div>
 
     <div class="filter-controls">
-      <select *ngIf="showProjectFilter && projects.length > 0" [(ngModel)]="selectedProject" (ngModelChange)="onFilterChange()" class="filter-select">
-        <option value="all">All Projects</option>
-        <option *ngFor="let project of projects" [value]="project.id">{{ project.name }}</option>
-      </select>
-
-      <select *ngIf="showAssigneeFilter && assignees.length > 0" [(ngModel)]="selectedAssignee" (ngModelChange)="onFilterChange()" class="filter-select">
-        <option value="all">All Assignees</option>
-        <option *ngFor="let assignee of assignees" [value]="assignee.id">{{ assignee.name }}</option>
-      </select>
-
-      <select *ngIf="showStatusFilter" [(ngModel)]="selectedStatus" (ngModelChange)="onFilterChange()" class="filter-select">
+      <select *ngIf="showStatusFilter" [(ngModel)]="selectedStatus" (ngModelChange)="filterTasks()" class="filter-select">
         <option value="all">All Status</option>
         <option *ngFor="let status of statusOptions" [value]="status.value">{{ status.label }}</option>
       </select>
     </div>
   </div>
 
-  <!-- Kanban Board -->
   <div class="kanban-board">
     <div *ngFor="let status of statusOptions" class="kanban-column">
       <div class="column-header">
@@ -67,7 +55,7 @@
             </div>
             <div class="task-actions">
               <button class="action-btn" (click)="$event.stopPropagation(); onDeleteTask(task.id)">
-                <i class="material-icons">delete</i>
+                <i class="fas fa-trash"></i>
               </button>
             </div>
           </div>
@@ -81,7 +69,7 @@
               <span class="assignee-name">{{ task.assignee.name }}</span>
             </div>
             <div class="due-date">
-              <i class="material-icons">event</i>
+              <i class="fas fa-calendar-alt text-muted me-1"></i>
               <span>{{ getDaysUntilDue(task.dueDate) }} days</span>
             </div>
           </div>
@@ -97,21 +85,118 @@
 
           <div class="task-footer">
             <div class="hours">
-              <i class="material-icons">schedule</i>
+              <i class="fas fa-clock text-muted me-1"></i>
               <span>{{ task.actualHours }}/{{ task.estimatedHours }}h</span>
             </div>
             <div class="subtasks">
-              <i class="material-icons">checklist</i>
-              <span>{{ getCompletedSubtasksCount(task) }}/{{ task.subtasks.length }}</span>
+              <i class="fas fa-tasks text-muted me-1"></i>
+              <span>{{ getCompletedSubtasksCount(task) }}/{{ task.subtasks?.length || 0 }}</span>
             </div>
           </div>
         </div>
 
         <div *ngIf="getFilteredTasksByStatus(status.value).length === 0" class="empty-column">
-          <i class="material-icons">inbox</i>
+          <i class="fas fa-inbox text-muted"></i>
           <p>No tasks</p>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<div class="modal fade" [class.show]="showAddModal" [style.display]="showAddModal ? 'block' : 'none'" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold"><i class="fas fa-plus-circle text-primary me-2"></i>Add New Task</h5>
+        <button type="button" class="btn-close" (click)="closeAddModal()"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="mb-3">
+          <label class="form-label text-secondary fw-semibold">Task Title *</label>
+          <input #newTaskTitle type="text" class="form-control" placeholder="What needs to be done?">
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary fw-semibold">Description</label>
+          <textarea #newTaskDesc class="form-control" rows="2" placeholder="Task details..."></textarea>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label text-secondary fw-semibold">Priority</label>
+            <select #newTaskPriority class="form-select">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label text-secondary fw-semibold">Estimated Hours</label>
+            <input #newTaskHours type="number" class="form-control" value="0">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary fw-semibold">Due Date</label>
+          <input #newTaskDate type="date" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeAddModal()">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" 
+                (click)="submitNewTask(newTaskTitle.value, newTaskDesc.value, newTaskPriority.value, newTaskDate.value, newTaskHours.value)">
+          Create Task
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold"><i class="fas fa-edit text-warning me-2"></i>Edit Task</h5>
+        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
+      </div>
+      <ng-container *ngIf="selectedTask">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Task Title</label>
+            <input #editTaskTitle type="text" class="form-control" [value]="selectedTask.title">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Status</label>
+            <select #editTaskStatus class="form-select" [value]="selectedTask.status">
+              <option value="todo">To Do</option>
+              <option value="in-progress">In Progress</option>
+              <option value="review">Review</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Priority</label>
+            <select #editTaskPriority class="form-select" [value]="selectedTask.priority">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-secondary fw-semibold">Description</label>
+            <textarea #editTaskDesc class="form-control" rows="3">{{ selectedTask.description }}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer border-0 bg-light">
+          <button type="button" class="btn btn-outline-secondary" (click)="closeEditModal()">Cancel</button>
+          <button type="button" class="btn btn-warning fw-bold px-4" 
+                  (click)="submitEditTask(editTaskTitle.value, editTaskDesc.value, editTaskStatus.value, editTaskPriority.value)">
+            Save Changes
+          </button>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="showAddModal || showEditModal"></div>

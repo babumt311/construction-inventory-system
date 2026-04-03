@@ -55,6 +55,7 @@ import { NotFoundComponent } from './components/not-found/not-found.component';
 import { UnauthorizedComponent } from './components/unauthorized/unauthorized.component';
 import { PurchaseOrderComponent } from './components/purchase-order/purchase-order.component';
 import { StockBalanceComponent } from './components/stock-balance/stock-balance.component';
+import { StockManagementComponent } from './components/stock-management/stock-management.component'; // <-- ADDED THIS
 import { AuditLogsComponent } from './components/audit-logs/audit-logs.component';
 import { TaskListComponent } from './components/task-list/task-list.component';
 import { ProjectSitesComponent } from './components/project-sites/project-sites.component';
@@ -105,6 +106,7 @@ export function tokenGetter() {
   //  UnauthorizedComponent,
     PurchaseOrderComponent,
     StockBalanceComponent,
+    StockManagementComponent, // <-- ADDED THIS
   //  AuditLogsComponent,
   //  TruncatePipe,
     FilesizePipe

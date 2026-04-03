@@ -99,6 +99,7 @@ export function tokenGetter() {
     ProjectSitesComponent,
     UserManagementComponent,
     TaskListComponent,
+    ProjectTeamComponent,
   //  ProfileComponent,
     NotFoundComponent,
   //  UnauthorizedComponent,

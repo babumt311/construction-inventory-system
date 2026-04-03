@@ -82,16 +82,16 @@
             </div>
             
             <div class="mb-3">
-              <label class="form-label small fw-bold">Category</label>
-              <div class="input-group">
-                <select class="form-select" formControlName="category_id">
-                  <option value="">Select Category</option>
-                  <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
-                </select>
-                <button class="btn btn-outline-info bg-white" type="button" (click)="openCategoryModal()" title="Add New Category">
-                  <i class="fas fa-plus"></i>
+              <div class="d-flex justify-content-between align-items-end mb-1">
+                <label class="form-label small fw-bold mb-0">Category</label>
+                <button type="button" class="btn btn-sm btn-link text-info p-0 text-decoration-none fw-bold" (click)="openCategoryModal()">
+                  <i class="fas fa-plus-circle me-1"></i>Add New
                 </button>
               </div>
+              <select class="form-select" formControlName="category_id">
+                <option value="">Select Category</option>
+                <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
+              </select>
             </div>
 
             <div class="row mb-3">

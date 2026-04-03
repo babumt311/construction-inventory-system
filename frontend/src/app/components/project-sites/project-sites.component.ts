@@ -1,12 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { ProjectService } from '../../services/project.service'; // <-- ADDED THIS
 
 export interface Site {
-  id: string;
+  id?: string | number; // Optional because the DB generates it!
   name: string;
   location: string;
   manager: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'COMPLETED';
+  status: string;
 }
 
 @Component({
@@ -17,46 +18,37 @@ export interface Site {
 export class ProjectSitesComponent implements OnInit {
   projectId: string = '';
   sites: Site[] = [];
+  isLoading = false;
   
   // Modal Controls
   showAddModal = false;
-  showEditModal = false;
-  editingSite: Site | null = null;
 
-  constructor(private route: ActivatedRoute) {}
+  // We injected the ProjectService here
+  constructor(
+    private route: ActivatedRoute,
+    private projectService: ProjectService
+  ) {}
 
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
-    this.loadSites(); // Swapped to our LocalStorage loader!
+    this.loadRealSites();
   }
 
-  // --- LOCAL STORAGE LOGIC ---
-  private loadSites(): void {
-    const savedData = localStorage.getItem(`project_sites_${this.projectId}`);
-    
-    if (savedData) {
-      // Load saved sites from browser storage
-      this.sites = JSON.parse(savedData);
-    } else {
-      // If empty, load mock data and save it
-      this.loadMockSites();
-      this.saveSites();
-    }
+  // --- REAL DATABASE LOGIC ---
+  loadRealSites(): void {
+    this.isLoading = true;
+    this.projectService.getProjectSites(this.projectId).subscribe({
+      next: (dbSites) => {
+        this.sites = dbSites;
+        this.isLoading = false;
+      },
+      error: (err) => {
+        console.error("Error loading sites from PostgreSQL:", err);
+        this.isLoading = false;
+      }
+    });
   }
 
-  private saveSites(): void {
-    // Save the array permanently to the browser
-    localStorage.setItem(`project_sites_${this.projectId}`, JSON.stringify(this.sites));
-  }
-
-  loadMockSites(): void {
-    this.sites = [
-      { id: '1', name: 'Main Foundation', location: 'North Wing', manager: 'John Doe', status: 'ACTIVE' },
-      { id: '2', name: 'Electrical Hub', location: 'East Wing', manager: 'Jane Smith', status: 'INACTIVE' }
-    ];
-  }
-
-  // --- Add Modal Controls ---
   openAddModal(): void {
     this.showAddModal = true;
   }
@@ -71,55 +63,33 @@ export class ProjectSitesComponent implements OnInit {
       return;
     }
 
-    const newSite: Site = {
-      id: Math.random().toString(),
+    const newSite = {
       name: name,
       location: location,
       manager: manager || 'Unassigned',
-      status: 'ACTIVE'
+      status: 'active'
     };
 
-    this.sites.push(newSite);
-    this.saveSites(); // ADDED: Save immediately!
-    this.closeAddModal();
+    // Send it to Python to save permanently!
+    this.projectService.addProjectSite(this.projectId, newSite).subscribe({
+      next: (savedSite) => {
+        // Push the newly saved DB site (which now has a real ID) into our array
+        this.sites.push(savedSite);
+        this.closeAddModal();
+      },
+      error: (err) => console.error("Error saving site to database:", err)
+    });
   }
 
-  // --- Edit Modal Controls ---
-  openEditModal(site: Site): void {
-    this.editingSite = { ...site }; 
-    this.showEditModal = true;
-  }
-
-  closeEditModal(): void {
-    this.showEditModal = false;
-    this.editingSite = null;
-  }
-
-  submitEditSite(name: string, location: string, manager: string, status: string): void {
-    if (!this.editingSite || !name || !location) {
-      alert('Please provide a Site Name and Location.');
-      return;
-    }
-
-    const index = this.sites.findIndex(s => s.id === this.editingSite!.id);
-    if (index !== -1) {
-      this.sites[index] = {
-        ...this.editingSite,
-        name: name,
-        location: location,
-        manager: manager || 'Unassigned',
-        status: status as 'ACTIVE' | 'INACTIVE' | 'COMPLETED'
-      };
-    }
-
-    this.saveSites(); // ADDED: Save immediately!
-    this.closeEditModal();
-  }
-
-  deleteSite(siteId: string): void {
-    if (confirm('Are you sure you want to delete this site?')) {
-      this.sites = this.sites.filter(s => s.id !== siteId);
-      this.saveSites(); // ADDED: Save immediately!
+  deleteSite(siteId: any): void {
+    if (confirm('Are you sure you want to permanently delete this site from the database?')) {
+      this.projectService.deleteProjectSite(siteId).subscribe({
+        next: () => {
+          // Remove it from the screen once Python confirms it's deleted
+          this.sites = this.sites.filter(s => s.id !== siteId);
+        },
+        error: (err) => console.error("Error deleting site from database:", err)
+      });
     }
   }
 }

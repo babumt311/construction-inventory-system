@@ -27,7 +27,26 @@ export class ProjectSitesComponent implements OnInit {
 
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
-    this.loadMockSites();
+    this.loadSites(); // Swapped to our LocalStorage loader!
+  }
+
+  // --- LOCAL STORAGE LOGIC ---
+  private loadSites(): void {
+    const savedData = localStorage.getItem(`project_sites_${this.projectId}`);
+    
+    if (savedData) {
+      // Load saved sites from browser storage
+      this.sites = JSON.parse(savedData);
+    } else {
+      // If empty, load mock data and save it
+      this.loadMockSites();
+      this.saveSites();
+    }
+  }
+
+  private saveSites(): void {
+    // Save the array permanently to the browser
+    localStorage.setItem(`project_sites_${this.projectId}`, JSON.stringify(this.sites));
   }
 
   loadMockSites(): void {
@@ -61,12 +80,13 @@ export class ProjectSitesComponent implements OnInit {
     };
 
     this.sites.push(newSite);
+    this.saveSites(); // ADDED: Save immediately!
     this.closeAddModal();
   }
 
   // --- Edit Modal Controls ---
   openEditModal(site: Site): void {
-    this.editingSite = { ...site }; // Clone it so we don't accidentally edit the table before hitting 'Save'
+    this.editingSite = { ...site }; 
     this.showEditModal = true;
   }
 
@@ -92,12 +112,14 @@ export class ProjectSitesComponent implements OnInit {
       };
     }
 
+    this.saveSites(); // ADDED: Save immediately!
     this.closeEditModal();
   }
 
   deleteSite(siteId: string): void {
     if (confirm('Are you sure you want to delete this site?')) {
       this.sites = this.sites.filter(s => s.id !== siteId);
+      this.saveSites(); // ADDED: Save immediately!
     }
   }
 }

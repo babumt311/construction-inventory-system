@@ -9,12 +9,15 @@ import { Project, Site, ProjectCreateRequest } from '../models/project.model';
 export class ProjectService {
   constructor(private api: ApiService) {}
 
-  // Project Management
+  // ==========================================
+  // PROJECT MANAGEMENT
+  // ==========================================
+  
   getProjects(params?: any): Observable<Project[]> {
     return this.api.get<Project[]>('projects', params);
   }
 
-  getProject(id: number): Observable<Project> {
+  getProject(id: number | string): Observable<Project> {
     return this.api.get<Project>(`projects/${id}`);
   }
 
@@ -22,41 +25,70 @@ export class ProjectService {
     return this.api.post<Project>('projects', project);
   }
 
-  updateProject(id: number, project: Partial<Project>): Observable<Project> {
+  updateProject(id: number | string, project: Partial<Project>): Observable<Project> {
     return this.api.put<Project>(`projects/${id}`, project);
   }
 
-  deleteProject(id: number): Observable<any> {
+  deleteProject(id: number | string): Observable<any> {
     return this.api.delete<any>(`projects/${id}`);
   }
 
-  // Site Management
-  getProjectSites(projectId: number): Observable<Site[]> {
+
+  // ==========================================
+  // SITE MANAGEMENT
+  // ==========================================
+
+  getProjectSites(projectId: number | string): Observable<Site[]> {
     return this.api.get<Site[]>(`projects/${projectId}/sites`);
   }
 
-  getSite(id: number): Observable<Site> {
+  getSite(id: number | string): Observable<Site> {
     return this.api.get<Site>(`sites/${id}`);
   }
 
+  // NEW: Directly links a new site to a specific project
+  addProjectSite(projectId: number | string, siteData: any): Observable<Site> {
+    const payload = {
+      ...siteData,
+      project_id: typeof projectId === 'string' ? parseInt(projectId, 10) : projectId
+    };
+    return this.api.post<Site>(`projects/${projectId}/sites`, payload);
+  }
+
+  updateSite(id: number | string, site: Partial<Site>): Observable<Site> {
+    return this.api.put<Site>(`sites/${id}`, site);
+  }
+
+  // NEW: Deletes the site via the projects router
+  deleteProjectSite(siteId: number | string): Observable<any> {
+    return this.api.delete<any>(`projects/sites/${siteId}`);
+  }
+
+  // (Kept for backwards compatibility if used elsewhere)
   createSite(site: Partial<Site>): Observable<Site> {
     return this.api.post<Site>('sites', site);
   }
 
-  updateSite(id: number, site: Partial<Site>): Observable<Site> {
-    return this.api.put<Site>(`sites/${id}`, site);
-  }
-
-  deleteSite(id: number): Observable<any> {
+  // (Kept for backwards compatibility if used elsewhere)
+  deleteSite(id: number | string): Observable<any> {
     return this.api.delete<any>(`sites/${id}`);
   }
 
-  // User Access Management
-  addUserToProject(projectId: number, userId: number): Observable<any> {
+
+  // ==========================================
+  // USER ACCESS / TEAM MANAGEMENT
+  // ==========================================
+
+  // NEW: Fetch all users currently assigned to a project
+  getProjectUsers(projectId: number | string): Observable<any[]> {
+    return this.api.get<any[]>(`projects/${projectId}/users`);
+  }
+
+  addUserToProject(projectId: number | string, userId: number | string): Observable<any> {
     return this.api.post<any>(`projects/${projectId}/users/${userId}`, {});
   }
 
-  removeUserFromProject(projectId: number, userId: number): Observable<any> {
+  removeUserFromProject(projectId: number | string, userId: number | string): Observable<any> {
     return this.api.delete<any>(`projects/${projectId}/users/${userId}`);
   }
 }

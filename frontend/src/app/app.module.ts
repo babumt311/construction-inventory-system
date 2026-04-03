@@ -58,6 +58,7 @@ import { StockBalanceComponent } from './components/stock-balance/stock-balance.
 import { AuditLogsComponent } from './components/audit-logs/audit-logs.component';
 import { TaskListComponent } from './components/task-list/task-list.component';
 import { ProjectSitesComponent } from './components/project-sites/project-sites.component';
+import { ProjectTeamComponent } from './components/project-team/project-team.component';
 
 // Pipes
 import { TruncatePipe } from './pipes/truncate.pipe';

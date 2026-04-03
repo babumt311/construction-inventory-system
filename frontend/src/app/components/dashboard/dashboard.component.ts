@@ -108,20 +108,28 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
     this.subscriptions.push(stockSub);
   }
-
-// ===============================
+  
+  // ===============================
   // PROJECT STATS + CHART
   // ===============================
   calculateProjectStats(projects: Project[]): void {
+    // Loop through all projects and count the sites saved in LocalStorage
+    let totalSitesCount = 0;
+    projects.forEach(p => {
+      try {
+        const savedSites = localStorage.getItem(`project_sites_${p.id}`);
+        if (savedSites) {
+          totalSitesCount += JSON.parse(savedSites).length;
+        }
+      } catch (e) {}
+    });
+
     this.projectStats = {
       total_projects: projects.length,
-      // FIX: Updated to match the exact uppercase strings from your FastAPI backend
       active_projects: projects.filter(p => p.status === 'IN_PROGRESS' || p.status === 'PLANNING').length,
       completed_projects: projects.filter(p => p.status === 'COMPLETED').length,
       on_hold_projects: projects.filter(p => p.status === 'ON_HOLD').length,
-      total_sites: projects.reduce(
-        (sum, p) => sum + (p.sites?.length || 0), 0
-      )
+      total_sites: totalSitesCount // <-- Now reads your saved local storage!
     };
 
     setTimeout(() => this.createProjectChart(), 100);

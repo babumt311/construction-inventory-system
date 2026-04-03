@@ -1,4 +1,5 @@
 import { Component, OnInit, Input } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 
 export interface Task {
   id: string;
@@ -11,7 +12,7 @@ export interface Task {
     name: string;
     avatar?: string;
   };
-  dueDate: Date;
+  dueDate: Date | string; // Updated to accept string from JSON
   estimatedHours: number;
   actualHours: number;
   tags: string[];
@@ -42,6 +43,7 @@ export interface Assignee {
   styleUrls: ['./task-list.component.scss']
 })
 export class TaskListComponent implements OnInit {
+  projectId: string = '';
   @Input() tasks: Task[] = [];
   @Input() projects: Project[] = [];
   @Input() assignees: Assignee[] = [];
@@ -74,11 +76,33 @@ export class TaskListComponent implements OnInit {
     { value: 'critical', label: 'Critical', color: '#dc2626' }
   ];
 
-  constructor() {}
+  // ADDED: ActivatedRoute to get the Project ID from the URL
+  constructor(private route: ActivatedRoute) {}
 
   ngOnInit(): void {
-    this.initializeMockTasks();
+    this.projectId = this.route.snapshot.paramMap.get('id') || 'default';
+    this.loadTasks(); // Replaces initializeMockTasks()
+  }
+
+  // --- LOCAL STORAGE LOGIC ---
+  private loadTasks(): void {
+    const savedData = localStorage.getItem(`project_tasks_${this.projectId}`);
+    
+    if (savedData) {
+      // If we found saved tasks in the browser, use them!
+      this.tasks = JSON.parse(savedData);
+    } else {
+      // If it's empty, load the mock data so it looks pretty, then save it.
+      this.initializeMockTasks();
+      this.saveTasks();
+    }
+    
     this.filterTasks();
+  }
+
+  private saveTasks(): void {
+    // Converts the tasks array to a string and saves it permanently to the browser
+    localStorage.setItem(`project_tasks_${this.projectId}`, JSON.stringify(this.tasks));
   }
 
   private initializeMockTasks(): void {
@@ -159,12 +183,13 @@ export class TaskListComponent implements OnInit {
     };
 
     this.tasks.push(newTask);
+    this.saveTasks(); // ADDED: Save to memory immediately!
     this.filterTasks();
     this.closeAddModal();
   }
 
   onTaskClick(task: Task): void {
-    this.selectedTask = { ...task }; // Clone it
+    this.selectedTask = { ...task };
     this.showEditModal = true;
   }
 
@@ -184,6 +209,7 @@ export class TaskListComponent implements OnInit {
       this.tasks[index].priority = priority as any;
     }
     
+    this.saveTasks(); // ADDED: Save to memory immediately!
     this.filterTasks();
     this.closeEditModal();
   }
@@ -191,6 +217,7 @@ export class TaskListComponent implements OnInit {
   onDeleteTask(taskId: string): void {
     if (confirm('Are you sure you want to delete this task?')) {
       this.tasks = this.tasks.filter(t => t.id !== taskId);
+      this.saveTasks(); // ADDED: Save to memory immediately!
       this.filterTasks();
     }
   }
@@ -217,9 +244,9 @@ export class TaskListComponent implements OnInit {
     return Math.round((completed / task.subtasks.length) * 100);
   }
 
-  getDaysUntilDue(dueDate: Date): number {
+  getDaysUntilDue(dueDate: Date | string): number {
     const today = new Date();
-    const due = new Date(dueDate);
+    const due = new Date(dueDate); // Safely converts strings back to dates
     const diffTime = due.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }

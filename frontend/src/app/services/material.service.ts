@@ -9,7 +9,10 @@ import { Category, Material, MaterialCreateRequest } from '../models/material.mo
 export class MaterialService {
   constructor(private api: ApiService) {}
 
-  // Category Management
+  // ==========================================
+  // CATEGORY MANAGEMENT
+  // ==========================================
+  
   getCategories(): Observable<Category[]> {
     return this.api.get<Category[]>('products/categories');
   }
@@ -30,7 +33,10 @@ export class MaterialService {
     return this.api.delete<any>(`products/categories/${id}`);
   }
 
-  // Material Management
+  // ==========================================
+  // MATERIAL MANAGEMENT
+  // ==========================================
+  
   getMaterials(params?: any): Observable<Material[]> {
     return this.api.get<Material[]>('products/materials', params);
   }
@@ -39,7 +45,7 @@ export class MaterialService {
     return this.api.get<Material>(`products/materials/${id}`);
   }
 
-  createMaterial(material: MaterialCreateRequest): Observable<Material> {
+  createMaterial(material: MaterialCreateRequest | any): Observable<Material> {
     return this.api.post<Material>('products/materials', material);
   }
 
@@ -55,7 +61,10 @@ export class MaterialService {
     return this.api.get<Material[]>('products/materials/search', { q: searchTerm });
   }
 
-  // Excel Upload
+  // ==========================================
+  // EXCEL UPLOAD & TEMPLATES
+  // ==========================================
+  
   uploadMaterials(file: File): Observable<any> {
     return this.api.uploadFile('products/upload/materials', file);
   }

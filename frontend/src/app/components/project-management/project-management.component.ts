@@ -1,329 +1,344 @@
-]<div class="project-management-container">
-  <div class="header-section">
-    <div class="d-flex align-items-center">
-      <h2 class="mb-0 me-4">Project Management</h2>
-      <button *ngIf="canEditProject()" class="btn btn-primary shadow-sm" (click)="openAddModal()">
-        <i class="fas fa-plus me-2"></i> Create New Project
-      </button>
-    </div>
-    <div class="header-actions">
-      <div class="header-stats">
-        <div class="stat-item">
-          <span class="stat-label">Total Projects:</span>
-          <span class="stat-value">{{ getProjectStats().total }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">Active:</span>
-          <span class="stat-value text-success">{{ getProjectStats().active }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">Delayed:</span>
-          <span class="stat-value text-danger">{{ getProjectStats().delayed }}</span>
-        </div>
-      </div>
-    </div>
-  </div>
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
-  <div class="filters-section card">
-    <div class="card-body">
-      <div class="row g-3">
-        <div class="col-md-3">
-          <input type="text" class="form-control" placeholder="Search projects..." [(ngModel)]="searchTerm" (input)="applyFilters()"/>
-        </div>
-        <div class="col-md-2">
-          <select class="form-select" [(ngModel)]="statusFilter" (change)="applyFilters()">
-            <option value="ALL">All Status</option>
-            <option value="PLANNING">Planning</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="ON_HOLD">On Hold</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-        </div>
-        <div class="col-md-3">
-          <div class="input-group">
-            <span class="input-group-text">From</span>
-            <input type="date" class="form-control" [(ngModel)]="dateRange.start" (change)="applyFilters()"/>
-            <span class="input-group-text">To</span>
-            <input type="date" class="form-control" [(ngModel)]="dateRange.end" (change)="applyFilters()"/>
-          </div>
-        </div>
-        <div class="col-md-2">
-          <button class="btn btn-outline-secondary w-100" (click)="clearFilters()">Clear Filters</button>
-        </div>
-        <div class="col-md-2">
-          <select class="form-select" [(ngModel)]="itemsPerPage" (change)="applyFilters()">
-            <option value="5">5 per page</option>
-            <option value="10">10 per page</option>
-            <option value="25">25 per page</option>
-            <option value="50">50 per page</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
+// Services
+import { ProjectService } from '../../services/project.service';
+import { AuthService } from '../../services/auth.service';
 
-  <div *ngIf="isLoading" class="loading-section">
-    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-  </div>
-  <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
-    {{ errorMessage }}
-    <button type="button" class="btn-close" (click)="errorMessage = ''"></button>
-  </div>
+// Models
+import { Project } from '../../models/project.model';
 
-  <div *ngIf="!isLoading && filteredProjects.length > 0" class="projects-grid">
-    <div class="row">
-      <div class="col-md-8">
-        <div class="project-list card">
-          <div class="card-header"><h5 class="mb-0">Projects ({{ filteredProjects.length }})</h5></div>
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-hover">
-                <thead>
-                  <tr>
-                    <th>Project Name</th>
-                    <th>Client</th>
-                    <th>Status</th>
-                    <th>Start Date</th>
-                    <th>End Date</th>
-                    <th>Progress</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let project of paginatedProjects" 
-                      [class.table-active]="selectedProject?.id === project.id"
-                      (click)="selectProject(project)"
-                      style="cursor: pointer;">
-                    <td>
-                      <strong>{{ project.code ? project.code + ' - ' : '' }}{{ project.name }}</strong>
-                      <div class="text-muted small">{{ (project.description || '') | truncate:50 }}</div>
-                    </td>
-                    <td>{{ project.client || 'N/A' }}</td>
-                    <td>
-                      <span class="badge" [ngClass]="{
-                        'bg-secondary': project.status === 'PLANNING',
-                        'bg-primary': project.status === 'IN_PROGRESS',
-                        'bg-warning': project.status === 'ON_HOLD',
-                        'bg-success': project.status === 'COMPLETED',
-                        'bg-danger': project.status === 'CANCELLED'
-                      }">{{ project.status | titlecase }}</span>
-                    </td>
-                    <td>{{ project.start_date | date:'mediumDate' }}</td>
-                    <td>{{ project.end_date | date:'mediumDate' }}</td>
-                    
-                    <td>
-                      <div class="progress" style="height: 8px;">
-                        <div class="progress-bar" 
-                             [ngClass]="{
-                               'bg-success': getProjectProgress(project.id) >= 80,
-                               'bg-warning': getProjectProgress(project.id) >= 50 && getProjectProgress(project.id) < 80,
-                               'bg-danger': getProjectProgress(project.id) < 50
-                             }"
-                             [style.width]="getProjectProgress(project.id) + '%'">
-                        </div>
-                      </div>
-                      <small class="text-muted">{{ getProjectProgress(project.id) }}%</small>
-                    </td>
+@Component({
+  selector: 'app-project-management',
+  templateUrl: './project-management.component.html',
+  styleUrls: ['./project-management.component.scss']
+})
+export class ProjectManagementComponent implements OnInit, OnDestroy {
 
-                    <td>
-                      <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-primary" (click)="selectProject(project); $event.stopPropagation()">
-                          <i class="fas fa-eye"></i>
-                        </button>
-                        <button *ngIf="canEditProject()" class="btn btn-outline-warning" (click)="openEditModal(project); $event.stopPropagation()">
-                          <i class="fas fa-edit"></i>
-                        </button>
-                        <button *ngIf="canDeleteProject()" class="btn btn-outline-danger" (click)="deleteProject(project.id); $event.stopPropagation()">
-                          <i class="fas fa-trash"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+  protected readonly Math = Math;
 
-            <div class="d-flex justify-content-between align-items-center">
-              <div class="text-muted">Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, totalItems) }} of {{ totalItems }} projects</div>
-              <nav>
-                <ul class="pagination">
-                  <li class="page-item" [class.disabled]="currentPage === 1"><button class="page-link" (click)="changePage(currentPage - 1)">Previous</button></li>
-                  <li *ngFor="let page of [1, 2, 3]" class="page-item" [class.active]="currentPage === page"><button class="page-link" (click)="changePage(page)">{{ page }}</button></li>
-                  <li class="page-item" [class.disabled]="currentPage * itemsPerPage >= totalItems"><button class="page-link" (click)="changePage(currentPage + 1)">Next</button></li>
-                </ul>
-              </nav>
-            </div>
-          </div>
-        </div>
-      </div>
+  projects: Project[] = [];
+  filteredProjects: Project[] = [];
+  selectedProject: Project | null = null;
 
-      <div class="col-md-4">
-        <div class="project-details card">
-          <div class="card-header"><h5 class="mb-0">Project Details</h5></div>
-          <div class="card-body">
-            <div *ngIf="selectedProject; else noProjectSelected">
-              <h4>{{ selectedProject.code ? selectedProject.code + ' - ' : '' }}{{ selectedProject.name }}</h4>
-              <p class="text-muted">{{ selectedProject.description }}</p>
-              
-              <div class="details-grid">
-                <div class="detail-item"><strong>Client:</strong><span>{{ selectedProject.client || 'N/A' }}</span></div>
-                <div class="detail-item">
-                  <strong>Status:</strong>
-                  <span class="badge" [ngClass]="{'bg-secondary': selectedProject.status === 'PLANNING', 'bg-primary': selectedProject.status === 'IN_PROGRESS', 'bg-warning': selectedProject.status === 'ON_HOLD', 'bg-success': selectedProject.status === 'COMPLETED', 'bg-danger': selectedProject.status === 'CANCELLED'}">
-                    {{ selectedProject.status | titlecase }}
-                  </span>
-                </div>
-                <div class="detail-item"><strong>Timeline:</strong><span>{{ selectedProject.start_date | date:'shortDate' }} - {{ selectedProject.end_date | date:'shortDate' }}</span></div>
-                <div class="detail-item"><strong>Budget:</strong><span>{{ selectedProject.budget | currency:'INR' }}</span></div>
-                
-                <div class="detail-item">
-                  <strong>Progress:</strong>
-                  <span>{{ getProjectProgress(selectedProject.id) }}%</span>
-                </div>
-                <div class="detail-item">
-                  <strong>Team Members:</strong>
-                  <span>{{ selectedProject.users?.length || 0 }}</span>
-                </div>
-              </div>
+  isLoading = false;
+  errorMessage = '';
 
-              <div class="project-actions mt-4 d-grid gap-2 d-md-flex flex-wrap">
-                <button class="btn btn-outline-info btn-sm" [routerLink]="['/projects', selectedProject.id, 'sites']"><i class="fas fa-map-marker-alt"></i> Manage Sites</button>
-                <button class="btn btn-outline-primary btn-sm" [routerLink]="['/projects', selectedProject.id, 'tasks']"><i class="fas fa-tasks"></i> View Tasks</button>
-                <button class="btn btn-outline-success btn-sm" [routerLink]="['/projects', selectedProject.id, 'team']"><i class="fas fa-users"></i> Manage Team</button>
-                <button *ngIf="canEditProject()" class="btn btn-outline-warning btn-sm" (click)="openEditModal(selectedProject)"><i class="fas fa-edit"></i> Edit</button>
-              </div>
-            </div>
+  // Filters
+  searchTerm = '';
+  statusFilter: 'ALL' | string = 'ALL';
+  dateRange = { start: '', end: '' };
 
-            <ng-template #noProjectSelected>
-              <div class="text-center text-muted py-5"><i class="fas fa-folder-open fa-3x mb-3"></i><p>Select a project to view details</p></div>
-            </ng-template>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+  // Pagination
+  currentPage = 1;
+  itemsPerPage = 10;
+  totalItems = 0;
 
-<div class="modal fade" [class.show]="showAddModal" [style.display]="showAddModal ? 'block' : 'none'" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content border-0 shadow">
-      <div class="modal-header bg-light border-0">
-        <h5 class="modal-title fw-bold"><i class="fas fa-folder-plus text-primary me-2"></i>Create New Project</h5>
-        <button type="button" class="btn-close" (click)="closeAddModal()"></button>
-      </div>
-      <div class="modal-body p-4">
-        <form>
-          <div class="row">
-            <div class="col-md-4 mb-3">
-              <label class="form-label text-secondary fw-semibold">Project Code *</label>
-              <input #newCode type="text" class="form-control" placeholder="e.g. PRJ-001">
-            </div>
-            <div class="col-md-4 mb-3">
-              <label class="form-label text-secondary fw-semibold">Project Name *</label>
-              <input #newName type="text" class="form-control" placeholder="Enter project name">
-            </div>
-            <div class="col-md-4 mb-3">
-              <label class="form-label text-secondary fw-semibold">Client Name</label>
-              <input #newClient type="text" class="form-control" placeholder="Enter client name">
-            </div>
-            <div class="col-md-4 mb-3">
-              <label class="form-label text-secondary fw-semibold">Status</label>
-              <select #newStatus class="form-select">
-                <option value="PLANNING">Planning</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="ON_HOLD">On Hold</option>
-              </select>
-            </div>
-            <div class="col-md-4 mb-3">
-              <label class="form-label text-secondary fw-semibold">Start Date</label>
-              <input #newStartDate type="date" class="form-control">
-            </div>
-            <div class="col-md-4 mb-3">
-              <label class="form-label text-secondary fw-semibold">End Date</label>
-              <input #newEndDate type="date" class="form-control">
-            </div>
-            <div class="col-md-12 mb-3">
-              <label class="form-label text-secondary fw-semibold">Budget (₹)</label>
-              <input #newBudget type="number" class="form-control" placeholder="0.00">
-            </div>
-            <div class="col-md-12 mb-4">
-              <label class="form-label text-secondary fw-semibold">Description / Notes</label>
-              <textarea #newDesc class="form-control" rows="3" placeholder="Enter project details..."></textarea>
-            </div>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer border-0 bg-light">
-        <button type="button" class="btn btn-outline-secondary" (click)="closeAddModal()">Cancel</button>
-        <button type="button" class="btn btn-primary px-4" (click)="submitNewProject(newCode.value, newName.value, newClient.value, newStatus.value, newStartDate.value, newEndDate.value, newBudget.value, newDesc.value); newCode.value=''; newName.value=''; newClient.value=''; newStartDate.value=''; newEndDate.value=''; newBudget.value=''; newDesc.value=''">Save Project</button>
-      </div>
-    </div>
-  </div>
-</div>
+  // User role
+  userRole = '';
 
-<div class="modal fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content border-0 shadow">
-      <div class="modal-header bg-light border-0">
-        <h5 class="modal-title fw-bold"><i class="fas fa-edit text-warning me-2"></i>Edit Project</h5>
-        <button type="button" class="btn-close" (click)="closeEditModal()"></button>
-      </div>
-      <ng-container *ngIf="editingProject">
-        <div class="modal-body p-4">
-          <form>
-            <div class="row">
-              <div class="col-md-4 mb-3">
-                <label class="form-label text-secondary fw-semibold">Project Code *</label>
-                <input #editCode type="text" class="form-control" [value]="editingProject.code">
-              </div>
-              <div class="col-md-4 mb-3">
-                <label class="form-label text-secondary fw-semibold">Project Name *</label>
-                <input #editName type="text" class="form-control" [value]="editingProject.name">
-              </div>
-              <div class="col-md-4 mb-3">
-                <label class="form-label text-secondary fw-semibold">Client Name</label>
-                <input #editClient type="text" class="form-control" [value]="editingProject.client || ''">
-              </div>
-              <div class="col-md-4 mb-3">
-                <label class="form-label text-secondary fw-semibold">Status</label>
-                <select #editStatus class="form-select" [value]="editingProject.status">
-                  <option value="PLANNING">Planning</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="ON_HOLD">On Hold</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-              </div>
-              <div class="col-md-4 mb-3">
-                <label class="form-label text-secondary fw-semibold">Start Date</label>
-                <input #editStartDate type="date" class="form-control" [value]="formatDateForInput(editingProject.start_date)">
-              </div>
-              <div class="col-md-4 mb-3">
-                <label class="form-label text-secondary fw-semibold">End Date</label>
-                <input #editEndDate type="date" class="form-control" [value]="formatDateForInput(editingProject.end_date)">
-              </div>
-              <div class="col-md-12 mb-3">
-                <label class="form-label text-secondary fw-semibold">Budget (₹)</label>
-                <input #editBudget type="number" class="form-control" [value]="editingProject.budget || 0">
-              </div>
-              <div class="col-md-12 mb-4">
-                <label class="form-label text-secondary fw-semibold">Description / Notes</label>
-                <textarea #editDesc class="form-control" rows="3">{{ editingProject.description }}</textarea>
-              </div>
-            </div>
-          </form>
-        </div>
-        <div class="modal-footer border-0 bg-light">
-          <button type="button" class="btn btn-outline-secondary" (click)="closeEditModal()">Cancel</button>
-          <button type="button" class="btn btn-warning px-4 text-dark fw-bold" 
-                  (click)="submitEditProject(editCode.value, editName.value, editClient.value, editStatus.value, editStartDate.value, editEndDate.value, editBudget.value, editDesc.value)">
-            Update Project
-          </button>
-        </div>
-      </ng-container>
-    </div>
-  </div>
-</div>
+  // Modal Controls
+  showAddModal = false;
+  showEditModal = false;
+  editingProject: Project | null = null;
 
-<div class="modal-backdrop fade show" *ngIf="showAddModal || showEditModal"></div>
+  private destroy$ = new Subject<void>();
+
+  constructor(
+    private projectService: ProjectService,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit(): void {
+    this.loadProjects();
+    this.loadUserRole();
+  }
+
+  loadProjects(): void {
+    this.isLoading = true;
+
+    this.projectService.getProjects()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (projects: Project[]) => {
+          this.projects = projects;
+          this.filteredProjects = [...projects];
+          this.totalItems = projects.length;
+          this.applyFilters();
+          this.isLoading = false;
+        },
+        error: (error: any) => {
+          this.errorMessage = 'Failed to load projects';
+          console.error('Error loading projects:', error);
+          this.isLoading = false;
+        }
+      });
+  }
+
+  loadUserRole(): void {
+    this.authService.getCurrentUser()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (user) => {
+          this.userRole = user?.role || '';
+        },
+        error: () => {
+          this.userRole = '';
+        }
+      });
+  }
+
+  selectProject(project: Project): void {
+    this.selectedProject = project;
+  }
+
+  createProject(projectData: Partial<Project>): void {
+    this.projectService.createProject(projectData as any)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (newProject: Project) => {
+          this.projects.push(newProject);
+          this.filteredProjects = [...this.projects];
+          this.applyFilters();
+        },
+        error: (error: any) => {
+          this.errorMessage = 'Failed to create project';
+          console.error('Error creating project:', error);
+        }
+      });
+  }
+
+  updateProject(projectId: number, updates: Partial<Project>): void {
+    this.projectService.updateProject(projectId, updates)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (updatedProject: Project) => {
+          const index = this.projects.findIndex(p => p.id === projectId);
+          if (index !== -1) {
+            this.projects[index] = updatedProject;
+            this.filteredProjects = [...this.projects];
+            this.applyFilters();
+            
+            // If the user was viewing this project in the sidebar, update it there too!
+            if (this.selectedProject?.id === projectId) {
+              this.selectedProject = updatedProject;
+            }
+          }
+        },
+        error: (error: any) => {
+          this.errorMessage = 'Failed to update project';
+          console.error('Error updating project:', error);
+        }
+      });
+  }
+
+  deleteProject(projectId: number): void {
+    if (!confirm('Are you sure you want to delete this project?')) {
+      return;
+    }
+
+    this.projectService.deleteProject(projectId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.projects = this.projects.filter(p => p.id !== projectId);
+          this.filteredProjects = [...this.projects];
+          this.applyFilters();
+          if (this.selectedProject?.id === projectId) {
+            this.selectedProject = null;
+          }
+        },
+        error: (error: any) => {
+          this.errorMessage = 'Failed to delete project';
+          console.error('Error deleting project:', error);
+        }
+      });
+  }
+
+  applyFilters(): void {
+    let filtered = [...this.projects];
+
+    if (this.searchTerm) {
+      const term = this.searchTerm.toLowerCase();
+      filtered = filtered.filter(project =>
+        project.name.toLowerCase().includes(term) ||
+        project.description?.toLowerCase().includes(term) ||
+        project.code?.toLowerCase().includes(term)
+      );
+    }
+
+    if (this.statusFilter !== 'ALL') {
+      filtered = filtered.filter(
+        project => project.status === this.statusFilter
+      );
+    }
+
+    if (this.dateRange.start) {
+      const startDate = new Date(this.dateRange.start);
+      filtered = filtered.filter(
+        project =>
+          project.start_date &&
+          new Date(project.start_date) >= startDate
+      );
+    }
+
+    if (this.dateRange.end) {
+      const endDate = new Date(this.dateRange.end);
+      filtered = filtered.filter(
+        project =>
+          project.end_date &&
+          new Date(project.end_date) <= endDate
+      );
+    }
+
+    this.filteredProjects = filtered;
+    this.totalItems = filtered.length;
+    this.currentPage = 1;
+  }
+
+  clearFilters(): void {
+    this.searchTerm = '';
+    this.statusFilter = 'ALL';
+    this.dateRange = { start: '', end: '' };
+    this.applyFilters();
+  }
+
+  get paginatedProjects(): Project[] {
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    return this.filteredProjects.slice(
+      startIndex,
+      startIndex + this.itemsPerPage
+    );
+  }
+
+  changePage(page: number): void {
+    this.currentPage = page;
+  }
+
+  getProjectStats(): {
+    total: number;
+    active: number;
+    completed: number;
+    delayed: number;
+  } {
+    const now = new Date();
+    return {
+      total: this.projects.length,
+      active: this.projects.filter(p => p.status === 'IN_PROGRESS').length,
+      completed: this.projects.filter(p => p.status === 'COMPLETED').length,
+      delayed: this.projects.filter(
+        p =>
+          p.status === 'IN_PROGRESS' &&
+          p.end_date &&
+          new Date(p.end_date) < now
+      ).length
+    };
+  }
+
+  canEditProject(): boolean {
+    if (!this.userRole) return false;
+    const role = this.userRole.toLowerCase();
+    return ['admin', 'project_manager', 'owner'].includes(role);
+  }
+
+  canDeleteProject(): boolean {
+    if (!this.userRole) return false;
+    return this.userRole.toLowerCase() === 'admin';
+  }
+
+  // --- Add Project Controls ---
+  openAddModal(): void {
+    this.showAddModal = true;
+  }
+
+  closeAddModal(): void {
+    this.showAddModal = false;
+  }
+
+  submitNewProject(code: string, name: string, client: string, status: string, startDate: string, endDate: string, budget: string, description: string): void {
+    if (!code || !name) {
+      alert('Please provide both a Project Code and Project Name.');
+      return;
+    }
+
+    const newProjectPayload: Partial<Project> = {
+      code: code,
+      name: name,
+      client: client || '',
+      status: status,
+      start_date: startDate ? new Date(startDate) : undefined,
+      end_date: endDate ? new Date(endDate) : undefined,
+      budget: budget ? parseFloat(budget) : 0,
+      description: description || '',
+      progress: 0
+    };
+
+    this.createProject(newProjectPayload); 
+    this.closeAddModal();
+  }
+
+  // --- Edit Project Controls ---
+  openEditModal(project: Project): void {
+    this.editingProject = project;
+    this.showEditModal = true;
+  }
+
+  closeEditModal(): void {
+    this.showEditModal = false;
+    this.editingProject = null;
+  }
+
+  submitEditProject(code: string, name: string, client: string, status: string, startDate: string, endDate: string, budget: string, description: string): void {
+    if (!this.editingProject || !code || !name) {
+      alert('Please provide both a Project Code and Project Name.');
+      return;
+    }
+
+    const updates: Partial<Project> = {
+      code: code,
+      name: name,
+      client: client || '',
+      status: status,
+      start_date: startDate ? new Date(startDate) : undefined,
+      end_date: endDate ? new Date(endDate) : undefined,
+      budget: budget ? parseFloat(budget) : 0,
+      description: description || ''
+    };
+
+    this.updateProject(this.editingProject.id, updates); 
+    this.closeEditModal();
+  }
+
+  // Format date helper for the edit HTML inputs
+  formatDateForInput(date: Date | string | undefined): string {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toISOString().split('T')[0];
+  }
+
+  // --- Dynamic Calculations ---
+  getProjectProgress(projectId: any): number {
+    try {
+      // Look for tasks saved in LocalStorage for this specific project
+      const savedTasks = localStorage.getItem(`project_tasks_${projectId}`);
+      if (!savedTasks) return 0;
+      
+      const tasks = JSON.parse(savedTasks);
+      if (tasks.length === 0) return 0;
+      
+      // Count how many tasks have the status 'completed'
+      const completedTasks = tasks.filter((t: any) => t.status === 'completed').length;
+      
+      // Calculate the percentage
+      return Math.round((completedTasks / tasks.length) * 100);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+}

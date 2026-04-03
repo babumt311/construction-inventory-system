@@ -294,7 +294,10 @@ export class StockBalanceComponent implements OnInit {
   }
 
   exportStockReport(): void {
-    if (this.dataSource.data.length === 0) return this.toastr.warning('No data to export', 'Warning');
+    if (this.dataSource.data.length === 0) {
+      this.toastr.warning('No data to export', 'Warning');
+      return;
+    }
     const headers = ['Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Status'];
     const rows = this.dataSource.data.map(item => [item.material_name, this.getCategoryName(item.material_id), item.current_balance, item.opening_balance, item.total_received, item.total_used, this.getStockStatusText(item)]);
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');

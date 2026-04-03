@@ -1,0 +1,122 @@
+<div class="container-fluid p-4">
+  <div class="mb-4">
+    <h2 class="fw-bold"><i class="fas fa-truck-loading text-primary me-2"></i>Inventory Management</h2>
+    <p class="text-muted">Record material transactions and add new materials to the database.</p>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-md-7">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white border-0 pt-4 pb-0">
+          <h5 class="fw-bold"><i class="fas fa-plus-circle text-success me-2"></i>Record Stock Transaction</h5>
+        </div>
+        <div class="card-body p-4">
+          <form [formGroup]="entryForm">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Project</label>
+                <select class="form-select" formControlName="project_id" (change)="onProjectChange($any($event.target).value)">
+                  <option value="">Select Project</option>
+                  <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Site</label>
+                <select class="form-select" formControlName="site_id">
+                  <option value="">Select Site</option>
+                  <option *ngFor="let s of entrySites" [value]="s.id">{{ s.name }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Material</label>
+              <select class="form-select" formControlName="material_id">
+                <option value="">Select Material</option>
+                <option *ngFor="let m of materials" [value]="m.id">{{ m.name }}</option>
+              </select>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Transaction Type</label>
+                <select class="form-select" formControlName="entry_type">
+                  <option value="received">Received (Delivery to Site)</option>
+                  <option value="used">Used (Consumed at Site)</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Quantity</label>
+                <input type="number" class="form-control" formControlName="quantity">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Reference / Invoice # (Optional)</label>
+              <input type="text" class="form-control" formControlName="reference">
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label small fw-bold">Remarks</label>
+              <textarea class="form-control" formControlName="remarks" rows="2"></textarea>
+            </div>
+
+            <button class="btn btn-primary w-100 fw-bold" [disabled]="entryForm.invalid || loading" (click)="submitStockEntry()">
+              <i class="fas fa-save me-2"></i> Save Transaction
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-5">
+      <div class="card shadow-sm border-0 h-100 bg-light">
+        <div class="card-header bg-transparent border-0 pt-4 pb-0">
+          <h5 class="fw-bold"><i class="fas fa-box text-info me-2"></i>Create New Material</h5>
+        </div>
+        <div class="card-body p-4">
+          <form [formGroup]="materialForm">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Material Name</label>
+              <input type="text" class="form-control" formControlName="name" placeholder="e.g. Portland Cement (50kg)">
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Category</label>
+              <select class="form-select" formControlName="category_id">
+                <option value="">Select Category</option>
+                <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
+              </select>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Unit of Measure</label>
+                <select class="form-select" formControlName="unit">
+                  <option value="kg">Kilograms (kg)</option>
+                  <option value="tons">Tons</option>
+                  <option value="bags">Bags</option>
+                  <option value="liters">Liters</option>
+                  <option value="units">Pieces / Units</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Standard Cost (₹)</label>
+                <input type="number" class="form-control" formControlName="standard_cost">
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label small fw-bold">Description</label>
+              <textarea class="form-control" formControlName="description" rows="2"></textarea>
+            </div>
+
+            <button class="btn btn-info text-white w-100 fw-bold" [disabled]="materialForm.invalid || loading" (click)="submitMaterial()">
+              <i class="fas fa-plus me-2"></i> Add Material to Database
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -22,13 +22,30 @@ export class ProjectTeamComponent implements OnInit {
   constructor(private route: ActivatedRoute) {}
 
   ngOnInit(): void {
-    // Grabs the project ID from the URL (e.g., /projects/4/team)
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
-    this.loadMockTeam();
+    this.loadTeam(); // Swapped to our new LocalStorage loader
   }
 
-  loadMockTeam(): void {
-    // Fake data to visualize the table
+  // --- LOCAL STORAGE LOGIC ---
+  private loadTeam(): void {
+    const savedData = localStorage.getItem(`project_team_${this.projectId}`);
+    
+    if (savedData) {
+      // Load saved team from browser storage
+      this.teamMembers = JSON.parse(savedData);
+    } else {
+      // If empty, load mock data and save it
+      this.loadMockTeam();
+      this.saveTeam();
+    }
+  }
+
+  private saveTeam(): void {
+    // Save the array permanently to the browser
+    localStorage.setItem(`project_team_${this.projectId}`, JSON.stringify(this.teamMembers));
+  }
+
+  private loadMockTeam(): void {
     this.teamMembers = [
       { id: '1', name: 'John Doe', email: 'john@construction.com', role: 'Project Manager', status: 'ACTIVE' },
       { id: '2', name: 'Jane Smith', email: 'jane@construction.com', role: 'Site Engineer', status: 'ACTIVE' },
@@ -36,6 +53,7 @@ export class ProjectTeamComponent implements OnInit {
     ];
   }
 
+  // --- MODAL & ACTIONS ---
   openAddModal(): void {
     this.showAddModal = true;
   }
@@ -59,12 +77,14 @@ export class ProjectTeamComponent implements OnInit {
     };
 
     this.teamMembers.push(newMember);
+    this.saveTeam(); // ADDED: Save immediately!
     this.closeAddModal();
   }
 
   removeMember(memberId: string): void {
     if (confirm('Are you sure you want to remove this user from the project?')) {
       this.teamMembers = this.teamMembers.filter(m => m.id !== memberId);
+      this.saveTeam(); // ADDED: Save immediately!
     }
   }
 }

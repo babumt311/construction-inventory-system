@@ -14,12 +14,15 @@ import { Material } from '../../models/material.model';
 export class StockManagementComponent implements OnInit {
   entryForm: FormGroup;
   materialForm: FormGroup;
+  categoryForm: FormGroup; // NEW: Form for creating categories
 
   projects: Project[] = [];
   entrySites: Site[] = [];
   materials: Material[] = [];
   categories: any[] = [];
+  
   loading = false;
+  showCategoryModal = false; // NEW: Controls the popup
 
   constructor(
     private fb: FormBuilder,
@@ -28,7 +31,6 @@ export class StockManagementComponent implements OnInit {
     private materialService: MaterialService,
     private toastr: ToastrService
   ) {
-    // 1. Stock Entry Form
     this.entryForm = this.fb.group({
       project_id: ['', Validators.required],
       site_id: ['', Validators.required],
@@ -39,12 +41,17 @@ export class StockManagementComponent implements OnInit {
       remarks: ['']
     });
 
-    // 2. Material Creation Form
     this.materialForm = this.fb.group({
       name: ['', Validators.required],
       category_id: ['', Validators.required],
-      unit: ['kg', Validators.required],
+      unit: ['bags', Validators.required],
       standard_cost: [0, Validators.min(0)],
+      description: ['']
+    });
+
+    // NEW: Initialize Category Form
+    this.categoryForm = this.fb.group({
+      name: ['', Validators.required],
       description: ['']
     });
   }
@@ -87,16 +94,46 @@ export class StockManagementComponent implements OnInit {
     if (this.materialForm.invalid) return;
     this.loading = true;
     
-    // Assuming your MaterialService has a createMaterial method
     this.materialService.createMaterial(this.materialForm.value).subscribe({
       next: () => {
         this.toastr.success('New Material created successfully!');
-        this.materialForm.reset({ unit: 'kg', standard_cost: 0 });
-        this.loadInitialData(); // Refresh dropdowns!
+        this.materialForm.reset({ unit: 'bags', standard_cost: 0 });
+        this.loadInitialData(); 
         this.loading = false;
       },
       error: () => {
         this.toastr.error('Failed to create material.');
+        this.loading = false;
+      }
+    });
+  }
+
+  // --- NEW: CATEGORY LOGIC ---
+  openCategoryModal(): void {
+    this.categoryForm.reset();
+    this.showCategoryModal = true;
+  }
+
+  submitCategory(): void {
+    if (this.categoryForm.invalid) return;
+    this.loading = true;
+
+    this.materialService.createCategory(this.categoryForm.value).subscribe({
+      next: (newCategory) => {
+        this.toastr.success('Category created!');
+        this.showCategoryModal = false;
+        
+        // Reload categories and auto-select the new one
+        this.materialService.getCategories().subscribe(c => {
+          this.categories = c;
+          if (newCategory && newCategory.id) {
+            this.materialForm.patchValue({ category_id: newCategory.id });
+          }
+          this.loading = false;
+        });
+      },
+      error: () => {
+        this.toastr.error('Failed to create category.');
         this.loading = false;
       }
     });

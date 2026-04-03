@@ -1,169 +1,181 @@
-<div class="dashboard-container p-4">
-  
-  <div class="loading-overlay" *ngIf="loading">
-    <div class="spinner-border text-primary" role="status"></div>
-  </div>
+<div class="dashboard-container">
+  
+  <div class="loading-overlay" *ngIf="loading">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
 
-  <div class="welcome-card shadow-sm border-0 rounded-4 bg-white p-4 mb-4">
-    <div class="d-flex justify-content-between align-items-center flex-wrap">
-      <div>
-        <h1 class="h3 fw-bold mb-1">
-          <i class="fas fa-hard-hat text-primary me-2"></i>
-          Welcome, {{ currentUser?.full_name || currentUser?.username }}!
-        </h1>
-        <p class="text-muted mb-0">
-          <span class="badge bg-primary px-3">{{ userRoleText }}</span>
-          <span class="ms-3 text-muted small"><i class="fas fa-clock me-1"></i>Last login: {{ currentUser?.updated_at | date:'medium' }}</span>
-        </p>
-      </div>
-      <div class="d-flex gap-2 mt-3 mt-md-0">
-        <button class="btn btn-warning shadow-sm fw-bold px-4" (click)="openEntryModal()">
-          <i class="fas fa-truck-loading me-2"></i> Quick Stock Entry
-        </button>
-        <button class="btn btn-outline-primary shadow-sm px-3" (click)="loadDashboardData()" [disabled]="loading">
-          <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i>
-        </button>
-      </div>
-    </div>
-  </div>
+  <div class="welcome-card">
+    <div class="card-body">
+      <div class="user-info">
+        <div class="user-details">
+          <h1>
+            <i class="fas fa-hard-hat"></i>
+            Welcome, {{ currentUser?.full_name || currentUser?.username }}!
+          </h1>
+          <div class="user-meta">
+            <span class="role-badge">{{ userRoleText }}</span>
+            <span class="last-login">Last login: {{ currentUser?.updated_at | date:'medium' }}</span>
+          </div>
+        </div>
+        <button class="refresh-btn" (click)="loadDashboardData()" [disabled]="loading">
+          <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i>
+          Refresh
+        </button>
+      </div>
+    </div>
+  </div>
 
-  <div class="row g-4 mb-4">
-    <div class="col-md-3" *ngIf="isAdmin()" routerLink="/users" style="cursor: pointer;">
-      <div class="card border-0 shadow-sm h-100 p-3 card-hover">
-        <div class="d-flex justify-content-between align-items-center">
-          <div><p class="text-muted mb-1 small fw-bold text-uppercase">Total Users</p><h2 class="fw-bold mb-0">{{ userStats?.total_users || 0 }}</h2></div>
-          <div class="p-3 bg-primary bg-opacity-10 text-primary rounded-circle"><i class="fas fa-users fa-lg"></i></div>
-        </div>
-        <div class="mt-2 small text-muted">
-          <span class="me-2"><i class="fas fa-user-shield"></i> {{ userStats?.admins || 0 }} Admins</span>
-          <span><i class="fas fa-user-tie"></i> {{ userStats?.owners || 0 }} Owners</span>
-        </div>
-      </div>
-    </div>
+  <div class="stats-grid">
+    <div class="stat-card" *ngIf="isAdmin()" routerLink="/users" style="cursor: pointer;">
+      <div class="stat-header">
+        <div class="stat-info">
+          <h6>Total Users</h6>
+          <h2>{{ userStats?.total_users || 0 }}</h2>
+        </div>
+        <div class="stat-icon users">
+          <i class="fas fa-users"></i>
+        </div>
+      </div>
+      <div class="stat-details">
+        <div class="detail-item">
+          <i class="fas fa-user-shield"></i>
+          Admins: {{ userStats?.admins || 0 }}
+        </div>
+        <div class="detail-item">
+          <i class="fas fa-user-tie"></i>
+          Owners: {{ userStats?.owners || 0 }}
+        </div>
+      </div>
+    </div>
 
-    <div class="col-md-3" routerLink="/projects" style="cursor: pointer;">
-      <div class="card border-0 shadow-sm h-100 p-3 card-hover">
-        <div class="d-flex justify-content-between align-items-center">
-          <div><p class="text-muted mb-1 small fw-bold text-uppercase">Active Projects</p><h2 class="fw-bold mb-0 text-success">{{ projectStats?.active_projects || 0 }}</h2></div>
-          <div class="p-3 bg-success bg-opacity-10 text-success rounded-circle"><i class="fas fa-hard-hat fa-lg"></i></div>
-        </div>
-        <div class="mt-2 small text-muted"><i class="fas fa-map-marker-alt"></i> Sites: {{ projectStats?.total_sites || 0 }}</div>
-      </div>
-    </div>
+    <div class="stat-card" routerLink="/projects" style="cursor: pointer;">
+      <div class="stat-header">
+        <div class="stat-info">
+          <h6>Active Projects</h6>
+          <h2>{{ projectStats?.active_projects || 0 }}</h2>
+        </div>
+        <div class="stat-icon projects">
+          <i class="fas fa-hard-hat"></i>
+        </div>
+      </div>
+      <div class="stat-details">
+        <div class="detail-item">
+          <i class="fas fa-map-marker-alt"></i>
+          Sites: {{ projectStats?.total_sites || 0 }}
+        </div>
+      </div>
+    </div>
 
-    <div class="col-md-3" routerLink="/stock-balance" style="cursor: pointer;">
-      <div class="card border-0 shadow-sm h-100 p-3 card-hover">
-        <div class="d-flex justify-content-between align-items-center">
-          <div><p class="text-muted mb-1 small fw-bold text-uppercase">Materials</p><h2 class="fw-bold mb-0 text-info">{{ stockStats?.length || 0 }}</h2></div>
-          <div class="p-3 bg-info bg-opacity-10 text-info rounded-circle"><i class="fas fa-boxes fa-lg"></i></div>
-        </div>
-        <div class="mt-2 small text-muted"><i class="fas fa-rupee-sign"></i> Value: ₹{{ getTotalStockValue() | number:'1.0-0' }}</div>
-      </div>
-    </div>
+    <div class="stat-card" routerLink="/stock" style="cursor: pointer;">
+      <div class="stat-header">
+        <div class="stat-info">
+          <h6>Materials</h6>
+          <h2>{{ stockStats?.length || 0 }}</h2>
+        </div>
+        <div class="stat-icon materials">
+          <i class="fas fa-boxes"></i>
+        </div>
+      </div>
+      <div class="stat-details">
+        <div class="detail-item">
+          <i class="fas fa-rupee-sign"></i>
+          Total Value: ₹{{ getTotalStockValue() | number:'1.2-2' }}
+        </div>
+      </div>
+    </div>
 
-    <div class="col-md-3">
-      <div class="card border-0 shadow-sm h-100 p-3">
-        <div class="d-flex justify-content-between align-items-center">
-          <div><p class="text-muted mb-1 small fw-bold text-uppercase">Recent Projects</p><h2 class="fw-bold mb-0">{{ recentProjects.length }}</h2></div>
-          <div class="p-3 bg-warning bg-opacity-10 text-warning rounded-circle"><i class="fas fa-history fa-lg"></i></div>
-        </div>
-        <div class="mt-2 small text-muted"><i class="fas fa-clock"></i> Just updated</div>
-      </div>
-    </div>
-  </div>
+    <div class="stat-card" routerLink="/activity" style="cursor: pointer;">
+      <div class="stat-header">
+        <div class="stat-info">
+          <h6>Recent Activity</h6>
+          <h2>{{ recentProjects.length }}</h2>
+        </div>
+        <div class="stat-icon activity">
+          <i class="fas fa-history"></i>
+        </div>
+      </div>
+      <div class="stat-details">
+        <div class="detail-item">
+          <i class="fas fa-clock"></i>
+          Last updated: Just now
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <div class="row g-4 mb-4">
-    <div class="col-md-5">
-      <div class="card border-0 shadow-sm p-4 h-100">
-        <h5 class="fw-bold mb-4"><i class="fas fa-chart-pie text-primary me-2"></i>Project Status</h5>
-        <div class="chart-container" style="height: 300px;"><canvas id="projectChart"></canvas></div>
-      </div>
-    </div>
-    <div class="col-md-7">
-      <div class="card border-0 shadow-sm p-4 h-100">
-        <h5 class="fw-bold mb-4"><i class="fas fa-chart-line text-info me-2"></i>Stock Value Analysis</h5>
-        <div class="chart-container" style="height: 300px;"><canvas id="stockChart"></canvas></div>
-      </div>
-    </div>
-  </div>
+  <div class="charts-section">
+    <div class="chart-card">
+      <h5><i class="fas fa-chart-pie"></i> Project Status</h5>
+      <div class="chart-container">
+        <canvas id="projectChart"></canvas>
+      </div>
+    </div>
 
-  <div class="card border-0 shadow-sm mb-5">
-    <div class="card-header bg-white border-0 py-3"><h5 class="fw-bold mb-0">Recent Projects</h5></div>
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
-          <tr><th class="ps-4">Code</th><th>Name</th><th>Status</th><th>Sites</th><th>Action</th></tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let p of recentProjects">
-            <td class="ps-4"><span class="badge bg-secondary">{{ p.code }}</span></td>
-            <td class="fw-bold">{{ p.name }}</td>
-            <td>
-              <span class="badge" [ngClass]="{
-                'bg-primary': p.status === 'IN_PROGRESS', 
-                'bg-success': p.status === 'COMPLETED', 
-                'bg-warning text-dark': p.status === 'ON_HOLD',
-                'bg-secondary': p.status === 'PLANNING'
-              }">{{ p.status | titlecase }}</span>
-            </td>
-            <td><span class="badge bg-info text-dark">{{ p.sites?.length || 0 }}</span></td>
-            <td><button class="btn btn-sm btn-outline-primary" [routerLink]="['/projects', p.id]"><i class="fas fa-eye"></i> View</button></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    <div class="chart-card">
+      <h5><i class="fas fa-chart-line"></i> Stock Value Analysis</h5>
+      <div class="chart-container">
+        <canvas id="stockChart"></canvas>
+      </div>
+    </div>
+  </div>
 
-  <div class="modal fade shadow" [class.show]="showEntryModal" [style.display]="showEntryModal ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0">
-        <div class="modal-header bg-light">
-          <h5 class="fw-bold mb-0"><i class="fas fa-truck-loading text-primary me-2"></i>Quick Stock Entry</h5>
-          <button type="button" class="btn-close" (click)="showEntryModal = false"></button>
-        </div>
-        <div class="modal-body p-4">
-          <form [formGroup]="entryForm">
-            <div class="mb-3">
-              <label class="form-label small fw-bold">Project</label>
-              <select class="form-select" formControlName="project_id" (change)="onEntryProjectChange($any($event.target).value)">
-                <option value="">Select Project</option>
-                <option *ngFor="let p of recentProjects" [value]="p.id">{{ p.name }}</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label small fw-bold">Site</label>
-              <select class="form-select" formControlName="site_id">
-                <option value="">Select Site</option>
-                <option *ngFor="let s of entrySites" [value]="s.id">{{ s.name }}</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label small fw-bold">Material</label>
-              <select class="form-select" formControlName="material_id">
-                <option value="">Select Material</option>
-                <option *ngFor="let m of materials" [value]="m.id">{{ m.name }}</option>
-              </select>
-            </div>
-            <div class="row">
-              <div class="col-6 mb-3">
-                <label class="form-label small fw-bold">Type</label>
-                <select class="form-select" formControlName="entry_type">
-                  <option value="received">Received (+)</option>
-                  <option value="used">Used (-)</option>
-                </select>
-              </div>
-              <div class="col-6 mb-3">
-                <label class="form-label small fw-bold">Quantity</label>
-                <input type="number" class="form-control" formControlName="quantity">
-              </div>
-            </div>
-          </form>
-        </div>
-        <div class="modal-footer bg-light border-0">
-          <button class="btn btn-secondary" (click)="showEntryModal = false">Cancel</button>
-          <button class="btn btn-primary px-4" [disabled]="entryForm.invalid || loading" (click)="submitStockEntry()">Save Entry</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div class="recent-table-card">
+    <div class="card-header">
+      <h5>
+        <i class="fas fa-project-diagram"></i>
+        Recent Projects
+      </h5>
+    </div>
+    
+    <div class="card-body">
+      <div class="table-responsive" *ngIf="recentProjects.length > 0">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Project Code</th>
+              <th>Project Name</th>
+              <th>Status</th>
+              <th>Sites</th>
+              <th>Start Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let project of recentProjects">
+              <td>
+                <span class="project-code">{{ project.code }}</span>
+              </td>
+              <td>{{ project.name }}</td>
+              <td>
+                <span class="badge" [ngClass]="{
+                  'bg-success': project.status === 'active',
+                  'bg-secondary': project.status === 'completed',
+                  'bg-warning': project.status === 'on-hold'
+                }">
+                  {{ project.status }}
+                </span>
+              </td>
+              <td>
+                <span class="badge bg-info">{{ project.sites?.length || 0 }}</span>
+              </td>
+              <td>{{ project.start_date | date:'mediumDate' }}</td>
+              <td>
+                <button class="btn btn-outline-primary" [routerLink]="['/projects', project.id]">
+                  <i class="fas fa-eye"></i> View
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="empty-state" *ngIf="recentProjects.length === 0">
+        <i class="fas fa-folder-open"></i>
+        <p>No projects found</p>
+      </div>
+    </div>
+  </div>
+
 </div>

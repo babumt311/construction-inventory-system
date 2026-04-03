@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 import logging
 from app import schemas, crud, models
 from app.database import get_db
+from app.models import Site
+from app.schemas import SiteCreate, SiteInDB
 from app.dependencies import (
     get_owner_or_admin_user_dependency,
     get_current_user_dependency,
@@ -249,3 +251,33 @@ async def remove_user_from_project(
     
     logger.info(f"User {user_id} removed from project {project_id}")
     return {"message": "User removed from project successfully"}
+# ==========================================
+# SITES DATABASE API
+# ==========================================
+
+@router.get("/{project_id}/sites", response_model=list[SiteInDB])
+def get_project_sites(project_id: int, db: Session = Depends(get_db)):
+    """Fetch all sites saved in PostgreSQL for a specific project."""
+    return db.query(Site).filter(Site.project_id == project_id).all()
+
+@router.post("/{project_id}/sites", response_model=SiteInDB)
+def create_project_site(project_id: int, site: SiteCreate, db: Session = Depends(get_db)):
+    """Save a brand new site to PostgreSQL."""
+    # Force the project_id to match the URL so it saves to the right place
+    site_data = site.dict()
+    site_data['project_id'] = project_id 
+    
+    db_site = Site(**site_data)
+    db.add(db_site)
+    db.commit()
+    db.refresh(db_site)
+    return db_site
+
+@router.delete("/sites/{site_id}")
+def delete_site(site_id: int, db: Session = Depends(get_db)):
+    """Permanently delete a site from PostgreSQL."""
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if site:
+        db.delete(site)
+        db.commit()
+    return {"message": "Site permanently deleted"}

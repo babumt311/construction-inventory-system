@@ -16,6 +16,9 @@
         <button class="btn btn-success" (click)="refreshData()" [disabled]="loading">
           <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i> Refresh
         </button>
+        <button class="btn btn-warning fw-bold" (click)="openEntryModal()">
+          <i class="fas fa-plus-circle me-2"></i> Record Entry
+        </button>
       </div>
     </div>
   </div>
@@ -29,7 +32,7 @@
             <select class="form-control" formControlName="project_id" (change)="onProjectChange($any($event.target).value)">
               <option value="">All Projects</option>
               <option *ngFor="let project of projects" [value]="project.id">
-                {{ project.name }} ({{ project.code }})
+                {{ project.name }}
               </option>
             </select>
           </div>
@@ -76,7 +79,7 @@
               <h6 class="text-muted mb-1">Total Materials</h6>
               <h3 class="mb-0">{{ stockBalances.length }}</h3>
             </div>
-            <div class="avatar bg-primary text-white p-3 rounded-circle">
+            <div class="avatar bg-primary text-white rounded-circle p-3">
               <i class="fas fa-boxes fa-lg"></i>
             </div>
           </div>
@@ -92,7 +95,7 @@
               <h6 class="text-muted mb-1">In Stock</h6>
                <h3 class="mb-0">{{ getHealthyStockCount() }}</h3>
             </div>
-            <div class="avatar bg-success text-white p-3 rounded-circle">
+            <div class="avatar bg-success text-white rounded-circle p-3">
               <i class="fas fa-check-circle fa-lg"></i>
             </div>
           </div>
@@ -108,7 +111,7 @@
               <h6 class="text-muted mb-1">Low Stock</h6>
               <h3 class="mb-0">{{ getLowStockCount() }}</h3>
             </div>
-            <div class="avatar bg-warning text-dark p-3 rounded-circle">
+            <div class="avatar bg-warning text-dark rounded-circle p-3">
               <i class="fas fa-exclamation-triangle fa-lg"></i>
             </div>
           </div>
@@ -124,7 +127,7 @@
               <h6 class="text-muted mb-1">Stock Value</h6>
               <h3 class="mb-0">₹{{ calculateStockValue() | number:'1.2-2' }}</h3>
             </div>
-            <div class="avatar bg-info text-white p-3 rounded-circle">
+            <div class="avatar bg-info text-white rounded-circle p-3">
               <i class="fas fa-rupee-sign fa-lg"></i>
             </div>
           </div>
@@ -148,14 +151,14 @@
   <div class="card" *ngIf="viewMode === 'table'">
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table mat-table [dataSource]="dataSource" matSort class="table table-hover w-100 mb-0">
+        <table mat-table [dataSource]="dataSource" matSort class="table w-100 mb-0">
           
           <ng-container matColumnDef="material">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Material</th>
             <td mat-cell *matCellDef="let balance">
               <div class="d-flex align-items-center py-2">
-                <div class="material-icon me-3 text-primary">
-                  <i class="fas fa-box fa-lg"></i>
+                <div class="material-icon me-2 text-primary">
+                  <i class="fas fa-box"></i>
                 </div>
                 <div>
                   <strong>{{ balance.material_name }}</strong>
@@ -198,7 +201,7 @@
           <ng-container matColumnDef="total_received">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Total Received</th>
             <td mat-cell *matCellDef="let balance">
-              <span class="text-success fw-semibold">
+              <span class="text-success fw-bold">
                 <i class="fas fa-arrow-down me-1"></i>
                 {{ balance.total_received }}
               </span>
@@ -208,7 +211,7 @@
           <ng-container matColumnDef="total_used">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Total Used</th>
             <td mat-cell *matCellDef="let balance">
-              <span class="text-danger fw-semibold">
+              <span class="text-danger fw-bold">
                 <i class="fas fa-arrow-up me-1"></i>
                 {{ balance.total_used }}
               </span>
@@ -223,11 +226,6 @@
                         (click)="showMaterialDetails(getMaterial(balance.material_id))">
                   <i class="fas fa-chart-line"></i> History
                 </button>
-                <button class="btn btn-sm btn-outline-primary" 
-                        *ngIf="balance.has_negative_balance || balance.current_balance < 10"
-                        (click)="createReorder(balance.material_id)">
-                  <i class="fas fa-shopping-cart"></i> Reorder
-                </button>
               </div>
             </td>
           </ng-container>
@@ -240,79 +238,100 @@
           <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
           <h5>No Stock Data Available</h5>
           <p class="text-muted" *ngIf="!selectedSiteId">
-            Please use the dropdowns above to select a Project and Site.
+            Please select a Project and Site from the dropdowns above.
           </p>
           <p class="text-muted" *ngIf="selectedSiteId">
-            No stock entries found for this site.
+            No stock entries found for this site. Click "Record Entry" to add materials!
           </p>
         </div>
 
-        <div class="text-center py-5" *ngIf="loading">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <p class="mt-2">Loading stock balances...</p>
-        </div>
       </div>
-
       <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons 
                      aria-label="Select page of stock balances" *ngIf="dataSource.data.length > 0">
       </mat-paginator>
     </div>
   </div>
+</div>
 
-  <div class="row" *ngIf="viewMode === 'cards' && dataSource.data.length > 0">
-    <div class="col-md-4 mb-3" *ngFor="let balance of dataSource.data">
-      <div class="card stock-card h-100">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start mb-3">
-            <div>
-              <h5 class="card-title mb-1">{{ balance.material_name }}</h5>
-              <span class="badge bg-secondary">{{ getCategoryName(balance.material_id) }}</span>
+<div class="modal fade" [class.show]="showEntryModal" [style.display]="showEntryModal ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold"><i class="fas fa-truck-loading text-primary me-2"></i>Record Stock Transaction</h5>
+        <button type="button" class="btn-close" (click)="closeEntryModal()"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form [formGroup]="entryForm">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label text-secondary fw-semibold">Project *</label>
+              <select class="form-select" formControlName="project_id" (change)="onEntryProjectChange($any($event.target).value)">
+                <option value="">Select Project</option>
+                <option *ngFor="let project of projects" [value]="project.id">{{ project.name }}</option>
+              </select>
             </div>
-            <span class="badge" [ngClass]="'bg-' + getStockStatus(balance)">
-              {{ getStockStatusText(balance) }}
-            </span>
-          </div>
-          
-          <div class="stock-stats mb-4 mt-3 bg-light p-3 rounded">
-            <div class="row text-center">
-              <div class="col-4 border-end">
-                <div class="stat-value fw-bold fs-5">{{ balance.current_balance }}</div>
-                <div class="stat-label text-muted small">Current</div>
-              </div>
-              <div class="col-4 border-end">
-                <div class="stat-value text-success fw-bold fs-5">{{ balance.total_received }}</div>
-                <div class="stat-label text-muted small">Received</div>
-              </div>
-              <div class="col-4">
-                <div class="stat-value text-danger fw-bold fs-5">{{ balance.total_used }}</div>
-                <div class="stat-label text-muted small">Used</div>
-              </div>
+            <div class="col-md-6">
+              <label class="form-label text-secondary fw-semibold">Site *</label>
+              <select class="form-select" formControlName="site_id">
+                <option value="">Select Site</option>
+                <option *ngFor="let site of entrySites" [value]="site.id">{{ site.name }}</option>
+              </select>
             </div>
           </div>
-          
-          <div class="d-grid gap-2">
-            <button class="btn btn-outline-info" 
-                    (click)="showMaterialDetails(getMaterial(balance.material_id))">
-              <i class="fas fa-chart-line me-2"></i>View History
-            </button>
-            <button class="btn btn-outline-primary" 
-                    *ngIf="balance.has_negative_balance || balance.current_balance < 10"
-                    (click)="createReorder(balance.material_id)">
-              <i class="fas fa-shopping-cart me-2"></i>Create Reorder
-            </button>
+
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <label class="form-label text-secondary fw-semibold">Material *</label>
+              <select class="form-select" formControlName="material_id">
+                <option value="">Select Material</option>
+                <option *ngFor="let material of materials" [value]="material.id">{{ material.name }}</option>
+              </select>
+            </div>
           </div>
-        </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label text-secondary fw-semibold">Transaction Type *</label>
+              <select class="form-select" formControlName="entry_type">
+                <option value="received">➕ Received (Delivery to Site)</option>
+                <option value="used">➖ Used (Consumed at Site)</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-secondary fw-semibold">Quantity *</label>
+              <input type="number" class="form-control" formControlName="quantity" placeholder="0.00" min="0.01" step="0.01">
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <label class="form-label text-secondary fw-semibold">Reference / Invoice Number (Optional)</label>
+              <input type="text" class="form-control" formControlName="reference" placeholder="e.g. INV-2026-001 or Delivery Slip #">
+            </div>
+          </div>
+
+          <div class="row mb-2">
+            <div class="col-md-12">
+              <label class="form-label text-secondary fw-semibold">Remarks / Notes (Optional)</label>
+              <textarea class="form-control" formControlName="remarks" rows="2" placeholder="Any additional details..."></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeEntryModal()">Cancel</button>
+        <button type="button" class="btn btn-warning px-4 text-dark fw-bold" [disabled]="entryForm.invalid" (click)="submitStockEntry()">
+          <i class="fas fa-save me-2"></i>Save Entry
+        </button>
       </div>
     </div>
   </div>
 </div>
 
 <ng-template #materialDetails>
-  <div class="modal-header bg-light">
-    <h5 class="modal-title fw-bold">
-      <i class="fas fa-box text-primary me-2"></i>
+  <div class="modal-header">
+    <h5 class="modal-title">
+      <i class="fas fa-box me-2"></i>
       {{ selectedMaterial?.name }} - Stock History
     </h5>
     <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
@@ -320,98 +339,29 @@
   <div class="modal-body">
     <div class="row mb-4">
       <div class="col-md-6">
-        <div class="card h-100 border-0 bg-light">
-          <div class="card-body">
-            <h6 class="fw-bold border-bottom pb-2 mb-3">Material Information</h6>
-            <div class="d-flex justify-content-between mb-2">
-              <span class="text-muted">Name:</span>
-              <span class="fw-semibold">{{ selectedMaterial?.name }}</span>
-            </div>
-            <div class="d-flex justify-content-between mb-2">
-              <span class="text-muted">Category:</span>
-              <span class="fw-semibold">{{ getCategoryName(selectedMaterial?.id) }}</span>
-            </div>
-            <div class="d-flex justify-content-between mb-2">
-              <span class="text-muted">Unit:</span>
-              <span class="fw-semibold">{{ selectedMaterial?.unit || 'N/A' }}</span>
-            </div>
-            <div class="d-flex justify-content-between">
-              <span class="text-muted">Standard Cost:</span>
-              <span class="fw-semibold text-success">₹{{ selectedMaterial?.standard_cost | number:'1.2-2' }}</span>
-            </div>
-          </div>
+        <div class="info-card border rounded p-3 bg-light">
+          <h6>Material Information</h6>
+          <div><strong>Name:</strong> {{ selectedMaterial?.name }}</div>
+          <div><strong>Category:</strong> {{ getCategoryName(selectedMaterial?.id) }}</div>
+          <div><strong>Standard Cost:</strong> ₹{{ selectedMaterial?.standard_cost | number:'1.2-2' }}</div>
         </div>
       </div>
       <div class="col-md-6">
-        <div class="card h-100 border-0 bg-light">
-          <div class="card-body text-center d-flex flex-column justify-content-center">
-            <h6 class="fw-bold border-bottom pb-2 mb-3">Current Stock</h6>
-            <div *ngIf="selectedSiteId && selectedMaterial">
-              <h1 class="display-4 fw-bold text-primary mb-2">
-                {{ getCurrentStock(selectedMaterial.id) }}
-              </h1>
-              <div>
-                <span class="badge px-3 py-2 fs-6" [ngClass]="'bg-' + getStockStatus(getBalance(selectedMaterial.id))">
-                  {{ getStockStatusText(getBalance(selectedMaterial.id)) }}
-                </span>
-              </div>
-            </div>
-          </div>
+        <div class="info-card border rounded p-3 bg-light text-center">
+          <h6>Current Stock</h6>
+          <h2 class="text-primary mb-0">{{ getCurrentStock(selectedMaterial?.id) }}</h2>
         </div>
       </div>
     </div>
     
-    <div class="chart-section mb-4">
-      <h6 class="fw-bold mb-3">Stock History (Last 30 Days)</h6>
+    <div class="chart-section mt-4">
+      <h6>Stock History (Last 30 Days)</h6>
       <div class="chart-container" style="height: 250px;">
         <canvas id="materialChart"></canvas>
       </div>
     </div>
-    
-    <div class="history-table">
-      <h6 class="fw-bold mb-3">Recent Transactions</h6>
-      <div class="table-responsive">
-        <table class="table table-hover table-sm">
-          <thead class="table-light">
-            <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Quantity</th>
-              <th>Supplier</th>
-              <th>Reference</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let entry of materialStockHistory.slice(0, 10)">
-              <td>{{ entry.entry_date | date:'short' }}</td>
-              <td>
-                <span class="badge" [ngClass]="{
-                  'bg-success': entry.entry_type === 'received',
-                  'bg-danger': entry.entry_type === 'used',
-                  'bg-warning text-dark': entry.entry_type === 'returned_received',
-                  'bg-secondary': entry.entry_type === 'returned_supplier'
-                }">
-                  {{ entry.entry_type | uppercase }}
-                </span>
-              </td>
-              <td class="fw-bold">{{ entry.quantity }}</td>
-              <td>{{ entry.supplier_name || 'N/A' }}</td>
-              <td>{{ entry.reference || 'N/A' }}</td>
-            </tr>
-            <tr *ngIf="materialStockHistory.length === 0">
-              <td colspan="5" class="text-center text-muted py-3">No recent transactions found.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
-  <div class="modal-footer bg-light">
+  <div class="modal-footer">
     <button type="button" class="btn btn-secondary" (click)="dialog.closeAll()">Close</button>
-    <button type="button" class="btn btn-primary" 
-            *ngIf="selectedMaterial && (getCurrentStock(selectedMaterial.id) < 10)"
-            (click)="createReorder(selectedMaterial.id); dialog.closeAll()">
-      <i class="fas fa-shopping-cart me-2"></i>Create Purchase Order
-    </button>
   </div>
 </ng-template>

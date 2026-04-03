@@ -337,6 +337,17 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
     }
   }
 
+  getProjectTeamCount(projectId: any): number {
+    try {
+      const savedTeam = localStorage.getItem(`project_team_${projectId}`);
+      if (!savedTeam) return 0;
+      const team = JSON.parse(savedTeam);
+      return team.length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();

@@ -1,14 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { ProjectService } from '../../services/project.service'; // <-- ADDED THIS
-
-export interface Site {
-  id?: string | number; // Optional because the DB generates it!
-  name: string;
-  location: string;
-  manager: string;
-  status: string;
-}
+import { ProjectService } from '../../services/project.service';
+import { Site } from '../../models/project.model'; // <-- Using the official model to fix the type errors!
 
 @Component({
   selector: 'app-project-sites',
@@ -22,8 +15,9 @@ export class ProjectSitesComponent implements OnInit {
   
   // Modal Controls
   showAddModal = false;
+  showEditModal = false;
+  editingSite: Site | null = null;
 
-  // We injected the ProjectService here
   constructor(
     private route: ActivatedRoute,
     private projectService: ProjectService
@@ -49,6 +43,7 @@ export class ProjectSitesComponent implements OnInit {
     });
   }
 
+  // --- ADD MODAL ---
   openAddModal(): void {
     this.showAddModal = true;
   }
@@ -63,17 +58,15 @@ export class ProjectSitesComponent implements OnInit {
       return;
     }
 
-    const newSite = {
+    const newSite: Partial<Site> = {
       name: name,
       location: location,
       manager: manager || 'Unassigned',
       status: 'active'
     };
 
-    // Send it to Python to save permanently!
     this.projectService.addProjectSite(this.projectId, newSite).subscribe({
       next: (savedSite) => {
-        // Push the newly saved DB site (which now has a real ID) into our array
         this.sites.push(savedSite);
         this.closeAddModal();
       },
@@ -81,11 +74,48 @@ export class ProjectSitesComponent implements OnInit {
     });
   }
 
+  // --- EDIT MODAL ---
+  openEditModal(site: Site): void {
+    this.editingSite = { ...site }; 
+    this.showEditModal = true;
+  }
+
+  closeEditModal(): void {
+    this.showEditModal = false;
+    this.editingSite = null;
+  }
+
+  submitEditSite(name: string, location: string, manager: string, status: string): void {
+    if (!this.editingSite || !this.editingSite.id) {
+      alert('Error: Cannot edit this site.');
+      return;
+    }
+
+    const updatedData: Partial<Site> = {
+      name: name,
+      location: location,
+      manager: manager || 'Unassigned',
+      status: status
+    };
+
+    this.projectService.updateSite(this.editingSite.id, updatedData).subscribe({
+      next: (savedSite) => {
+        // Find the old site in the array and replace it with the updated one from the DB
+        const index = this.sites.findIndex(s => s.id === savedSite.id);
+        if (index !== -1) {
+          this.sites[index] = savedSite;
+        }
+        this.closeEditModal();
+      },
+      error: (err) => console.error("Error updating site:", err)
+    });
+  }
+
+  // --- DELETE ---
   deleteSite(siteId: any): void {
     if (confirm('Are you sure you want to permanently delete this site from the database?')) {
       this.projectService.deleteProjectSite(siteId).subscribe({
         next: () => {
-          // Remove it from the screen once Python confirms it's deleted
           this.sites = this.sites.filter(s => s.id !== siteId);
         },
         error: (err) => console.error("Error deleting site from database:", err)

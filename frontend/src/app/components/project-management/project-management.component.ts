@@ -317,6 +317,26 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
     return d.toISOString().split('T')[0];
   }
 
+  // --- Dynamic Calculations ---
+  getProjectProgress(projectId: any): number {
+    try {
+      // Look for tasks saved in LocalStorage for this specific project
+      const savedTasks = localStorage.getItem(`project_tasks_${projectId}`);
+      if (!savedTasks) return 0;
+      
+      const tasks = JSON.parse(savedTasks);
+      if (tasks.length === 0) return 0;
+      
+      // Count how many tasks have the status 'completed'
+      const completedTasks = tasks.filter((t: any) => t.status === 'completed').length;
+      
+      // Calculate the percentage
+      return Math.round((completedTasks / tasks.length) * 100);
+    } catch (e) {
+      return 0;
+    }
+  }
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();

@@ -135,13 +135,18 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     if (id) this.loadStockBalances();
   }
 
-  // ==========================================
+// ==========================================
   // BULLETPROOF FILTERING LOGIC
   // ==========================================
   applyFilters(): void {
     const filters = this.filterForm.value;
     let filteredData = this.stockBalances;
     
+    // DEBUG: Let's see exactly what fields the backend is giving us!
+    if (filteredData.length > 0) {
+        console.log("Raw Stock Data (Look for date fields here!):", filteredData[0]);
+    }
+
     if (filters.material_id) {
       filteredData = filteredData.filter(b => Number(b.material_id) === Number(filters.material_id));
     }
@@ -152,9 +157,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       const startTime = start.getTime();
       
       filteredData = filteredData.filter((b: any) => {
-        // Aggressively look for any date field the backend might have sent
         const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date;
-        if (!rawDate) return false; 
+        // FIX: If the backend didn't send a date for this summary row, DO NOT hide it!
+        if (!rawDate) return true; 
         return new Date(rawDate).getTime() >= startTime;
       });
     }
@@ -166,7 +171,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       
       filteredData = filteredData.filter((b: any) => {
         const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date;
-        if (!rawDate) return false;
+        // FIX: If the backend didn't send a date, DO NOT hide it!
+        if (!rawDate) return true;
         return new Date(rawDate).getTime() <= endTime;
       });
     }

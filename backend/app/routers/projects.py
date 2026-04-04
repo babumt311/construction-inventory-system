@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 # PERSISTENT DOCKER VOLUME FOR TASKS & TEAMS
 # (Survives docker compose down/up!)
 # ==========================================
-DATA_DIR = "/backend_data"
+DATA_DIR = "./data"
 os.makedirs(DATA_DIR, exist_ok=True)
 EC2_DATA_FILE = os.path.join(DATA_DIR, "ec2_persistent_data.json")
 

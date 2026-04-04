@@ -58,7 +58,7 @@ services:
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs
-      - persistent_json_data:/backend_data
+      - persistent_json_data:/app/data
     ports:
       - "8000:8000"
     networks:
@@ -148,6 +148,8 @@ services:
       FLOWER_BASIC_AUTH: "admin:Admin@123"
     ports:
       - "5555:5555"
+    volumes:
+      - persistent_json_data:/app/data
     networks:
       - construction_network
     command: celery -A app.tasks.celery_app flower --port=5555 --basic_auth=admin:Admin@123

@@ -58,6 +58,7 @@ services:
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs
+      - persistent_json_data:/backend_data
     ports:
       - "8000:8000"
     networks:
@@ -201,3 +202,4 @@ volumes:
   postgres_data:
   redis_data:
   celery_beat_data:
+  persistent_json_data:

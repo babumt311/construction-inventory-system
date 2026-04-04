@@ -30,14 +30,15 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   sites: Site[] = [];
   materials: Material[] = [];
   categories: any[] = [];
-  stockBalances: StockBalance[] = [];
+  stockBalances: any[] = []; // Allows our dynamically added site_name
   selectedMaterial: Material | null = null;
   materialStockHistory: any[] = [];
   
   filterForm: FormGroup;
   
-  displayedColumns: string[] = ['material', 'category', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'updated_at', 'status'];
-  dataSource = new MatTableDataSource<StockBalance>();
+  // ADDED 'site' to the displayed columns array
+  displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'updated_at', 'status'];
+  dataSource = new MatTableDataSource<any>();
   
   stockChart: Chart | null = null;
   materialChart: Chart | null = null;
@@ -70,7 +71,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.loadProjects();
     this.loadMaterials();
     this.loadCategories();
-    
     this.filterForm.valueChanges.subscribe(() => this.applyFilters());
   }
 
@@ -92,59 +92,74 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.materialService.getCategories().subscribe(categories => this.categories = categories);
   }
 
-  loadStockBalances(): void {
-    this.loading = true;
-    if (this.selectedSiteId) {
-      this.loadSiteStockSummary(this.selectedSiteId);
-    } else {
-      this.loading = false;
-    }
-  }
-
-  loadSiteStockSummary(siteId: number): void {
-    this.stockService.getSiteStockSummary(siteId).subscribe({
-      next: (balances) => {
-        this.stockBalances = balances;
-        this.applyFilters(); // Trigger filters immediately after loading
-        this.loading = false;
-      },
-      error: () => {
-        this.toastr.error('Failed to load stock balances');
-        this.loading = false;
-      }
-    });
-  }
-
+  // ==========================================
+  // UPDATED: Fetch All Sites for a Project
+  // ==========================================
   onProjectChange(projectId: any): void {
     const id = projectId ? Number(projectId) : 0;
     this.selectedProjectId = id;
     this.sites = [];
     this.selectedSiteId = undefined;
-    this.filterForm.patchValue({ site_id: '' });
+    this.stockBalances = [];
     
+    // Reset site filter silently
+    this.filterForm.patchValue({ site_id: '' }, { emitEvent: false });
+    this.applyFilters();
+
     if (id) {
+      this.loading = true;
       this.projectService.getProjectSites(id).subscribe(sites => {
         this.sites = sites.filter(site => site.status === 'ACTIVE' || site.status === 'active' || site.status === 'IN_PROGRESS');
+        
+        if (this.sites.length === 0) {
+          this.loading = false;
+          return;
+        }
+
+        // Fetch stock for EVERY site in the project and combine them
+        let loadedCount = 0;
+        this.sites.forEach(site => {
+          this.stockService.getSiteStockSummary(site.id).subscribe({
+            next: (balances) => {
+              // Tag the data with the Site Name so we can show it in the table
+              const taggedBalances = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
+              this.stockBalances = [...this.stockBalances, ...taggedBalances];
+              
+              loadedCount++;
+              if (loadedCount === this.sites.length) {
+                this.loading = false;
+                this.applyFilters();
+              }
+            },
+            error: () => {
+              loadedCount++;
+              if (loadedCount === this.sites.length) {
+                this.loading = false;
+                this.applyFilters();
+              }
+            }
+          });
+        });
       });
     }
   }
 
   onSiteChange(siteId: any): void {
-    const id = siteId ? Number(siteId) : 0;
-    this.selectedSiteId = id;
-    if (id) this.loadStockBalances();
+    this.selectedSiteId = siteId ? Number(siteId) : undefined;
+    // We already have all the data! Just re-run the local filter.
+    this.applyFilters();
   }
 
-// ==========================================
-  // BULLETPROOF FILTERING LOGIC
+  // ==========================================
+  // FILTER LOGIC
   // ==========================================
   applyFilters(): void {
     const filters = this.filterForm.value;
-    let filteredData = this.stockBalances;
+    let filteredData = [...this.stockBalances]; // Copy array
     
-    // DEBUG: Let's see exactly what fields the backend is giving us!
-    if (filteredData.length > 0) {
-        console.log("Raw Stock Data (Look for date fields here!):", filteredData[0]);
+    // NEW: Filter by specific Site if selected
+    if (filters.site_id) {
+      filteredData = filteredData.filter(b => Number(b.site_id) === Number(filters.site_id));
     }
 
     if (filters.material_id) {
@@ -153,26 +168,24 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     
     if (filters.start_date) {
       const start = new Date(filters.start_date);
-      start.setHours(0, 0, 0, 0); // Start of day
+      start.setHours(0, 0, 0, 0);
       const startTime = start.getTime();
       
       filteredData = filteredData.filter((b: any) => {
         const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date;
-        // FIX: If the backend didn't send a date for this summary row, DO NOT hide it!
-        if (!rawDate) return true; 
+        if (!rawDate) return true; // Keep items with no date tracking
         return new Date(rawDate).getTime() >= startTime;
       });
     }
 
     if (filters.end_date) {
       const end = new Date(filters.end_date);
-      end.setHours(23, 59, 59, 999); // End of day
+      end.setHours(23, 59, 59, 999);
       const endTime = end.getTime();
       
       filteredData = filteredData.filter((b: any) => {
         const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date;
-        // FIX: If the backend didn't send a date, DO NOT hide it!
-        if (!rawDate) return true;
+        if (!rawDate) return true; // Keep items with no date tracking
         return new Date(rawDate).getTime() <= endTime;
       });
     }
@@ -181,27 +194,17 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       filteredData = filteredData.filter(b => b.has_negative_balance);
     }
     
-    // Update the table
     this.dataSource.data = filteredData;
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
-    
-    // Update the chart dynamically!
     this.createStockChart(filteredData);
   }
 
   // ==========================================
-  // DYNAMIC SUMMARY CALCULATORS
+  // SUMMARY CALCULATORS
   // ==========================================
-  // FIX: These now look at this.dataSource.data so they update when you filter!
-  getHealthyStockCount(): number { 
-    return this.dataSource.data.filter(b => !b.has_negative_balance && b.current_balance > 0).length; 
-  }
-  
-  getLowStockCount(): number { 
-    return this.dataSource.data.filter(b => b.current_balance < 10 && !b.has_negative_balance).length; 
-  }
-  
+  getHealthyStockCount(): number { return this.dataSource.data.filter(b => !b.has_negative_balance && b.current_balance > 0).length; }
+  getLowStockCount(): number { return this.dataSource.data.filter(b => b.current_balance < 10 && !b.has_negative_balance).length; }
   calculateStockValue(): number {
     return this.dataSource.data.reduce((total, balance) => {
       const material = this.materials.find(m => m.id === balance.material_id);
@@ -209,7 +212,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }, 0);
   }
 
-  // --- HTML Helper Methods ---
   getCategoryName(categoryId: number | undefined): string {
     const category = this.categories?.find((c: any) => c.id === categoryId);
     return category ? category.name : 'Unknown';
@@ -229,16 +231,17 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
 
   // --- CHARTS & EXPORT ---
-  createStockChart(balances: StockBalance[]): void {
+  createStockChart(balances: any[]): void {
     this.destroyChart('stockChart');
     const ctx = document.getElementById('stockChart') as HTMLCanvasElement;
     if (!ctx || balances.length === 0) return;
     
-    const topMaterials = balances.filter(b => b.current_balance > 0).sort((a, b) => b.current_balance - a.current_balance).slice(0, 10);
+    const topMaterials = balances.filter(b => b.current_balance > 0).sort((a, b) => b.current_balance - a.current_balance).slice(0, 15);
     this.stockChart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: topMaterials.map(b => b.material_name),
+        // Show Site Name in the chart label if multiple sites exist
+        labels: topMaterials.map(b => `${b.material_name} (${b.site_name || 'Site'})`),
         datasets: [
           { label: 'Current Stock', data: topMaterials.map(b => b.current_balance), backgroundColor: 'rgba(63, 81, 181, 0.7)', borderColor: 'rgb(63, 81, 181)', borderWidth: 1 },
           { label: 'Opening Stock', data: topMaterials.map(b => b.opening_balance), backgroundColor: 'rgba(76, 175, 80, 0.7)', borderColor: 'rgb(76, 175, 80)', borderWidth: 1 }
@@ -285,11 +288,15 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       this.toastr.warning('No data to export', 'Warning');
       return;
     }
-    const headers = ['Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Last Updated', 'Status'];
+    const headers = ['Project', 'Site', 'Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Date', 'Status'];
+    const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'Unknown';
+    
     const rows = this.dataSource.data.map((item: any) => {
       const rawDate = item.updated_at || item.created_at || item.last_updated;
       const dateStr = rawDate ? new Date(rawDate).toLocaleDateString() : 'N/A';
       return [
+        projectName,
+        item.site_name || 'N/A',
         item.material_name, 
         this.getCategoryName(item.material_id), 
         item.current_balance, 
@@ -322,5 +329,11 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
 
   toggleViewMode(): void { this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; }
-  refreshData(): void { this.loadStockBalances(); }
+  
+  // Fix refresh to use Project change instead of single site load
+  refreshData(): void { 
+    if (this.selectedProjectId) {
+      this.onProjectChange(this.selectedProjectId);
+    }
+  }
 }

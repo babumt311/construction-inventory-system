@@ -14,15 +14,16 @@ import { Material } from '../../models/material.model';
 export class StockManagementComponent implements OnInit {
   entryForm: FormGroup;
   materialForm: FormGroup;
-  categoryForm: FormGroup; // NEW: Form for creating categories
+  categoryForm: FormGroup; 
 
   projects: Project[] = [];
   entrySites: Site[] = [];
   materials: Material[] = [];
+  filteredMaterials: Material[] = []; // NEW: Array for filtered dropdown
   categories: any[] = [];
   
   loading = false;
-  showCategoryModal = false; // NEW: Controls the popup
+  showCategoryModal = false;
 
   constructor(
     private fb: FormBuilder,
@@ -34,6 +35,7 @@ export class StockManagementComponent implements OnInit {
     this.entryForm = this.fb.group({
       project_id: ['', Validators.required],
       site_id: ['', Validators.required],
+      entry_category_id: [''], // NEW: Form control for the category filter
       material_id: ['', Validators.required],
       entry_type: ['received', Validators.required],
       quantity: ['', [Validators.required, Validators.min(0.01)]],
@@ -49,7 +51,6 @@ export class StockManagementComponent implements OnInit {
       description: ['']
     });
 
-    // NEW: Initialize Category Form
     this.categoryForm = this.fb.group({
       name: ['', Validators.required],
       description: ['']
@@ -62,7 +63,10 @@ export class StockManagementComponent implements OnInit {
 
   loadInitialData(): void {
     this.projectService.getProjects().subscribe(p => this.projects = p);
-    this.materialService.getMaterials().subscribe(m => this.materials = m);
+    this.materialService.getMaterials().subscribe(m => {
+      this.materials = m;
+      this.filteredMaterials = m; // Load all materials by default
+    });
     this.materialService.getCategories().subscribe(c => this.categories = c);
   }
 
@@ -74,13 +78,33 @@ export class StockManagementComponent implements OnInit {
     }
   }
 
+  // NEW: Filtering logic for the Material dropdown
+  onEntryCategoryChange(categoryId: any): void {
+    const catId = Number(categoryId);
+    this.entryForm.patchValue({ material_id: '' }); // Reset material selection to blank
+
+    if (catId) {
+      // Filter materials matching the selected category
+      this.filteredMaterials = this.materials.filter(m => Number(m.category_id) === catId);
+    } else {
+      // Show all if "All Categories" is selected
+      this.filteredMaterials = this.materials;
+    }
+  }
+
   submitStockEntry(): void {
     if (this.entryForm.invalid) return;
     this.loading = true;
-    this.stockService.createStockEntry(this.entryForm.value).subscribe({
+
+    // We strip out 'entry_category_id' because the backend doesn't expect it in the payload
+    const payload = { ...this.entryForm.value };
+    delete payload.entry_category_id;
+
+    this.stockService.createStockEntry(payload).subscribe({
       next: () => {
         this.toastr.success('Stock entry recorded successfully!');
-        this.entryForm.reset({ entry_type: 'received' });
+        this.entryForm.reset({ entry_type: 'received', entry_category_id: '' });
+        this.filteredMaterials = this.materials; // Reset filter back to all
         this.loading = false;
       },
       error: () => {
@@ -108,7 +132,6 @@ export class StockManagementComponent implements OnInit {
     });
   }
 
-  // --- NEW: CATEGORY LOGIC ---
   openCategoryModal(): void {
     this.categoryForm.reset();
     this.showCategoryModal = true;
@@ -123,7 +146,6 @@ export class StockManagementComponent implements OnInit {
         this.toastr.success('Category created!');
         this.showCategoryModal = false;
         
-        // Reload categories and auto-select the new one
         this.materialService.getCategories().subscribe(c => {
           this.categories = c;
           if (newCategory && newCategory.id) {

@@ -1,6 +1,7 @@
 import { Component, OnInit, Input } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { ApiService } from '../../services/api.service'; // <-- Added API Service
+import { ApiService } from '../../services/api.service';
+import { ToastrService } from 'ngx-toastr'; // <-- NEW: Added Toastr!
 
 export interface Task {
   id?: string;
@@ -60,7 +61,8 @@ export class TaskListComponent implements OnInit {
 
   constructor(
     private route: ActivatedRoute,
-    private api: ApiService // <-- Injected API Service
+    private api: ApiService,
+    private toastr: ToastrService // <-- NEW: Injected
   ) {}
 
   ngOnInit(): void {
@@ -68,14 +70,16 @@ export class TaskListComponent implements OnInit {
     this.loadTasks(); 
   }
 
-  // --- REAL BACKEND LOGIC ---
   private loadTasks(): void {
     this.api.get<Task[]>(`projects/${this.projectId}/tasks`).subscribe({
       next: (data) => {
-        this.tasks = data;
+        this.tasks = data || [];
         this.filterTasks();
       },
-      error: (err) => console.error("Error loading tasks", err)
+      error: (err) => {
+        console.error("Error loading tasks", err);
+        this.toastr.error('Failed to load tasks from server.');
+      }
     });
   }
 
@@ -94,13 +98,16 @@ export class TaskListComponent implements OnInit {
   closeAddModal(): void { this.showAddModal = false; }
 
   submitNewTask(title: string, description: string, priority: string, dueDate: string, estHours: string): void {
-    if (!title) return alert('Task title is required');
+    if (!title) {
+      this.toastr.warning('Task Title is required');
+      return;
+    }
 
     const newTask: Task = {
       title: title,
-      description: description,
+      description: description || '',
       status: 'todo',
-      priority: priority as any,
+      priority: (priority || 'medium').toLowerCase() as any, // FIX: Forces "High" to "high"
       assignee: { id: '0', name: 'Unassigned', avatar: 'UN' },
       dueDate: dueDate ? new Date(dueDate) : new Date(),
       estimatedHours: parseInt(estHours) || 0,
@@ -109,14 +116,19 @@ export class TaskListComponent implements OnInit {
       subtasks: []
     };
 
-    // Send permanently to Backend!
     this.api.post<Task>(`projects/${this.projectId}/tasks`, newTask).subscribe({
       next: (savedTask) => {
+        if (!this.tasks) this.tasks = []; // Safety check
         this.tasks.push(savedTask);
         this.filterTasks();
         this.closeAddModal();
+        this.toastr.success('Task created successfully!');
       },
-      error: (err) => console.error("Error adding task", err)
+      error: (err) => {
+        console.error("Error adding task", err);
+        // NEW: This will pop up and tell you exactly if the backend failed!
+        this.toastr.error('Backend Error: Could not save task. Check your Docker container permissions.', 'Save Failed');
+      }
     });
   }
 
@@ -133,7 +145,12 @@ export class TaskListComponent implements OnInit {
   submitEditTask(title: string, description: string, status: string, priority: string): void {
     if (!this.selectedTask || !this.selectedTask.id) return;
     
-    const updatedData = { title, description, status, priority };
+    const updatedData = { 
+      title, 
+      description, 
+      status: (status || 'todo').toLowerCase(), 
+      priority: (priority || 'medium').toLowerCase() 
+    };
 
     this.api.put<any>(`projects/${this.projectId}/tasks/${this.selectedTask.id}`, updatedData).subscribe({
       next: () => {
@@ -141,13 +158,17 @@ export class TaskListComponent implements OnInit {
         if (index > -1) {
           this.tasks[index].title = title;
           this.tasks[index].description = description;
-          this.tasks[index].status = status as any;
-          this.tasks[index].priority = priority as any;
+          this.tasks[index].status = updatedData.status as any;
+          this.tasks[index].priority = updatedData.priority as any;
         }
         this.filterTasks();
         this.closeEditModal();
+        this.toastr.success('Task updated!');
       },
-      error: (err) => console.error("Error updating task", err)
+      error: (err) => {
+        console.error("Error updating task", err);
+        this.toastr.error('Failed to update task.');
+      }
     });
   }
 
@@ -157,8 +178,12 @@ export class TaskListComponent implements OnInit {
         next: () => {
           this.tasks = this.tasks.filter(t => t.id !== taskId);
           this.filterTasks();
+          this.toastr.info('Task deleted.');
         },
-        error: (err) => console.error("Error deleting task", err)
+        error: (err) => {
+          console.error("Error deleting task", err);
+          this.toastr.error('Failed to delete task.');
+        }
       });
     }
   }
@@ -178,8 +203,8 @@ export class TaskListComponent implements OnInit {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
   getAssigneeInitials(assignee: any): string {
-    if (assignee.avatar) return assignee.avatar;
-    if (!assignee.name) return '??';
+    if (assignee?.avatar) return assignee.avatar;
+    if (!assignee?.name) return '??';
     const names = assignee.name.split(' ');
     return (names[0].charAt(0) + (names[1]?.charAt(0) || '')).toUpperCase();
   }

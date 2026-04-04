@@ -5,6 +5,7 @@ import { takeUntil } from 'rxjs/operators';
 // Services
 import { ProjectService } from '../../services/project.service';
 import { AuthService } from '../../services/auth.service';
+import { ApiService } from '../../services/api.service'; // <-- NEW: Added ApiService
 
 // Models
 import { Project } from '../../models/project.model';
@@ -21,6 +22,10 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
   projects: Project[] = [];
   filteredProjects: Project[] = [];
   selectedProject: Project | null = null;
+
+  // NEW: Maps to store the real database counts for fast lookup
+  projectProgressMap: Map<number, number> = new Map();
+  projectTeamCountMap: Map<number, number> = new Map();
 
   isLoading = false;
   errorMessage = '';
@@ -47,7 +52,8 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
 
   constructor(
     private projectService: ProjectService,
-    private authService: AuthService
+    private authService: AuthService,
+    private api: ApiService // <-- NEW: Injected ApiService
   ) {}
 
   ngOnInit(): void {
@@ -65,6 +71,10 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
           this.projects = projects;
           this.filteredProjects = [...projects];
           this.totalItems = projects.length;
+          
+          // NEW: Loop through all projects and ask the backend for their real Team/Task data!
+          this.projects.forEach(p => this.loadProjectDetails(p.id));
+
           this.applyFilters();
           this.isLoading = false;
         },
@@ -74,6 +84,30 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
           this.isLoading = false;
         }
       });
+  }
+
+  // --- NEW: Load Real Data from the Backend JSON Persistent Storage ---
+  loadProjectDetails(projectId: number): void {
+    // Load Team Count
+    this.api.get<any[]>(`projects/${projectId}/team`).subscribe({
+      next: (team) => {
+        this.projectTeamCountMap.set(projectId, team ? team.length : 0);
+      },
+      error: () => this.projectTeamCountMap.set(projectId, 0)
+    });
+
+    // Load Tasks and Calculate Progress %
+    this.api.get<any[]>(`projects/${projectId}/tasks`).subscribe({
+      next: (tasks) => {
+        if (!tasks || tasks.length === 0) {
+          this.projectProgressMap.set(projectId, 0);
+        } else {
+          const completedTasks = tasks.filter(t => t.status === 'completed').length;
+          this.projectProgressMap.set(projectId, Math.round((completedTasks / tasks.length) * 100));
+        }
+      },
+      error: () => this.projectProgressMap.set(projectId, 0)
+    });
   }
 
   loadUserRole(): void {
@@ -120,7 +154,6 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
             this.filteredProjects = [...this.projects];
             this.applyFilters();
             
-            // If the user was viewing this project in the sidebar, update it there too!
             if (this.selectedProject?.id === projectId) {
               this.selectedProject = updatedProject;
             }
@@ -310,42 +343,19 @@ export class ProjectManagementComponent implements OnInit, OnDestroy {
     this.closeEditModal();
   }
 
-  // Format date helper for the edit HTML inputs
   formatDateForInput(date: Date | string | undefined): string {
     if (!date) return '';
     const d = new Date(date);
     return d.toISOString().split('T')[0];
   }
 
-  // --- Dynamic Calculations ---
+  // --- UPDATED: Read from our local memory Maps instead of LocalStorage! ---
   getProjectProgress(projectId: any): number {
-    try {
-      // Look for tasks saved in LocalStorage for this specific project
-      const savedTasks = localStorage.getItem(`project_tasks_${projectId}`);
-      if (!savedTasks) return 0;
-      
-      const tasks = JSON.parse(savedTasks);
-      if (tasks.length === 0) return 0;
-      
-      // Count how many tasks have the status 'completed'
-      const completedTasks = tasks.filter((t: any) => t.status === 'completed').length;
-      
-      // Calculate the percentage
-      return Math.round((completedTasks / tasks.length) * 100);
-    } catch (e) {
-      return 0;
-    }
+    return this.projectProgressMap.get(projectId) || 0;
   }
 
   getProjectTeamCount(projectId: any): number {
-    try {
-      const savedTeam = localStorage.getItem(`project_team_${projectId}`);
-      if (!savedTeam) return 0;
-      const team = JSON.parse(savedTeam);
-      return team.length;
-    } catch (e) {
-      return 0;
-    }
+    return this.projectTeamCountMap.get(projectId) || 0;
   }
 
   ngOnDestroy(): void {

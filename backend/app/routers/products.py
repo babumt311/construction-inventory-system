@@ -2,9 +2,7 @@
 Products (Materials and Categories) router
 """
 
-# Add to any router file if these imports are missing
 from app.auth import check_project_access
-from app.auth import get_admin_user_dependency  # Add this function if missing
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
@@ -47,7 +45,6 @@ async def create_category(
     """
     logger.info(f"Creating new category: {category_in.name} by {current_user.username}")
     
-    # Check if category already exists
     existing_category = crud.crud_category.get_by_name(db, name=category_in.name)
     if existing_category:
         logger.warning(f"Category already exists: {category_in.name}")
@@ -56,7 +53,10 @@ async def create_category(
             detail="Category already exists"
         )
     
+    # Explicit creation & commit to prevent data loss
     category = crud.crud_category.create(db, obj_in=category_in)
+    db.commit()
+    db.refresh(category)
     
     logger.info(f"Category created successfully: {category.name} (ID: {category.id})")
     return category
@@ -75,7 +75,6 @@ async def update_category(
     logger.info(f"Updating category ID: {category_id} by {current_user.username}")
     
     category = crud.crud_category.get(db, id=category_id)
-    
     if not category:
         logger.warning(f"Category not found for update: {category_id}")
         raise HTTPException(
@@ -83,17 +82,17 @@ async def update_category(
             detail="Category not found"
         )
     
-    # Check if new name already exists
     if category_in.name and category_in.name != category.name:
         existing_category = crud.crud_category.get_by_name(db, name=category_in.name)
         if existing_category:
-            logger.warning(f"Category name already exists: {category_in.name}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Category name already exists"
             )
     
     updated_category = crud.crud_category.update(db, db_obj=category, obj_in=category_in)
+    db.commit()
+    db.refresh(updated_category)
     
     logger.info(f"Category updated successfully: {updated_category.name}")
     return updated_category
@@ -110,7 +109,6 @@ async def delete_category(
     """
     logger.info(f"Deleting category ID: {category_id} by {current_user.username}")
     
-    # Check if category has materials
     category = crud.crud_category.get_with_materials(db, category_id)
     if category and category.materials:
         logger.warning(f"Cannot delete category with materials: {category_id}")
@@ -120,9 +118,7 @@ async def delete_category(
         )
     
     deleted_category = crud.crud_category.delete(db, id=category_id)
-    
     if not deleted_category:
-        logger.warning(f"Category not found for deletion: {category_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Category not found"
@@ -146,15 +142,12 @@ async def read_materials(
     logger.debug("Reading materials")
     
     query = db.query(models.Material)
-    
-    # Apply filters
     if category_id:
         query = query.filter(models.Material.category_id == category_id)
     
     if search:
         query = query.filter(models.Material.name.ilike(f"%{search}%"))
     
-    # Apply sorting
     if pagination.sort_by:
         if hasattr(models.Material, pagination.sort_by):
             if pagination.sort_order == "desc":
@@ -164,7 +157,6 @@ async def read_materials(
     else:
         query = query.order_by(models.Material.name)
     
-    # Apply pagination
     materials = query.offset(pagination.skip).limit(pagination.size).all()
     
     logger.debug(f"Returning {len(materials)} materials")
@@ -181,14 +173,10 @@ async def search_materials(
     Search materials by name
     """
     logger.debug(f"Searching materials for query: {q}")
-    
     materials = crud.crud_material.search(db, search_term=q)
-    
-    # Limit results
     if limit:
         materials = materials[:limit]
     
-    logger.debug(f"Found {len(materials)} materials")
     return materials
 
 @router.post("/materials", response_model=schemas.MaterialInDB)
@@ -203,29 +191,28 @@ async def create_material(
     """
     logger.info(f"Creating new material: {material_in.name} by {current_user.username}")
     
-    # Check if material already exists in this category
     existing_material = db.query(models.Material).filter(
         models.Material.name == material_in.name,
         models.Material.category_id == material_in.category_id
     ).first()
     
     if existing_material:
-        logger.warning(f"Material already exists in category: {material_in.name}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Material already exists in this category"
         )
     
-    # Verify category exists
     category = crud.crud_category.get(db, id=material_in.category_id)
     if not category:
-        logger.warning(f"Category not found: {material_in.category_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Category not found"
         )
     
+    # Explicit creation & commit
     material = crud.crud_material.create(db, obj_in=material_in)
+    db.commit()
+    db.refresh(material)
     
     logger.info(f"Material created successfully: {material.name} (ID: {material.id})")
     return material
@@ -244,15 +231,12 @@ async def update_material(
     logger.info(f"Updating material ID: {material_id} by {current_user.username}")
     
     material = crud.crud_material.get(db, id=material_id)
-    
     if not material:
-        logger.warning(f"Material not found for update: {material_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Material not found"
         )
     
-    # Check if new name already exists in category
     if material_in.name and material_in.name != material.name:
         existing_material = db.query(models.Material).filter(
             models.Material.name == material_in.name,
@@ -260,13 +244,14 @@ async def update_material(
         ).first()
         
         if existing_material:
-            logger.warning(f"Material name already exists in category: {material_in.name}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Material name already exists in this category"
             )
     
     updated_material = crud.crud_material.update(db, db_obj=material, obj_in=material_in)
+    db.commit()
+    db.refresh(updated_material)
     
     logger.info(f"Material updated successfully: {updated_material.name}")
     return updated_material
@@ -283,41 +268,34 @@ async def delete_material(
     """
     logger.info(f"Deleting material ID: {material_id} by {current_user.username}")
     
-    # Check if material is used in stock entries or PO entries
     material = crud.crud_material.get(db, id=material_id)
     if not material:
-        logger.warning(f"Material not found for deletion: {material_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Material not found"
         )
     
-    # Check stock entries
     stock_entries = db.query(models.StockEntry).filter(
         models.StockEntry.material_id == material_id
     ).count()
     
     if stock_entries > 0:
-        logger.warning(f"Cannot delete material with stock entries: {material_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot delete material that has stock entries"
         )
     
-    # Check PO entries
     po_entries = db.query(models.POEntry).filter(
         models.POEntry.material_id == material_id
     ).count()
     
     if po_entries > 0:
-        logger.warning(f"Cannot delete material with PO entries: {material_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot delete material that has PO entries"
         )
     
     deleted_material = crud.crud_material.delete(db, id=material_id)
-    
     logger.info(f"Material deleted successfully: ID {material_id}")
     return {"message": "Material deleted successfully"}
 
@@ -335,16 +313,13 @@ async def upload_materials_excel(
     """
     logger.info(f"Uploading materials file: {file.filename} by {current_user.username}")
     
-    # Validate file
     is_valid, error_msg = ExcelProcessor.validate_file(file)
     if not is_valid:
-        logger.error(f"File validation failed: {error_msg}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_msg
         )
     
-    # Process file
     processor = ExcelProcessor()
     results = processor.process_material_file(db, file, update_existing)
     

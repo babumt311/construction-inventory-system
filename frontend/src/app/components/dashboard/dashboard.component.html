@@ -28,26 +28,17 @@
   </div>
 
   <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-    
     <div class="stat-card" *ngIf="isAdmin()" routerLink="/users" style="cursor: pointer;">
       <div class="stat-header">
         <div class="stat-info">
           <h6>Total Users</h6>
           <h2>{{ userStats?.total_users || 0 }}</h2>
         </div>
-        <div class="stat-icon users">
-          <i class="fas fa-users"></i>
-        </div>
+        <div class="stat-icon users"><i class="fas fa-users"></i></div>
       </div>
       <div class="stat-details">
-        <div class="detail-item">
-          <i class="fas fa-user-shield"></i>
-          Admins: {{ userStats?.admins || 0 }}
-        </div>
-        <div class="detail-item">
-          <i class="fas fa-user-tie"></i>
-          Owners: {{ userStats?.owners || 0 }}
-        </div>
+        <div class="detail-item"><i class="fas fa-user-shield"></i> Admins: {{ userStats?.admins || 0 }}</div>
+        <div class="detail-item"><i class="fas fa-user-tie"></i> Owners: {{ userStats?.owners || 0 }}</div>
       </div>
     </div>
 
@@ -57,15 +48,10 @@
           <h6>Active Projects</h6>
           <h2>{{ projectStats?.active_projects || 0 }}</h2>
         </div>
-        <div class="stat-icon projects">
-          <i class="fas fa-hard-hat"></i>
-        </div>
+        <div class="stat-icon projects"><i class="fas fa-hard-hat"></i></div>
       </div>
       <div class="stat-details">
-        <div class="detail-item">
-          <i class="fas fa-map-marker-alt"></i>
-          Sites: {{ projectStats?.total_sites || 0 }}
-        </div>
+        <div class="detail-item"><i class="fas fa-map-marker-alt"></i> Sites: {{ projectStats?.total_sites || 0 }}</div>
       </div>
     </div>
 
@@ -75,15 +61,10 @@
           <h6>Inventory</h6>
           <h2>Manage</h2>
         </div>
-        <div class="stat-icon" style="background: rgba(13, 110, 253, 0.1); color: #0d6efd;">
-          <i class="fas fa-truck-loading"></i>
-        </div>
+        <div class="stat-icon" style="background: rgba(13, 110, 253, 0.1); color: #0d6efd;"><i class="fas fa-truck-loading"></i></div>
       </div>
       <div class="stat-details">
-        <div class="detail-item">
-          <i class="fas fa-plus-circle"></i>
-          Entries & Materials
-        </div>
+        <div class="detail-item"><i class="fas fa-plus-circle"></i> Entries & Materials</div>
       </div>
     </div>
 
@@ -93,15 +74,10 @@
           <h6>Reports</h6>
           <h2>{{ stockStats?.length || 0 }}</h2>
         </div>
-        <div class="stat-icon materials">
-          <i class="fas fa-boxes"></i>
-        </div>
+        <div class="stat-icon materials"><i class="fas fa-boxes"></i></div>
       </div>
       <div class="stat-details">
-        <div class="detail-item">
-          <i class="fas fa-rupee-sign"></i>
-          Total Value: ₹{{ getTotalStockValue() | number:'1.2-2' }}
-        </div>
+        <div class="detail-item"><i class="fas fa-rupee-sign"></i> Total Value: ₹{{ getTotalStockValue() | number:'1.2-2' }}</div>
       </div>
     </div>
 
@@ -111,44 +87,79 @@
           <h6>Recent Activity</h6>
           <h2>{{ recentProjects.length }}</h2>
         </div>
-        <div class="stat-icon activity">
-          <i class="fas fa-history"></i>
-        </div>
+        <div class="stat-icon activity"><i class="fas fa-history"></i></div>
       </div>
       <div class="stat-details">
-        <div class="detail-item">
-          <i class="fas fa-clock"></i>
-          Last updated: Just now
-        </div>
+        <div class="detail-item"><i class="fas fa-clock"></i> Last updated: Just now</div>
       </div>
     </div>
-
   </div>
 
   <div class="charts-section">
-    <div class="chart-card">
-      <h5><i class="fas fa-chart-pie"></i> Project Status</h5>
-      <div class="chart-container" style="position: relative; height:250px; width:100%">
-        <canvas id="projectChart"></canvas>
+    
+    <div class="chart-card bg-white shadow-sm border-0 rounded-3 p-0" style="overflow: hidden;">
+      <h5 class="p-3 border-bottom mb-0 fw-bold bg-light">
+        <i class="fas fa-exclamation-triangle text-warning me-2"></i> Low Stock Alerts
+      </h5>
+      <div class="list-container" style="max-height: 250px; overflow-y: auto;">
+        
+        <div class="list-group list-group-flush" *ngIf="lowStockItems.length > 0">
+          <div class="list-group-item py-3" *ngFor="let item of lowStockItems">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="mb-1 fw-bold text-dark">{{ item.material_name }}</h6>
+                <small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>{{ item.projectName }} - {{ item.siteName }}</small>
+              </div>
+              <span class="badge bg-danger rounded-pill fs-6">{{ item.current_balance | number:'1.0-2' }} Left</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center py-5 text-muted" *ngIf="lowStockItems.length === 0">
+          <i class="fas fa-check-circle fa-3x mb-3 text-success opacity-75"></i>
+          <h6 class="fw-bold text-dark">All Stock Healthy</h6>
+          <p class="mb-0 small">No low stock alerts across any active sites.</p>
+        </div>
+
       </div>
     </div>
 
-    <div class="chart-card">
-      <h5><i class="fas fa-chart-line"></i> Stock Value Analysis</h5>
-      <div class="chart-container" style="position: relative; height:250px; width:100%">
-        <canvas id="stockChart"></canvas>
+    <div class="chart-card bg-white shadow-sm border-0 rounded-3 p-0" style="overflow: hidden;">
+      <h5 class="p-3 border-bottom mb-0 fw-bold bg-light">
+        <i class="fas fa-clipboard-list text-primary me-2"></i> Actionable Tasks
+      </h5>
+      <div class="list-container" style="max-height: 250px; overflow-y: auto;">
+        
+        <div class="list-group list-group-flush" *ngIf="actionableTasks.length > 0">
+          <a class="list-group-item list-group-item-action py-3" *ngFor="let task of actionableTasks" [routerLink]="['/projects', task.projectId]">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="mb-1 fw-bold text-dark">{{ task.title }}</h6>
+                <small class="text-muted"><i class="fas fa-project-diagram me-1"></i>{{ task.projectName }}</small>
+              </div>
+              <div>
+                <span class="badge bg-warning text-dark border ms-1" *ngIf="task.status === 'review'">In Review</span>
+                <span class="badge bg-danger ms-1" *ngIf="isOverdue(task)">Overdue</span>
+              </div>
+            </div>
+          </a>
+        </div>
+
+        <div class="text-center py-5 text-muted" *ngIf="actionableTasks.length === 0">
+          <i class="fas fa-tasks fa-3x mb-3 text-success opacity-75"></i>
+          <h6 class="fw-bold text-dark">You're Caught Up!</h6>
+          <p class="mb-0 small">No pending reviews or overdue tasks.</p>
+        </div>
+
       </div>
     </div>
+
   </div>
 
   <div class="recent-table-card" id="recentActivitySection">
     <div class="card-header">
-      <h5>
-        <i class="fas fa-project-diagram"></i>
-        Recent Projects
-      </h5>
+      <h5><i class="fas fa-project-diagram"></i> Recent Projects</h5>
     </div>
-    
     <div class="card-body">
       <div class="table-responsive" *ngIf="recentProjects.length > 0">
         <table class="table">
@@ -164,9 +175,7 @@
           </thead>
           <tbody>
             <tr *ngFor="let project of recentProjects">
-              <td>
-                <span class="project-code">{{ project.code }}</span>
-              </td>
+              <td><span class="project-code">{{ project.code }}</span></td>
               <td>{{ project.name }}</td>
               <td>
                 <span class="badge" [ngClass]="{
@@ -174,18 +183,12 @@
                   'bg-primary': project.status === 'IN_PROGRESS',
                   'bg-warning': project.status === 'ON_HOLD' || project.status === 'on-hold',
                   'bg-secondary': project.status === 'PLANNING' || project.status === 'completed'
-                }">
-                  {{ project.status | titlecase }}
-                </span>
+                }">{{ project.status | titlecase }}</span>
               </td>
-              <td>
-                <span class="badge bg-info">{{ project.sites?.length || 0 }}</span>
-              </td>
+              <td><span class="badge bg-info">{{ project.sites?.length || 0 }}</span></td>
               <td>{{ project.start_date | date:'mediumDate' }}</td>
               <td>
-                <button class="btn btn-outline-primary btn-sm" routerLink="/projects">
-                  <i class="fas fa-eye"></i> View
-                </button>
+                <button class="btn btn-outline-primary btn-sm" routerLink="/projects"><i class="fas fa-eye"></i> View</button>
               </td>
             </tr>
           </tbody>

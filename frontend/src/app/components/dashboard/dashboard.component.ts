@@ -62,7 +62,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.pendingCalls = 0;
 
-    // Admin user stats
     if (this.isAdmin()) {
       this.trackCall();
       const sub = this.userService.getUserStats().subscribe({
@@ -73,13 +72,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.subscriptions.push(sub);
     }
 
-    // Recent projects
     this.trackCall();
-    const projectsSub = this.projectService.getProjects({
-      limit: 5,
-      sort_by: 'created_at',
-      sort_order: 'desc'
-    }).subscribe({
+    const projectsSub = this.projectService.getProjects({ limit: 5, sort_by: 'created_at', sort_order: 'desc' }).subscribe({
       next: projects => {
         this.recentProjects = projects;
         this.calculateProjectStats(projects);
@@ -89,13 +83,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
     this.subscriptions.push(projectsSub);
 
-    // Recent stock entries
     this.trackCall();
-    const stockSub = this.stockService.getStockEntries({
-      limit: 10,
-      sort_by: 'entry_date',
-      sort_order: 'desc'
-    }).subscribe({
+    const stockSub = this.stockService.getStockEntries({ limit: 10, sort_by: 'entry_date', sort_order: 'desc' }).subscribe({
       next: entries => {
         this.recentStockEntries = entries;
         this.loadStockSummary();
@@ -142,18 +131,31 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.trackCall();
       const sub = this.reportService.getStockValuationReport().subscribe({
         next: data => {
-          
-          // FIX: Bulletproof data mapping. If Value calculation fails, chart the Quantity instead!
-          this.stockStats = data.map((d: any) => {
-            const balance = Number(d.current_balance || d.quantity || 0);
-            const cost = Number(d.standard_cost || 0);
-            
-            // If total_value is 0, or cost is missing, just display the raw stock amount so it isn't blank
-            const chartValue = Number(d.total_value) || (balance * cost) || balance;
+          // DEBUG TOOL: Press F12 in your browser to see exactly what fields the backend is sending
+          console.log("Raw Stock Report Data from Backend:", data);
 
+          this.stockStats = data.map((d: any) => {
+            // Aggressive Data Sniffer: Look for ANY metric we can plot
+            const val = Number(d.total_value || d.value || d.stock_value || 0);
+            const qty = Number(d.current_balance || d.quantity || d.balance || d.total_quantity || 0);
+            const cost = Number(d.standard_cost || d.cost || d.price || 0);
+            
+            let finalChartValue = val;
+            
+            // If total value is 0, try to manually multiply quantity * cost
+            if (finalChartValue === 0 && qty > 0) {
+                finalChartValue = qty * cost;
+            }
+            
+            // If cost was ₹0, fallback to plotting the raw physical quantity!
+            if (finalChartValue === 0 && qty > 0) {
+                finalChartValue = qty; 
+            }
+            
             return {
               ...d,
-              calculated_chart_value: chartValue
+              calculated_chart_value: finalChartValue,
+              total_value: finalChartValue // Overwrite this so the top summary card updates too
             };
           });
           
@@ -205,18 +207,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
         labels: data.map(d => d.material || d.material_name || 'Item'),
         datasets: [{
           label: 'Stock Metric (Value or Qty)',
-          data: data.map(d => d.calculated_chart_value || 0), // FIX: Uses our bulletproof number
+          data: data.map(d => d.calculated_chart_value || 0),
           backgroundColor: 'rgba(13, 110, 253, 0.7)',
           borderColor: 'rgb(13, 110, 253)',
           borderWidth: 1,
-          borderRadius: 4
+          borderRadius: 4,
+          minBarLength: 10 // <-- BULLETPROOF FIX: Forces a visible bar even if the data evaluates to exactly 0
         }]
       },
       options: { 
         responsive: true, 
         maintainAspectRatio: false,
         scales: {
-          y: { beginAtZero: true } // Ensures the Y-axis scales properly to your numbers
+          y: { beginAtZero: true }
         }
       }
     });
@@ -283,7 +286,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // ===============================
   getTotalStockValue(): number {
     return this.stockStats?.reduce(
-      (sum: number, i: any) => sum + (i.calculated_chart_value || 0), 0 // FIX: Matches new variable
+      (sum: number, i: any) => sum + (i.calculated_chart_value || 0), 0
     ) || 0;
   }
 

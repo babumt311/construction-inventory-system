@@ -51,6 +51,7 @@ export interface StockBalance {
   has_negative_balance: boolean;
   created_at?: string | Date;
   updated_at?: string | Date;
+  last_updated?: string | Date;
 }
 
 export interface DailyStockReport {

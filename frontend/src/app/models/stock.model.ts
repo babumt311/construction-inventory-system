@@ -49,6 +49,8 @@ export interface StockBalance {
   total_returned_received: number;
   total_returned_supplier: number;
   has_negative_balance: boolean;
+  created_at?: string | Date;
+  updated_at?: string | Date;
 }
 
 export interface DailyStockReport {

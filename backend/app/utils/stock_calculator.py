@@ -259,6 +259,12 @@ class StockCalculator:
         for material in materials:
             balance = StockCalculator.calculate_balance(db, site_id, material.id)
             
+            # ADDED: Find the absolute most recent transaction date for this material
+            latest_entry_date = db.query(func.max(models.StockEntry.entry_date)).filter(
+                models.StockEntry.site_id == site_id,
+                models.StockEntry.material_id == material.id
+            ).scalar()
+            
             summary.append({
                 "material_id": material.id,
                 "material_name": material.name,
@@ -268,7 +274,8 @@ class StockCalculator:
                 "opening_balance": balance["opening_balance"],
                 "total_received": balance["total_received"],
                 "total_used": balance["total_used"],
-                "has_negative_balance": balance["has_negative_balance"]
+                "has_negative_balance": balance["has_negative_balance"],
+                "last_updated": latest_entry_date  # <--- Now sent to Angular!
             })
         
         return summary

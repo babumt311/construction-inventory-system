@@ -112,18 +112,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // ===============================
   // PROJECT STATS + CHART
   // ===============================
-  calculateProjectStats(projects: Project[]): void {
-    // FIX: Calculate total sites directly from the Postgres database response!
-    const totalSitesCount = projects.reduce((sum, p) => sum + (p.sites?.length || 0), 0);
-
+ calculateProjectStats(projects: Project[]): void {
     this.projectStats = {
       total_projects: projects.length,
       active_projects: projects.filter(p => p.status === 'IN_PROGRESS' || p.status === 'PLANNING').length,
       completed_projects: projects.filter(p => p.status === 'COMPLETED').length,
       on_hold_projects: projects.filter(p => p.status === 'ON_HOLD').length,
-      total_sites: totalSitesCount
+      total_sites: 0 // Start at 0
     };
-    
+
+    // FIX: Explicitly ask the database for the sites of each project!
+    projects.forEach(p => {
+      this.projectService.getProjectSites(p.id).subscribe({
+        next: (sites) => {
+          // Add the sites to our running total as the database responds
+          this.projectStats.total_sites += (sites ? sites.length : 0);
+        },
+        error: (err) => console.error(`Error loading sites for project ${p.id}`, err)
+      });
+    });
+
     setTimeout(() => this.createProjectChart(), 100);
   }
   

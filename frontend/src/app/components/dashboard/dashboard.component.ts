@@ -121,11 +121,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       total_sites: 0
     };
 
-    // FIX: explicitly link sites to the project rows in the table
     projects.forEach(p => {
       this.projectService.getProjectSites(p.id).subscribe({
         next: (sites) => {
-          p.sites = sites; // Assign the fetched sites to the project object
+          p.sites = sites; 
           this.projectStats.total_sites += (sites ? sites.length : 0);
         },
         error: (err) => console.error(`Error loading sites for project ${p.id}`, err)
@@ -143,11 +142,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.trackCall();
       const sub = this.reportService.getStockValuationReport().subscribe({
         next: data => {
-          // Add safety fallbacks in case 'total_value' isn't pre-calculated by backend
-          this.stockStats = data.map((d: any) => ({
-            ...d,
-            total_value: d.total_value || (d.current_balance * d.standard_cost) || 0
-          }));
+          
+          // FIX: Bulletproof data mapping. If Value calculation fails, chart the Quantity instead!
+          this.stockStats = data.map((d: any) => {
+            const balance = Number(d.current_balance || d.quantity || 0);
+            const cost = Number(d.standard_cost || 0);
+            
+            // If total_value is 0, or cost is missing, just display the raw stock amount so it isn't blank
+            const chartValue = Number(d.total_value) || (balance * cost) || balance;
+
+            return {
+              ...d,
+              calculated_chart_value: chartValue
+            };
+          });
           
           setTimeout(() => {
             this.createStockChart(this.stockStats.slice(0, 10));
@@ -179,7 +187,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.projectStats?.completed_projects || 0,
             this.projectStats?.on_hold_projects || 0
           ],
-          backgroundColor: ['#0d6efd', '#198754', '#ffc107'] // Added Colors
+          backgroundColor: ['#0d6efd', '#198754', '#ffc107']
         }]
       },
       options: { responsive: true, maintainAspectRatio: false }
@@ -196,15 +204,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
       data: {
         labels: data.map(d => d.material || d.material_name || 'Item'),
         datasets: [{
-          label: 'Stock Value (₹)',
-          data: data.map(d => d.total_value || 0),
-          backgroundColor: 'rgba(13, 110, 253, 0.7)', // FIX: Added bar colors so they aren't invisible
+          label: 'Stock Metric (Value or Qty)',
+          data: data.map(d => d.calculated_chart_value || 0), // FIX: Uses our bulletproof number
+          backgroundColor: 'rgba(13, 110, 253, 0.7)',
           borderColor: 'rgb(13, 110, 253)',
           borderWidth: 1,
           borderRadius: 4
         }]
       },
-      options: { responsive: true, maintainAspectRatio: false }
+      options: { 
+        responsive: true, 
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true } // Ensures the Y-axis scales properly to your numbers
+        }
+      }
     });
   }
 
@@ -269,7 +283,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // ===============================
   getTotalStockValue(): number {
     return this.stockStats?.reduce(
-      (sum: number, i: any) => sum + (i.total_value || 0), 0
+      (sum: number, i: any) => sum + (i.calculated_chart_value || 0), 0 // FIX: Matches new variable
     ) || 0;
   }
 

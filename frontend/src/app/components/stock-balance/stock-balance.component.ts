@@ -30,13 +30,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   sites: Site[] = [];
   materials: Material[] = [];
   categories: any[] = [];
-  stockBalances: any[] = []; // Allows our dynamically added site_name
+  stockBalances: any[] = []; 
   selectedMaterial: Material | null = null;
   materialStockHistory: any[] = [];
   
   filterForm: FormGroup;
   
-  // ADDED 'site' to the displayed columns array
   displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'updated_at', 'status'];
   dataSource = new MatTableDataSource<any>();
   
@@ -92,9 +91,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.materialService.getCategories().subscribe(categories => this.categories = categories);
   }
 
-  // ==========================================
-  // UPDATED: Fetch All Sites for a Project
-  // ==========================================
   onProjectChange(projectId: any): void {
     const id = projectId ? Number(projectId) : 0;
     this.selectedProjectId = id;
@@ -102,7 +98,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.selectedSiteId = undefined;
     this.stockBalances = [];
     
-    // Reset site filter silently
     this.filterForm.patchValue({ site_id: '' }, { emitEvent: false });
     this.applyFilters();
 
@@ -116,12 +111,10 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
           return;
         }
 
-        // Fetch stock for EVERY site in the project and combine them
         let loadedCount = 0;
         this.sites.forEach(site => {
           this.stockService.getSiteStockSummary(site.id).subscribe({
             next: (balances) => {
-              // Tag the data with the Site Name so we can show it in the table
               const taggedBalances = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
               this.stockBalances = [...this.stockBalances, ...taggedBalances];
               
@@ -146,18 +139,13 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   onSiteChange(siteId: any): void {
     this.selectedSiteId = siteId ? Number(siteId) : undefined;
-    // We already have all the data! Just re-run the local filter.
     this.applyFilters();
   }
 
-  // ==========================================
-  // FILTER LOGIC
-  // ==========================================
   applyFilters(): void {
     const filters = this.filterForm.value;
-    let filteredData = [...this.stockBalances]; // Copy array
+    let filteredData = [...this.stockBalances]; 
     
-    // NEW: Filter by specific Site if selected
     if (filters.site_id) {
       filteredData = filteredData.filter(b => Number(b.site_id) === Number(filters.site_id));
     }
@@ -172,8 +160,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       const startTime = start.getTime();
       
       filteredData = filteredData.filter((b: any) => {
-        const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date;
-        if (!rawDate) return true; // Keep items with no date tracking
+        const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date || b.report_date;
+        if (!rawDate) return true; 
         return new Date(rawDate).getTime() >= startTime;
       });
     }
@@ -184,8 +172,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       const endTime = end.getTime();
       
       filteredData = filteredData.filter((b: any) => {
-        const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date;
-        if (!rawDate) return true; // Keep items with no date tracking
+        const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date || b.report_date;
+        if (!rawDate) return true; 
         return new Date(rawDate).getTime() <= endTime;
       });
     }
@@ -201,8 +189,21 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
 
   // ==========================================
-  // SUMMARY CALCULATORS
+  // NEW: Bulletproof Date Formatter
   // ==========================================
+  getFormattedDate(balance: any): string {
+    // Scans the object for ANY possible date field the backend might have used
+    const rawDate = balance.updated_at || balance.created_at || balance.last_updated || balance.entry_date || balance.report_date;
+    if (!rawDate) return 'N/A';
+    
+    // Returns a beautiful format like "Apr 4, 2026"
+    return new Date(rawDate).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  }
+
   getHealthyStockCount(): number { return this.dataSource.data.filter(b => !b.has_negative_balance && b.current_balance > 0).length; }
   getLowStockCount(): number { return this.dataSource.data.filter(b => b.current_balance < 10 && !b.has_negative_balance).length; }
   calculateStockValue(): number {
@@ -230,7 +231,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     return balance.has_negative_balance ? 'Negative Stock' : (balance.current_balance < 10 ? 'Low Stock' : 'In Stock');
   }
 
-  // --- CHARTS & EXPORT ---
   createStockChart(balances: any[]): void {
     this.destroyChart('stockChart');
     const ctx = document.getElementById('stockChart') as HTMLCanvasElement;
@@ -240,7 +240,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.stockChart = new Chart(ctx, {
       type: 'bar',
       data: {
-        // Show Site Name in the chart label if multiple sites exist
         labels: topMaterials.map(b => `${b.material_name} (${b.site_name || 'Site'})`),
         datasets: [
           { label: 'Current Stock', data: topMaterials.map(b => b.current_balance), backgroundColor: 'rgba(63, 81, 181, 0.7)', borderColor: 'rgb(63, 81, 181)', borderWidth: 1 },
@@ -292,8 +291,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'Unknown';
     
     const rows = this.dataSource.data.map((item: any) => {
-      const rawDate = item.updated_at || item.created_at || item.last_updated;
-      const dateStr = rawDate ? new Date(rawDate).toLocaleDateString() : 'N/A';
+      // FIX: Use our new formatter for the CSV export too!
+      const dateStr = this.getFormattedDate(item);
       return [
         projectName,
         item.site_name || 'N/A',
@@ -329,8 +328,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
 
   toggleViewMode(): void { this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; }
-  
-  // Fix refresh to use Project change instead of single site load
   refreshData(): void { 
     if (this.selectedProjectId) {
       this.onProjectChange(this.selectedProjectId);

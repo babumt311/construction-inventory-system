@@ -29,12 +29,21 @@
               </div>
             </div>
 
-            <div class="mb-3">
-              <label class="form-label small fw-bold">Material</label>
-              <select class="form-select" formControlName="material_id">
-                <option value="">Select Material</option>
-                <option *ngFor="let m of materials" [value]="m.id">{{ m.name }}</option>
-              </select>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Category Filter (Optional)</label>
+                <select class="form-select" formControlName="entry_category_id" (change)="onEntryCategoryChange($any($event.target).value)">
+                  <option value="">All Categories</option>
+                  <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Material *</label>
+                <select class="form-select" formControlName="material_id">
+                  <option value="">Select Material</option>
+                  <option *ngFor="let m of filteredMaterials" [value]="m.id">{{ m.name }}</option>
+                </select>
+              </div>
             </div>
 
             <div class="row mb-3">

@@ -1,41 +1,24 @@
 import { Component, OnInit, Input } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { ApiService } from '../../services/api.service'; // <-- Added API Service
 
 export interface Task {
-  id: string;
+  id?: string;
   title: string;
   description: string;
   status: 'todo' | 'in-progress' | 'review' | 'completed';
   priority: 'low' | 'medium' | 'high' | 'critical';
-  assignee: {
-    id: string;
-    name: string;
-    avatar?: string;
-  };
-  dueDate: Date | string; // Updated to accept string from JSON
+  assignee: { id: string; name: string; avatar?: string; };
+  dueDate: Date | string;
   estimatedHours: number;
   actualHours: number;
   tags: string[];
   subtasks: Subtask[];
 }
 
-export interface Subtask {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-}
-
-export interface Assignee {
-  id: string;
-  name: string;
-  avatar?: string;
-  role?: string;
-}
+export interface Subtask { id: string; title: string; completed: boolean; }
+export interface Project { id: string; name: string; }
+export interface Assignee { id: string; name: string; avatar?: string; role?: string; }
 
 @Component({
   selector: 'app-task-list',
@@ -57,7 +40,6 @@ export class TaskListComponent implements OnInit {
   selectedAssignee: string = 'all';
   selectedStatus: string = 'all';
   
-  // Modal Controls
   showAddModal = false;
   showEditModal = false;
   selectedTask: Task | null = null;
@@ -76,72 +58,25 @@ export class TaskListComponent implements OnInit {
     { value: 'critical', label: 'Critical', color: '#dc2626' }
   ];
 
-  // ADDED: ActivatedRoute to get the Project ID from the URL
-  constructor(private route: ActivatedRoute) {}
+  constructor(
+    private route: ActivatedRoute,
+    private api: ApiService // <-- Injected API Service
+  ) {}
 
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || 'default';
-    this.loadTasks(); // Replaces initializeMockTasks()
+    this.loadTasks(); 
   }
 
-  // --- LOCAL STORAGE LOGIC ---
+  // --- REAL BACKEND LOGIC ---
   private loadTasks(): void {
-    const savedData = localStorage.getItem(`project_tasks_${this.projectId}`);
-    
-    if (savedData) {
-      // If we found saved tasks in the browser, use them!
-      this.tasks = JSON.parse(savedData);
-    } else {
-      // If it's empty, load the mock data so it looks pretty, then save it.
-      this.initializeMockTasks();
-      this.saveTasks();
-    }
-    
-    this.filterTasks();
-  }
-
-  private saveTasks(): void {
-    // Converts the tasks array to a string and saves it permanently to the browser
-    localStorage.setItem(`project_tasks_${this.projectId}`, JSON.stringify(this.tasks));
-  }
-
-  private initializeMockTasks(): void {
-    if (this.tasks.length === 0) {
-      this.tasks = [
-        {
-          id: '1',
-          title: 'Design Homepage Layout',
-          description: 'Create wireframes and mockups for the new homepage',
-          status: 'in-progress',
-          priority: 'high',
-          assignee: { id: '2', name: 'Jane Smith', avatar: 'JS' },
-          dueDate: new Date('2026-12-20'),
-          estimatedHours: 8,
-          actualHours: 6,
-          tags: ['Design', 'UI/UX'],
-          subtasks: [
-            { id: '1-1', title: 'Wireframe creation', completed: true },
-            { id: '1-2', title: 'Mockup design', completed: true },
-            { id: '1-3', title: 'Client review', completed: false }
-          ]
-        },
-        {
-          id: '2',
-          title: 'Implement User Authentication',
-          description: 'Set up JWT-based authentication system',
-          status: 'todo',
-          priority: 'critical',
-          assignee: { id: '3', name: 'Bob Johnson', avatar: 'BJ' },
-          dueDate: new Date('2026-12-15'),
-          estimatedHours: 16,
-          actualHours: 0,
-          tags: ['Backend', 'Security'],
-          subtasks: [
-            { id: '2-1', title: 'Setup JWT middleware', completed: false }
-          ]
-        }
-      ];
-    }
+    this.api.get<Task[]>(`projects/${this.projectId}/tasks`).subscribe({
+      next: (data) => {
+        this.tasks = data;
+        this.filterTasks();
+      },
+      error: (err) => console.error("Error loading tasks", err)
+    });
   }
 
   filterTasks(): void {
@@ -155,21 +90,13 @@ export class TaskListComponent implements OnInit {
     });
   }
 
-  // --- Modal Logic ---
-
-  onAddTask(): void {
-    this.showAddModal = true;
-  }
-
-  closeAddModal(): void {
-    this.showAddModal = false;
-  }
+  onAddTask(): void { this.showAddModal = true; }
+  closeAddModal(): void { this.showAddModal = false; }
 
   submitNewTask(title: string, description: string, priority: string, dueDate: string, estHours: string): void {
     if (!title) return alert('Task title is required');
 
     const newTask: Task = {
-      id: Math.random().toString(),
       title: title,
       description: description,
       status: 'todo',
@@ -182,10 +109,15 @@ export class TaskListComponent implements OnInit {
       subtasks: []
     };
 
-    this.tasks.push(newTask);
-    this.saveTasks(); // ADDED: Save to memory immediately!
-    this.filterTasks();
-    this.closeAddModal();
+    // Send permanently to Backend!
+    this.api.post<Task>(`projects/${this.projectId}/tasks`, newTask).subscribe({
+      next: (savedTask) => {
+        this.tasks.push(savedTask);
+        this.filterTasks();
+        this.closeAddModal();
+      },
+      error: (err) => console.error("Error adding task", err)
+    });
   }
 
   onTaskClick(task: Task): void {
@@ -199,58 +131,52 @@ export class TaskListComponent implements OnInit {
   }
 
   submitEditTask(title: string, description: string, status: string, priority: string): void {
-    if (!this.selectedTask) return;
+    if (!this.selectedTask || !this.selectedTask.id) return;
     
-    const index = this.tasks.findIndex(t => t.id === this.selectedTask!.id);
-    if (index > -1) {
-      this.tasks[index].title = title;
-      this.tasks[index].description = description;
-      this.tasks[index].status = status as any;
-      this.tasks[index].priority = priority as any;
-    }
-    
-    this.saveTasks(); // ADDED: Save to memory immediately!
-    this.filterTasks();
-    this.closeEditModal();
+    const updatedData = { title, description, status, priority };
+
+    this.api.put<any>(`projects/${this.projectId}/tasks/${this.selectedTask.id}`, updatedData).subscribe({
+      next: () => {
+        const index = this.tasks.findIndex(t => t.id === this.selectedTask!.id);
+        if (index > -1) {
+          this.tasks[index].title = title;
+          this.tasks[index].description = description;
+          this.tasks[index].status = status as any;
+          this.tasks[index].priority = priority as any;
+        }
+        this.filterTasks();
+        this.closeEditModal();
+      },
+      error: (err) => console.error("Error updating task", err)
+    });
   }
 
-  onDeleteTask(taskId: string): void {
+  onDeleteTask(taskId: any): void {
     if (confirm('Are you sure you want to delete this task?')) {
-      this.tasks = this.tasks.filter(t => t.id !== taskId);
-      this.saveTasks(); // ADDED: Save to memory immediately!
-      this.filterTasks();
+      this.api.delete(`projects/${this.projectId}/tasks/${taskId}`).subscribe({
+        next: () => {
+          this.tasks = this.tasks.filter(t => t.id !== taskId);
+          this.filterTasks();
+        },
+        error: (err) => console.error("Error deleting task", err)
+      });
     }
   }
 
   // --- Helpers ---
-
-  getFilteredTasksByStatus(status: string): Task[] {
-    return this.filteredTasks.filter(task => task.status === status);
-  }
-
-  getCompletedSubtasksCount(task: Task): number {
-    if (!task.subtasks) return 0;
-    return task.subtasks.filter(st => st.completed).length;
-  }
-
-  getPriorityColor(priority: Task['priority']): string {
-    const priorityOption = this.priorityOptions.find(opt => opt.value === priority);
-    return priorityOption?.color || '#9ca3af';
-  }
-
+  getFilteredTasksByStatus(status: string): Task[] { return this.filteredTasks.filter(task => task.status === status); }
+  getCompletedSubtasksCount(task: Task): number { return task.subtasks ? task.subtasks.filter(st => st.completed).length : 0; }
+  getPriorityColor(priority: Task['priority']): string { return this.priorityOptions.find(opt => opt.value === priority)?.color || '#9ca3af'; }
   getProgressPercentage(task: Task): number {
     if (!task.subtasks || task.subtasks.length === 0) return 0;
     const completed = task.subtasks.filter(st => st.completed).length;
     return Math.round((completed / task.subtasks.length) * 100);
   }
-
   getDaysUntilDue(dueDate: Date | string): number {
     const today = new Date();
-    const due = new Date(dueDate); // Safely converts strings back to dates
-    const diffTime = due.getTime() - today.getTime();
+    const diffTime = new Date(dueDate).getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }
-
   getAssigneeInitials(assignee: any): string {
     if (assignee.avatar) return assignee.avatar;
     if (!assignee.name) return '??';

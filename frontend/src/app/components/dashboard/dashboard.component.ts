@@ -112,20 +112,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // ===============================
   // PROJECT STATS + CHART
   // ===============================
- calculateProjectStats(projects: Project[]): void {
+  calculateProjectStats(projects: Project[]): void {
     this.projectStats = {
       total_projects: projects.length,
       active_projects: projects.filter(p => p.status === 'IN_PROGRESS' || p.status === 'PLANNING').length,
       completed_projects: projects.filter(p => p.status === 'COMPLETED').length,
       on_hold_projects: projects.filter(p => p.status === 'ON_HOLD').length,
-      total_sites: 0 // Start at 0
+      total_sites: 0
     };
 
-    // FIX: Explicitly ask the database for the sites of each project!
+    // FIX: explicitly link sites to the project rows in the table
     projects.forEach(p => {
       this.projectService.getProjectSites(p.id).subscribe({
         next: (sites) => {
-          // Add the sites to our running total as the database responds
+          p.sites = sites; // Assign the fetched sites to the project object
           this.projectStats.total_sites += (sites ? sites.length : 0);
         },
         error: (err) => console.error(`Error loading sites for project ${p.id}`, err)
@@ -143,10 +143,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.trackCall();
       const sub = this.reportService.getStockValuationReport().subscribe({
         next: data => {
-          this.stockStats = data;
+          // Add safety fallbacks in case 'total_value' isn't pre-calculated by backend
+          this.stockStats = data.map((d: any) => ({
+            ...d,
+            total_value: d.total_value || (d.current_balance * d.standard_cost) || 0
+          }));
+          
           setTimeout(() => {
-            this.createStockChart(data.slice(0, 10));
-            this.createMaterialChart(data.slice(0, 8));
+            this.createStockChart(this.stockStats.slice(0, 10));
+            this.createMaterialChart(this.stockStats.slice(0, 8));
           }, 100);
         },
         error: err => console.error('Stock summary error:', err),
@@ -173,10 +178,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.projectStats?.active_projects || 0,
             this.projectStats?.completed_projects || 0,
             this.projectStats?.on_hold_projects || 0
-          ]
+          ],
+          backgroundColor: ['#0d6efd', '#198754', '#ffc107'] // Added Colors
         }]
       },
-      options: { responsive: true }
+      options: { responsive: true, maintainAspectRatio: false }
     });
   }
 
@@ -188,13 +194,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.stockChart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: data.map(d => d.material),
+        labels: data.map(d => d.material || d.material_name || 'Item'),
         datasets: [{
-          label: 'Stock Value',
-          data: data.map(d => d.total_value)
+          label: 'Stock Value (₹)',
+          data: data.map(d => d.total_value || 0),
+          backgroundColor: 'rgba(13, 110, 253, 0.7)', // FIX: Added bar colors so they aren't invisible
+          borderColor: 'rgb(13, 110, 253)',
+          borderWidth: 1,
+          borderRadius: 4
         }]
       },
-      options: { responsive: true }
+      options: { responsive: true, maintainAspectRatio: false }
     });
   }
 
@@ -217,7 +227,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           data: Object.values(categories)
         }]
       },
-      options: { responsive: true }
+      options: { responsive: true, maintainAspectRatio: false }
     });
   }
 

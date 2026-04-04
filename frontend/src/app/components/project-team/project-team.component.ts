@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { ApiService } from '../../services/api.service'; // <-- Added API Service
 
 export interface TeamMember {
-  id: string;
+  id?: string;
   name: string;
   email: string;
   role: string;
@@ -19,48 +20,26 @@ export class ProjectTeamComponent implements OnInit {
   teamMembers: TeamMember[] = [];
   showAddModal = false;
 
-  constructor(private route: ActivatedRoute) {}
+  constructor(
+    private route: ActivatedRoute,
+    private api: ApiService // <-- Injected API Service
+  ) {}
 
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
-    this.loadTeam(); // Swapped to our new LocalStorage loader
+    this.loadTeam(); 
   }
 
-  // --- LOCAL STORAGE LOGIC ---
+  // --- REAL BACKEND LOGIC ---
   private loadTeam(): void {
-    const savedData = localStorage.getItem(`project_team_${this.projectId}`);
-    
-    if (savedData) {
-      // Load saved team from browser storage
-      this.teamMembers = JSON.parse(savedData);
-    } else {
-      // If empty, load mock data and save it
-      this.loadMockTeam();
-      this.saveTeam();
-    }
+    this.api.get<TeamMember[]>(`projects/${this.projectId}/team`).subscribe({
+      next: (data) => this.teamMembers = data,
+      error: (err) => console.error("Error loading team", err)
+    });
   }
 
-  private saveTeam(): void {
-    // Save the array permanently to the browser
-    localStorage.setItem(`project_team_${this.projectId}`, JSON.stringify(this.teamMembers));
-  }
-
-  private loadMockTeam(): void {
-    this.teamMembers = [
-      { id: '1', name: 'John Doe', email: 'john@construction.com', role: 'Project Manager', status: 'ACTIVE' },
-      { id: '2', name: 'Jane Smith', email: 'jane@construction.com', role: 'Site Engineer', status: 'ACTIVE' },
-      { id: '3', name: 'Mike Johnson', email: 'mike@construction.com', role: 'Safety Officer', status: 'INACTIVE' }
-    ];
-  }
-
-  // --- MODAL & ACTIONS ---
-  openAddModal(): void {
-    this.showAddModal = true;
-  }
-
-  closeAddModal(): void {
-    this.showAddModal = false;
-  }
+  openAddModal(): void { this.showAddModal = true; }
+  closeAddModal(): void { this.showAddModal = false; }
 
   submitNewMember(name: string, email: string, role: string): void {
     if (!name || !email) {
@@ -69,22 +48,30 @@ export class ProjectTeamComponent implements OnInit {
     }
 
     const newMember: TeamMember = {
-      id: Math.random().toString(),
       name: name,
       email: email,
       role: role || 'Team Member',
       status: 'ACTIVE'
     };
 
-    this.teamMembers.push(newMember);
-    this.saveTeam(); // ADDED: Save immediately!
-    this.closeAddModal();
+    // Send permanently to Backend!
+    this.api.post<TeamMember>(`projects/${this.projectId}/team`, newMember).subscribe({
+      next: (savedMember) => {
+        this.teamMembers.push(savedMember);
+        this.closeAddModal();
+      },
+      error: (err) => console.error("Error adding member", err)
+    });
   }
 
-  removeMember(memberId: string): void {
+  removeMember(memberId: any): void {
     if (confirm('Are you sure you want to remove this user from the project?')) {
-      this.teamMembers = this.teamMembers.filter(m => m.id !== memberId);
-      this.saveTeam(); // ADDED: Save immediately!
+      this.api.delete(`projects/${this.projectId}/team/${memberId}`).subscribe({
+        next: () => {
+          this.teamMembers = this.teamMembers.filter(m => m.id !== memberId);
+        },
+        error: (err) => console.error("Error removing member", err)
+      });
     }
   }
 }

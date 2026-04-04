@@ -25,10 +25,12 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 logger = logging.getLogger(__name__)
 
 # ==========================================
-# PERSISTENT EC2 STORAGE FOR TASKS & TEAMS
-# (Survives EC2 Stop/Start!)
+# PERSISTENT DOCKER VOLUME FOR TASKS & TEAMS
+# (Survives docker compose down/up!)
 # ==========================================
-EC2_DATA_FILE = "ec2_persistent_data.json"
+DATA_DIR = "/backend_data"
+os.makedirs(DATA_DIR, exist_ok=True)
+EC2_DATA_FILE = os.path.join(DATA_DIR, "ec2_persistent_data.json")
 
 def _load_data():
     if not os.path.exists(EC2_DATA_FILE):
@@ -64,7 +66,6 @@ async def read_projects(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_dependency)
 ) -> Any:
-    # FIX: Added .options(selectinload(models.Project.sites)) so the Dashboard counts them correctly!
     if current_user.role == schemas.UserRole.ADMIN:
         query = db.query(models.Project).options(selectinload(models.Project.sites))
     else:
@@ -122,7 +123,7 @@ async def update_project(
 async def delete_project(
     project_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user_dependency), # Replaced undefined dependency
+    current_user: models.User = Depends(get_current_user_dependency),
     audit_log: dict = Depends(log_audit_action)
 ) -> Any:
     project = crud.crud_project.delete(db, id=project_id)

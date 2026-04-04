@@ -147,12 +147,15 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const filters = this.filterForm.value;
     let filteredData = this.stockBalances;
     
+    // FIX: Convert both to Number so that 3 perfectly matches "3"
     if (filters.material_id) {
-      filteredData = filteredData.filter(b => b.material_id === filters.material_id);
+      filteredData = filteredData.filter(b => Number(b.material_id) === Number(filters.material_id));
     }
+    
     if (filters.show_negative_only) {
       filteredData = filteredData.filter(b => b.has_negative_balance);
     }
+    
     this.dataSource.data = filteredData;
   }
 

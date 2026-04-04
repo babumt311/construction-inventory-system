@@ -78,7 +78,7 @@
         <div class="card-body p-4 d-flex justify-content-between align-items-center">
           <div>
             <h6 class="text-muted fw-bold mb-2">TOTAL MATERIALS</h6>
-            <h2 class="mb-0 fw-bold">{{ stockBalances.length }}</h2>
+            <h2 class="mb-0 fw-bold">{{ dataSource.data.length }}</h2>
           </div>
           <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;">
             <i class="fas fa-boxes fa-lg"></i>
@@ -130,7 +130,7 @@
     </div>
   </div>
 
-  <div class="card shadow-sm border-0 mb-4" [hidden]="!selectedSiteId || stockBalances.length === 0">
+  <div class="card shadow-sm border-0 mb-4" [hidden]="!selectedSiteId || dataSource.data.length === 0">
     <div class="card-body p-4">
       <h5 class="card-title fw-bold mb-4">
         <i class="fas fa-chart-bar text-primary me-2"></i>
@@ -212,7 +212,7 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3">Last Updated</th>
             <td mat-cell *matCellDef="let balance" class="py-3 text-muted">
               <i class="far fa-calendar-alt me-1"></i> 
-              {{ (balance.updated_at || balance.created_at | date:'mediumDate') || 'N/A' }}
+              {{ (balance.updated_at || balance.created_at || balance.last_updated) ? ((balance.updated_at || balance.created_at || balance.last_updated) | date:'mediumDate') : 'N/A' }}
             </td>
           </ng-container>
 
@@ -286,7 +286,7 @@
           </div>
         </div>
         <div class="card-footer bg-transparent border-0 pt-0 text-muted small text-end">
-           <i class="far fa-calendar-alt me-1"></i> Last updated: {{ (balance.updated_at || balance.created_at | date:'mediumDate') || 'N/A' }}
+           <i class="far fa-calendar-alt me-1"></i> Last updated: {{ (balance.updated_at || balance.created_at || balance.last_updated) ? ((balance.updated_at || balance.created_at || balance.last_updated) | date:'mediumDate') : 'N/A' }}
         </div>
       </div>
     </div>

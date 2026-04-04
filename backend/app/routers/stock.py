@@ -2,9 +2,7 @@
 Stock management router
 """
 
-# Add to any router file if these imports are missing
 from app.auth import check_project_access
-from app.auth import get_admin_user_dependency  # Add this function if missing
 from typing import Any, List, Optional
 from datetime import datetime, date
 from decimal import Decimal
@@ -15,7 +13,6 @@ from app import schemas, crud, models
 from app.database import get_db
 from app.dependencies import (
     get_current_user_dependency,
-    validate_project_access,
     PaginationParams,
     log_audit_action
 )
@@ -32,7 +29,7 @@ async def create_stock_entry(
     audit_log: dict = Depends(log_audit_action)
 ) -> Any:
     """
-    Create new stock entry
+    Create new stock entry and update total balance
     """
     logger.info(f"Creating stock entry by user: {current_user.username}")
     
@@ -46,7 +43,6 @@ async def create_stock_entry(
         )
     
     # Validate project access
-    from app.auth import check_project_access
     check_project_access(current_user, site.project_id, db)
     
     # Validate material exists
@@ -69,12 +65,42 @@ async def create_stock_entry(
             detail="Stock entry validation failed"
         )
     
-    # Create stock entry
+    # 1. Create stock entry history
     stock_data = stock_in.dict()
     stock_data["created_by"] = current_user.id
     
     stock_entry = models.StockEntry(**stock_data)
     db.add(stock_entry)
+
+    # 2. Update the Stock Balance Summary Table
+    try:
+        balance = db.query(models.StockBalance).filter(
+            models.StockBalance.site_id == stock_in.site_id,
+            models.StockBalance.material_id == stock_in.material_id
+        ).first()
+
+        qty_change = stock_in.quantity if stock_in.entry_type in ['received', 'returned_received'] else -stock_in.quantity
+
+        if balance:
+            balance.current_balance += qty_change
+            if qty_change > 0:
+                balance.total_received += qty_change
+            else:
+                balance.total_used += abs(qty_change)
+        else:
+            new_balance = models.StockBalance(
+                site_id=stock_in.site_id,
+                material_id=stock_in.material_id,
+                current_balance=qty_change,
+                opening_balance=0,
+                total_received=qty_change if qty_change > 0 else 0,
+                total_used=abs(qty_change) if qty_change < 0 else 0
+            )
+            db.add(new_balance)
+    except Exception as e:
+        logger.warning(f"StockBalance update skipped (Handled by calculator): {e}")
+
+    # 3. Permanently Commit to PostgreSQL
     db.commit()
     db.refresh(stock_entry)
     
@@ -102,14 +128,11 @@ async def read_stock_entries(
     
     # Apply filters
     if site_id:
-        # Check access to site's project
         site = crud.crud_site.get(db, id=site_id)
         if site:
-            from app.auth import check_project_access
             try:
                 check_project_access(current_user, site.project_id, db)
             except HTTPException:
-                # User doesn't have access to this site
                 logger.warning(f"User {current_user.id} doesn't have access to site {site_id}")
                 return []
         query = query.filter(models.StockEntry.site_id == site_id)
@@ -167,7 +190,6 @@ async def read_stock_entry(
     # Check access to site's project
     site = crud.crud_site.get(db, id=entry.site_id)
     if site:
-        from app.auth import check_project_access
         check_project_access(current_user, site.project_id, db)
     
     return entry
@@ -197,7 +219,6 @@ async def update_stock_entry(
     # Check access to site's project
     site = crud.crud_site.get(db, id=entry.site_id)
     if site:
-        from app.auth import check_project_access
         check_project_access(current_user, site.project_id, db)
     
     # Only allow updates by the creator or admin/owner
@@ -279,7 +300,6 @@ async def get_stock_balance(
             detail="Site not found"
         )
     
-    from app.auth import check_project_access
     check_project_access(current_user, site.project_id, db)
     
     # Calculate balance
@@ -316,7 +336,6 @@ async def get_site_stock_summary(
             detail="Site not found"
         )
     
-    from app.auth import check_project_access
     check_project_access(current_user, site.project_id, db)
     
     # Get summary
@@ -396,7 +415,6 @@ async def get_daily_reports(
             detail="Site not found"
         )
     
-    from app.auth import check_project_access
     check_project_access(current_user, site.project_id, db)
     
     query = db.query(models.DailyStockReport).filter(

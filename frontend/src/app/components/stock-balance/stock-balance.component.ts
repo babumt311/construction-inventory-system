@@ -38,8 +38,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   // Forms
   filterForm: FormGroup;
   
-  // Table
-  displayedColumns: string[] = ['material', 'category', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'status'];
+  // Table - NEW: Added 'updated_at' to the displayed columns array
+  displayedColumns: string[] = ['material', 'category', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'updated_at', 'status'];
   dataSource = new MatTableDataSource<StockBalance>();
   
   // Charts & UI
@@ -60,10 +60,13 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   ) {
     Chart.register(...registerables);
     
+    // NEW: Added start_date and end_date to the form
     this.filterForm = this.fb.group({
       project_id: [''],
       site_id: [''],
       material_id: [''],
+      start_date: [''],
+      end_date: [''],
       show_negative_only: [false]
     });
   }
@@ -143,13 +146,31 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     if (id) this.loadStockBalances();
   }
 
+  // NEW: Updated to handle Date Range filtering
   applyFilters(): void {
     const filters = this.filterForm.value;
     let filteredData = this.stockBalances;
     
-    // FIX: Convert both to Number so that 3 perfectly matches "3"
     if (filters.material_id) {
       filteredData = filteredData.filter(b => Number(b.material_id) === Number(filters.material_id));
+    }
+    
+    // Apply Start Date Filter
+    if (filters.start_date) {
+      const start = new Date(filters.start_date).getTime();
+      filteredData = filteredData.filter(b => {
+        const itemDate = new Date(b.updated_at || b.created_at).getTime();
+        return itemDate >= start;
+      });
+    }
+
+    // Apply End Date Filter
+    if (filters.end_date) {
+      const end = new Date(filters.end_date).getTime() + (24 * 60 * 60 * 1000) - 1; // End of the selected day
+      filteredData = filteredData.filter(b => {
+        const itemDate = new Date(b.updated_at || b.created_at).getTime();
+        return itemDate <= end;
+      });
     }
     
     if (filters.show_negative_only) {
@@ -243,8 +264,18 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       this.toastr.warning('No data to export', 'Warning');
       return;
     }
-    const headers = ['Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Status'];
-    const rows = this.dataSource.data.map(item => [item.material_name, this.getCategoryName(item.material_id), item.current_balance, item.opening_balance, item.total_received, item.total_used, this.getStockStatusText(item)]);
+    // NEW: Added 'Last Updated' to the exported CSV
+    const headers = ['Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Last Updated', 'Status'];
+    const rows = this.dataSource.data.map(item => [
+      item.material_name, 
+      this.getCategoryName(item.material_id), 
+      item.current_balance, 
+      item.opening_balance, 
+      item.total_received, 
+      item.total_used, 
+      item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A',
+      this.getStockStatusText(item)
+    ]);
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const a = document.createElement('a');
     a.href = window.URL.createObjectURL(new Blob([csvContent], { type: 'text/csv' }));

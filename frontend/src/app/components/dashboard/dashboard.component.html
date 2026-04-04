@@ -128,14 +128,14 @@
   <div class="charts-section">
     <div class="chart-card">
       <h5><i class="fas fa-chart-pie"></i> Project Status</h5>
-      <div class="chart-container">
+      <div class="chart-container" style="position: relative; height:250px; width:100%">
         <canvas id="projectChart"></canvas>
       </div>
     </div>
 
     <div class="chart-card">
       <h5><i class="fas fa-chart-line"></i> Stock Value Analysis</h5>
-      <div class="chart-container">
+      <div class="chart-container" style="position: relative; height:250px; width:100%">
         <canvas id="stockChart"></canvas>
       </div>
     </div>
@@ -183,7 +183,7 @@
               </td>
               <td>{{ project.start_date | date:'mediumDate' }}</td>
               <td>
-                <button class="btn btn-outline-primary" [routerLink]="['/projects', project.id]">
+                <button class="btn btn-outline-primary btn-sm" routerLink="/projects">
                   <i class="fas fa-eye"></i> View
                 </button>
               </td>

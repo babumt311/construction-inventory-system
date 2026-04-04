@@ -159,7 +159,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     if (filters.start_date) {
       const start = new Date(filters.start_date).getTime();
       filteredData = filteredData.filter(b => {
-        const itemDate = new Date(b.updated_at || b.created_at).getTime();
+        // FIX: Extract the date safely. If both are undefined, default to 0 to satisfy TypeScript
+        const rawDate = b.updated_at || b.created_at;
+        const itemDate = rawDate ? new Date(rawDate).getTime() : 0;
         return itemDate >= start;
       });
     }
@@ -168,7 +170,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     if (filters.end_date) {
       const end = new Date(filters.end_date).getTime() + (24 * 60 * 60 * 1000) - 1; // End of the selected day
       filteredData = filteredData.filter(b => {
-        const itemDate = new Date(b.updated_at || b.created_at).getTime();
+        // FIX: Safely extract date here as well
+        const rawDate = b.updated_at || b.created_at;
+        const itemDate = rawDate ? new Date(rawDate).getTime() : 0;
         return itemDate <= end;
       });
     }

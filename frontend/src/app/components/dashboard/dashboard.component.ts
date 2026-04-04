@@ -293,4 +293,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isUser(): boolean {
     return this.authService.isUser();
   }
+
+  scrollToRecent(): void {
+    const element = document.getElementById('recentActivitySection');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
 }

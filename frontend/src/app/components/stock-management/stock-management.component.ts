@@ -192,6 +192,17 @@ export class StockManagementComponent implements OnInit {
     }
   }
 
+  onMaterialChange(materialId: any): void {
+    if (materialId) {
+      // Find the material the user just selected
+      const selectedMat = this.materials.find(m => m.id === Number(materialId));
+      if (selectedMat) {
+        // Auto-fill the category dropdown to match!
+        this.stockForm.patchValue({ category_filter: selectedMat.category_id });
+      }
+    }
+  }
+
   submitStock(): void {
     if (this.stockForm.invalid) { this.stockForm.markAllAsTouched(); return; }
     this.submittingStock = true;

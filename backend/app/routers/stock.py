@@ -319,13 +319,15 @@ async def get_stock_balance(
 @router.get("/site-summary/{site_id}")
 async def get_site_stock_summary(
     site_id: int,
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_dependency)
 ) -> Any:
     """
-    Get stock summary for all materials at a site
+    Get stock summary for all materials at a site within a date range
     """
-    logger.debug(f"Getting site stock summary for site: {site_id}")
+    logger.debug(f"Getting site stock summary for site: {site_id}, dates: {start_date} to {end_date}")
     
     # Check access to site's project
     site = crud.crud_site.get(db, id=site_id)
@@ -340,7 +342,7 @@ async def get_site_stock_summary(
     
     # Get summary
     calculator = StockCalculator()
-    summary = calculator.get_site_stock_summary(db, site_id)
+    summary = calculator.get_site_stock_summary(db, site_id, start_date, end_date)
     
     logger.debug(f"Returning stock summary with {len(summary)} materials")
     

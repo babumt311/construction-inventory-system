@@ -77,16 +77,27 @@ export class MaterialManagementComponent implements OnInit {
         this.dataSource.paginator = this.paginator;
         this.dataSource.sort = this.sort;
         
-        // Custom filter logic to handle BOTH search text and category dropdown
-        this.dataSource.filterPredicate = (data: Material, filter: string) => {
-          const searchTerms = JSON.parse(filter);
-          const textMatch = !searchTerms.text || 
-                            data.name.toLowerCase().includes(searchTerms.text) || 
-                            (data.description && data.description.toLowerCase().includes(searchTerms.text));
-          const categoryMatch = !searchTerms.category || 
-                                data.category_id.toString() === searchTerms.category;
-          
-          return textMatch && categoryMatch;
+        // Custom filter logic (Strictly typed to return boolean)
+        this.dataSource.filterPredicate = (data: Material, filter: string): boolean => {
+          try {
+            const searchTerms = JSON.parse(filter);
+            
+            const textMatch = Boolean(
+              !searchTerms.text || 
+              data.name.toLowerCase().includes(searchTerms.text) || 
+              (data.description ? data.description.toLowerCase().includes(searchTerms.text) : false)
+            );
+            
+            const categoryMatch = Boolean(
+              !searchTerms.category || 
+              data.category_id.toString() === searchTerms.category
+            );
+            
+            return textMatch && categoryMatch;
+          } catch (e) {
+            // Fallback just in case the JSON.parse fails during initialization
+            return true; 
+          }
         };
 
         this.loading = false;

@@ -78,7 +78,7 @@
         <div class="card-body p-4 d-flex justify-content-between align-items-center">
           <div>
             <h6 class="text-muted fw-bold mb-2">TOTAL MATERIALS</h6>
-            <h2 class="mb-0 fw-bold">{{ dataSource.data.length }}</h2>
+            <h2 class="mb-0 fw-bold">{{ cardData.length }}</h2>
           </div>
           <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;">
             <i class="fas fa-boxes fa-lg"></i>
@@ -92,7 +92,7 @@
         <div class="card-body p-4 d-flex justify-content-between align-items-center">
           <div>
             <h6 class="text-muted fw-bold mb-2">IN STOCK</h6>
-             <h2 class="mb-0 fw-bold">{{ getHealthyStockCount() }}</h2>
+             <h2 class="mb-0 fw-bold">{{ getHealthyStockCount(cardData) }}</h2>
           </div>
           <div class="bg-success text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;">
             <i class="fas fa-check-circle fa-lg"></i>
@@ -106,7 +106,7 @@
         <div class="card-body p-4 d-flex justify-content-between align-items-center">
           <div>
             <h6 class="text-muted fw-bold mb-2">LOW STOCK</h6>
-            <h2 class="mb-0 fw-bold">{{ getLowStockCount() }}</h2>
+            <h2 class="mb-0 fw-bold">{{ getLowStockCount(cardData) }}</h2>
           </div>
           <div class="bg-warning text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;">
             <i class="fas fa-exclamation-triangle fa-lg"></i>
@@ -120,7 +120,7 @@
         <div class="card-body p-4 d-flex justify-content-between align-items-center">
           <div>
             <h6 class="text-muted fw-bold mb-2">STOCK VALUE</h6>
-            <h2 class="mb-0 fw-bold">₹{{ calculateStockValue() | number:'1.2-2' }}</h2>
+            <h2 class="mb-0 fw-bold">₹{{ calculateStockValue(cardData) | number:'1.2-2' }}</h2>
           </div>
           <div class="bg-info text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;">
             <i class="fas fa-rupee-sign fa-lg"></i>

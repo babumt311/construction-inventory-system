@@ -3,7 +3,6 @@ import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { Chart, registerables } from 'chart.js';
 import { ToastrService } from 'ngx-toastr';
-
 import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
@@ -11,8 +10,6 @@ import { MatSort } from '@angular/material/sort';
 import { StockService } from '../../services/stock.service';
 import { ProjectService } from '../../services/project.service';
 import { MaterialService } from '../../services/material.service';
-
-import { StockBalance } from '../../models/stock.model';
 import { Project, Site } from '../../models/project.model';
 import { Material } from '../../models/material.model';
 
@@ -30,10 +27,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   sites: Site[] = [];
   materials: Material[] = [];
   categories: any[] = [];
-  stockBalances: any[] = []; 
-  selectedMaterial: Material | null = null;
-  materialStockHistory: any[] = [];
   
+  // SEPARATED DATA ARRAYS
+  allTimeBalances: any[] = []; 
+  dateRangedBalances: any[] | null = null; 
+  
+  selectedMaterial: Material | null = null;
   filterForm: FormGroup;
   
   displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'updated_at', 'status'];
@@ -43,8 +42,10 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   materialChart: Chart | null = null;
   loading = false;
   selectedProjectId?: number;
-  selectedSiteId?: number;
   viewMode: 'table' | 'cards' = 'table';
+
+  private prevStart: string = '';
+  private prevEnd: string = '';
 
   constructor(
     private fb: FormBuilder,
@@ -55,7 +56,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     private toastr: ToastrService
   ) {
     Chart.register(...registerables);
-    
     this.filterForm = this.fb.group({
       project_id: [''],
       site_id: [''],
@@ -70,147 +70,127 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.loadProjects();
     this.loadMaterials();
     this.loadCategories();
-    this.filterForm.valueChanges.subscribe(() => this.applyFilters());
-  }
-
-  loadProjects(): void {
-    this.projectService.getProjects().subscribe({
-      next: (projects) => this.projects = projects,
-      error: () => this.toastr.error('Failed to load projects')
+    
+    this.filterForm.valueChanges.subscribe(vals => {
+      // If dates changed, fetch new history. If only dropdowns changed, just filter locally.
+      if (vals.start_date !== this.prevStart || vals.end_date !== this.prevEnd) {
+        this.prevStart = vals.start_date;
+        this.prevEnd = vals.end_date;
+        this.fetchDateRangedData();
+      } else {
+        this.updateTable();
+      }
     });
   }
 
-  loadMaterials(): void {
-    this.materialService.getMaterials().subscribe({
-      next: (materials) => this.materials = materials,
-      error: () => this.toastr.error('Failed to load materials')
-    });
-  }
-
-  loadCategories(): void {
-    this.materialService.getCategories().subscribe(categories => this.categories = categories);
-  }
+  loadProjects(): void { this.projectService.getProjects().subscribe(p => this.projects = p); }
+  loadMaterials(): void { this.materialService.getMaterials().subscribe(m => this.materials = m); }
+  loadCategories(): void { this.materialService.getCategories().subscribe(c => this.categories = c); }
 
   onProjectChange(projectId: any): void {
     const id = projectId ? Number(projectId) : 0;
     this.selectedProjectId = id;
     this.sites = [];
-    this.selectedSiteId = undefined;
-    this.stockBalances = [];
-    
-    this.filterForm.patchValue({ site_id: '' }, { emitEvent: false });
-    this.applyFilters();
+    this.allTimeBalances = [];
+    this.dateRangedBalances = null;
+    this.filterForm.patchValue({ site_id: '', start_date: '', end_date: '' }, { emitEvent: false });
+    this.prevStart = ''; this.prevEnd = '';
 
     if (id) {
       this.loading = true;
       this.projectService.getProjectSites(id).subscribe(sites => {
-        this.sites = sites.filter(site => site.status === 'ACTIVE' || site.status === 'active' || site.status === 'IN_PROGRESS');
-        
-        if (this.sites.length === 0) {
-          this.loading = false;
-          return;
-        }
+        this.sites = sites.filter(s => s.status.toUpperCase() === 'ACTIVE' || s.status.toUpperCase() === 'IN_PROGRESS');
+        if (this.sites.length === 0) { this.loading = false; return; }
 
-        let loadedCount = 0;
+        let loaded = 0;
         this.sites.forEach(site => {
           this.stockService.getSiteStockSummary(site.id).subscribe({
             next: (balances) => {
-              const taggedBalances = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
-              this.stockBalances = [...this.stockBalances, ...taggedBalances];
-              
-              loadedCount++;
-              if (loadedCount === this.sites.length) {
+              const tagged = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
+              this.allTimeBalances = [...this.allTimeBalances, ...tagged];
+              loaded++;
+              if (loaded === this.sites.length) {
                 this.loading = false;
-                this.applyFilters();
-              }
-            },
-            error: () => {
-              loadedCount++;
-              if (loadedCount === this.sites.length) {
-                this.loading = false;
-                this.applyFilters();
+                this.updateTable();
               }
             }
           });
         });
       });
+    } else {
+      this.updateTable();
     }
   }
 
-  onSiteChange(siteId: any): void {
-    this.selectedSiteId = siteId ? Number(siteId) : undefined;
-    this.applyFilters();
-  }
+  fetchDateRangedData(): void {
+    const start = this.filterForm.value.start_date;
+    const end = this.filterForm.value.end_date;
 
-  applyFilters(): void {
-    const filters = this.filterForm.value;
-    let filteredData = [...this.stockBalances]; 
-    
-    if (filters.site_id) {
-      filteredData = filteredData.filter(b => Number(b.site_id) === Number(filters.site_id));
+    if (!start && !end) {
+      this.dateRangedBalances = null;
+      this.updateTable();
+      return;
     }
 
-    if (filters.material_id) {
-      filteredData = filteredData.filter(b => Number(b.material_id) === Number(filters.material_id));
-    }
-    
-    if (filters.start_date) {
-      const start = new Date(filters.start_date);
-      start.setHours(0, 0, 0, 0);
-      const startTime = start.getTime();
-      
-      filteredData = filteredData.filter((b: any) => {
-        const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date || b.report_date;
-        if (!rawDate) return true; 
-        return new Date(rawDate).getTime() >= startTime;
+    this.loading = true;
+    this.dateRangedBalances = [];
+    let loaded = 0;
+    this.sites.forEach(site => {
+      this.stockService.getSiteStockSummary(site.id, start, end).subscribe({
+        next: (balances) => {
+          const tagged = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
+          this.dateRangedBalances = [...(this.dateRangedBalances || []), ...tagged];
+          loaded++;
+          if (loaded === this.sites.length) {
+            this.loading = false;
+            this.updateTable();
+          }
+        }
       });
-    }
-
-    if (filters.end_date) {
-      const end = new Date(filters.end_date);
-      end.setHours(23, 59, 59, 999);
-      const endTime = end.getTime();
-      
-      filteredData = filteredData.filter((b: any) => {
-        const rawDate = b.updated_at || b.created_at || b.last_updated || b.entry_date || b.report_date;
-        if (!rawDate) return true; 
-        return new Date(rawDate).getTime() <= endTime;
-      });
-    }
-    
-    if (filters.show_negative_only) {
-      filteredData = filteredData.filter(b => b.has_negative_balance);
-    }
-    
-    this.dataSource.data = filteredData;
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
-    this.createStockChart(filteredData);
-  }
-
-  // ==========================================
-  // NEW: Bulletproof Date Formatter
-  // ==========================================
-  getFormattedDate(balance: any): string {
-    // Scans the object for ANY possible date field the backend might have used
-    const rawDate = balance.updated_at || balance.created_at || balance.last_updated || balance.entry_date || balance.report_date;
-    if (!rawDate) return 'N/A';
-    
-    // Returns a beautiful format like "Apr 4, 2026"
-    return new Date(rawDate).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
     });
   }
 
-  getHealthyStockCount(): number { return this.dataSource.data.filter(b => !b.has_negative_balance && b.current_balance > 0).length; }
-  getLowStockCount(): number { return this.dataSource.data.filter(b => b.current_balance < 10 && !b.has_negative_balance).length; }
-  calculateStockValue(): number {
-    return this.dataSource.data.reduce((total, balance) => {
+  updateTable(): void {
+    const filters = this.filterForm.value;
+    let baseData = this.dateRangedBalances !== null ? this.dateRangedBalances : this.allTimeBalances;
+
+    baseData = baseData.filter(b => {
+      if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
+      if (filters.material_id && b.material_id !== Number(filters.material_id)) return false;
+      if (filters.show_negative_only && !b.has_negative_balance) return false;
+      return true;
+    });
+
+    this.dataSource.data = baseData;
+    this.dataSource.paginator = this.paginator;
+    this.dataSource.sort = this.sort;
+    this.createStockChart(baseData);
+  }
+
+  // --- TOP CARDS ALWAYS USE LATEST DATA ---
+  get cardData() {
+    const filters = this.filterForm.value;
+    return this.allTimeBalances.filter(b => {
+      if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
+      if (filters.material_id && b.material_id !== Number(filters.material_id)) return false;
+      if (filters.show_negative_only && !b.has_negative_balance) return false;
+      return true;
+    });
+  }
+
+  getHealthyStockCount(data: any[]): number { return data.filter(b => !b.has_negative_balance && b.current_balance > 0).length; }
+  getLowStockCount(data: any[]): number { return data.filter(b => b.current_balance < 10 && !b.has_negative_balance).length; }
+  calculateStockValue(data: any[]): number {
+    return data.reduce((total, balance) => {
       const material = this.materials.find(m => m.id === balance.material_id);
       return total + (balance.current_balance * (material?.standard_cost || 0));
     }, 0);
+  }
+
+  getFormattedDate(balance: any): string {
+    const rawDate = balance.updated_at || balance.created_at || balance.last_updated || balance.entry_date || balance.report_date;
+    if (!rawDate) return 'N/A';
+    return new Date(rawDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   getCategoryName(categoryId: number | undefined): string {
@@ -218,10 +198,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     return category ? category.name : 'Unknown';
   }
   getMaterial(materialId: number | undefined): any { return this.materials?.find(m => m.id === materialId); }
-  getCurrentStock(materialId: number | undefined): number {
-    const balance = this.stockBalances?.find(b => b.material_id === materialId);
-    return balance ? balance.current_balance : 0;
-  }
   getStockStatus(balance: any): string {
     if (!balance) return 'secondary';
     return balance.has_negative_balance ? 'danger' : (balance.current_balance < 10 ? 'warning' : 'success');
@@ -235,7 +211,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.destroyChart('stockChart');
     const ctx = document.getElementById('stockChart') as HTMLCanvasElement;
     if (!ctx || balances.length === 0) return;
-    
     const topMaterials = balances.filter(b => b.current_balance > 0).sort((a, b) => b.current_balance - a.current_balance).slice(0, 15);
     this.stockChart = new Chart(ctx, {
       type: 'bar',
@@ -253,8 +228,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   createMaterialChart(materialId: number): void {
     this.destroyChart('materialChart');
     const ctx = document.getElementById('materialChart') as HTMLCanvasElement;
-    if (!ctx || !this.selectedSiteId) return;
-    this.stockService.getStockEntries({ site_id: this.selectedSiteId, material_id: materialId, limit: 30 }).subscribe({
+    const filters = this.filterForm.value;
+    if (!ctx || !filters.site_id) return; // Requires a specific site for chart history
+    this.stockService.getStockEntries({ site_id: filters.site_id, material_id: materialId, limit: 30 }).subscribe({
       next: (entries) => {
         const labels = entries.map(e => new Date(e.entry_date).toLocaleDateString()).reverse();
         const quantities = entries.map(e => (e.entry_type === 'used' || e.entry_type === 'returned_supplier') ? -e.quantity : e.quantity).reverse();
@@ -271,7 +247,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
           },
           options: { responsive: true, maintainAspectRatio: false }
         });
-        this.materialStockHistory = entries;
       }
     });
   }
@@ -289,22 +264,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }
     const headers = ['Project', 'Site', 'Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Date', 'Status'];
     const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'Unknown';
-    
     const rows = this.dataSource.data.map((item: any) => {
-      // FIX: Use our new formatter for the CSV export too!
       const dateStr = this.getFormattedDate(item);
-      return [
-        projectName,
-        item.site_name || 'N/A',
-        item.material_name, 
-        this.getCategoryName(item.material_id), 
-        item.current_balance, 
-        item.opening_balance, 
-        item.total_received, 
-        item.total_used, 
-        dateStr,
-        this.getStockStatusText(item)
-      ];
+      return [ projectName, item.site_name || 'N/A', item.material_name, this.getCategoryName(item.material_id), item.current_balance, item.opening_balance, item.total_received, item.total_used, dateStr, this.getStockStatusText(item) ];
     });
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const a = document.createElement('a');
@@ -316,21 +278,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   destroyChart(chartId: string): void {
     const canvas = document.getElementById(chartId) as HTMLCanvasElement;
-    if (canvas) {
-      const chart = Chart.getChart(canvas);
-      if (chart) chart.destroy();
-    }
+    if (canvas) { const chart = Chart.getChart(canvas); if (chart) chart.destroy(); }
   }
-
-  ngOnDestroy(): void {
-    this.destroyChart('stockChart');
-    this.destroyChart('materialChart');
-  }
-
+  ngOnDestroy(): void { this.destroyChart('stockChart'); this.destroyChart('materialChart'); }
   toggleViewMode(): void { this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; }
-  refreshData(): void { 
-    if (this.selectedProjectId) {
-      this.onProjectChange(this.selectedProjectId);
-    }
-  }
+  refreshData(): void { if (this.selectedProjectId) this.onProjectChange(this.selectedProjectId); }
 }

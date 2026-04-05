@@ -1,165 +1,282 @@
 <div class="container-fluid p-4">
+  
   <div class="mb-4">
-    <h2 class="fw-bold"><i class="fas fa-truck-loading text-primary me-2"></i>Inventory Management</h2>
+    <h2 class="fw-bold"><i class="fas fa-boxes text-primary me-2"></i>Inventory Management</h2>
     <p class="text-muted">Record material transactions and add new materials to the database.</p>
   </div>
 
   <div class="row g-4">
-    <div class="col-md-7">
+    
+    <div class="col-lg-6">
       <div class="card shadow-sm border-0 h-100">
-        <div class="card-header bg-white border-0 pt-4 pb-0">
-          <h5 class="fw-bold"><i class="fas fa-plus-circle text-success me-2"></i>Record Stock Transaction</h5>
-        </div>
         <div class="card-body p-4">
-          <form [formGroup]="entryForm">
-            <div class="row mb-3">
+          <h5 class="fw-bold mb-4 text-success">
+            <i class="fas fa-plus-circle me-2"></i>Record Stock Transaction
+          </h5>
+          
+          <form [formGroup]="stockForm" (ngSubmit)="submitStockTransaction()">
+            <div class="row g-3">
+              
               <div class="col-md-6">
-                <label class="form-label small fw-bold">Project</label>
-                <select class="form-select" formControlName="project_id" (change)="onProjectChange($any($event.target).value)">
+                <label class="form-label fw-bold small text-muted">Project</label>
+                <select class="form-select" formControlName="project_id" (change)="onProjectChange($any($event.target).value)" 
+                        [class.is-invalid]="stockForm.get('project_id')?.invalid && stockForm.get('project_id')?.touched">
                   <option value="">Select Project</option>
                   <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
                 </select>
               </div>
+
               <div class="col-md-6">
-                <label class="form-label small fw-bold">Site</label>
-                <select class="form-select" formControlName="site_id">
+                <label class="form-label fw-bold small text-muted">Site</label>
+                <select class="form-select" formControlName="site_id" 
+                        [class.is-invalid]="stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched">
                   <option value="">Select Site</option>
-                  <option *ngFor="let s of entrySites" [value]="s.id">{{ s.name }}</option>
+                  <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
                 </select>
               </div>
-            </div>
 
-            <div class="row mb-3">
               <div class="col-md-6">
-                <label class="form-label small fw-bold">Category Filter (Optional)</label>
-                <select class="form-select" formControlName="entry_category_id" (change)="onEntryCategoryChange($any($event.target).value)">
+                <label class="form-label fw-bold small text-muted">Category Filter (Optional)</label>
+                <select class="form-select" formControlName="category_filter" (change)="onStockCategoryFilterChange($any($event.target).value)">
                   <option value="">All Categories</option>
                   <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
                 </select>
               </div>
+
               <div class="col-md-6">
-                <label class="form-label small fw-bold">Material *</label>
-                <select class="form-select" formControlName="material_id">
+                <label class="form-label fw-bold small text-muted">Material *</label>
+                <select class="form-select" formControlName="material_id" 
+                        [class.is-invalid]="stockForm.get('material_id')?.invalid && stockForm.get('material_id')?.touched">
                   <option value="">Select Material</option>
-                  <option *ngFor="let m of filteredMaterials" [value]="m.id">{{ m.name }}</option>
+                  <option *ngFor="let m of filteredMaterialsForStock" [value]="m.id">{{ m.name }}</option>
                 </select>
               </div>
-            </div>
 
-            <div class="row mb-3">
               <div class="col-md-6">
-                <label class="form-label small fw-bold">Transaction Type</label>
+                <label class="form-label fw-bold small text-muted">Transaction Type</label>
                 <select class="form-select" formControlName="entry_type">
                   <option value="received">Received (Delivery to Site)</option>
                   <option value="used">Used (Consumed at Site)</option>
+                  <option value="returned_supplier">Returned to Supplier</option>
+                  <option value="returned_received">Returned from Site</option>
                 </select>
               </div>
+
               <div class="col-md-6">
-                <label class="form-label small fw-bold">Quantity</label>
-                <input type="number" class="form-control" formControlName="quantity">
+                <label class="form-label fw-bold small text-muted">Quantity</label>
+                <input type="number" class="form-control" formControlName="quantity" min="0" step="0.01" 
+                       [class.is-invalid]="stockForm.get('quantity')?.invalid && stockForm.get('quantity')?.touched">
               </div>
-            </div>
 
-            <div class="mb-3">
-              <label class="form-label small fw-bold">Reference / Invoice # (Optional)</label>
-              <input type="text" class="form-control" formControlName="reference">
-            </div>
+              <div class="col-12">
+                <label class="form-label fw-bold small text-muted">Reference / Invoice # (Optional)</label>
+                <input type="text" class="form-control" formControlName="reference_no">
+              </div>
 
-            <div class="mb-4">
-              <label class="form-label small fw-bold">Remarks</label>
-              <textarea class="form-control" formControlName="remarks" rows="2"></textarea>
-            </div>
+              <div class="col-12">
+                <label class="form-label fw-bold small text-muted">Remarks</label>
+                <textarea class="form-control" formControlName="remarks" rows="2"></textarea>
+              </div>
 
-            <button class="btn btn-primary w-100 fw-bold" [disabled]="entryForm.invalid || loading" (click)="submitStockEntry()">
-              <i class="fas fa-save me-2"></i> Save Transaction
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-5">
-      <div class="card shadow-sm border-0 h-100 bg-light">
-        <div class="card-header bg-transparent border-0 pt-4 pb-0">
-          <h5 class="fw-bold"><i class="fas fa-box text-info me-2"></i>Create New Material</h5>
-        </div>
-        <div class="card-body p-4">
-          <form [formGroup]="materialForm">
-            <div class="mb-3">
-              <label class="form-label small fw-bold">Material Name</label>
-              <input type="text" class="form-control" formControlName="name" placeholder="e.g. Portland Cement (50kg)">
-            </div>
-            
-            <div class="mb-3">
-              <div class="d-flex justify-content-between align-items-end mb-1">
-                <label class="form-label small fw-bold mb-0">Category</label>
-                <button type="button" class="btn btn-sm btn-link text-info p-0 text-decoration-none fw-bold" (click)="openCategoryModal()">
-                  <i class="fas fa-plus-circle me-1"></i>Add New
+              <div class="col-12 mt-4 text-end">
+                <button type="submit" class="btn btn-success fw-bold px-4" [disabled]="submittingStock">
+                  <span *ngIf="!submittingStock"><i class="fas fa-save me-2"></i>Record Transaction</span>
+                  <span *ngIf="submittingStock"><i class="fas fa-spinner fa-spin me-2"></i>Saving...</span>
                 </button>
               </div>
-              <select class="form-select" formControlName="category_id">
-                <option value="">Select Category</option>
-                <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
-              </select>
-            </div>
 
-            <div class="row mb-3">
-              <div class="col-md-6">
-                <label class="form-label small fw-bold">Unit of Measure</label>
-                <select class="form-select" formControlName="unit">
-                  <option value="kg">Kilograms (kg)</option>
-                  <option value="tons">Tons</option>
-                  <option value="bags">Bags</option>
-                  <option value="liters">Liters</option>
-                  <option value="units">Pieces / Units</option>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100 bg-light">
+        <div class="card-body p-4">
+          <h5 class="fw-bold mb-4 text-primary">
+            <i class="fas" [class.fa-box]="!isEditingMaterial" [class.fa-edit]="isEditingMaterial"></i> 
+            {{ isEditingMaterial ? 'Edit Material' : 'Create New Material' }}
+          </h5>
+          
+          <form [formGroup]="materialForm" (ngSubmit)="submitMaterial()">
+            <div class="row g-3">
+              
+              <div class="col-12">
+                <label class="form-label fw-bold small text-muted">Material Name</label>
+                <input type="text" class="form-control" formControlName="name" placeholder="e.g. Portland Cement (50kg)" 
+                       [class.is-invalid]="materialForm.get('name')?.invalid && materialForm.get('name')?.touched">
+              </div>
+
+              <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label fw-bold small text-muted mb-0">Category</label>
+                  <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-bold" (click)="openCategoryDialog()">
+                    <i class="fas fa-plus-circle me-1"></i>Add New
+                  </button>
+                </div>
+                <select class="form-select" formControlName="category_id" 
+                        [class.is-invalid]="materialForm.get('category_id')?.invalid && materialForm.get('category_id')?.touched">
+                  <option value="">Select Category</option>
+                  <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
                 </select>
               </div>
+
               <div class="col-md-6">
-                <label class="form-label small fw-bold">Standard Cost (₹)</label>
-                <input type="number" class="form-control" formControlName="standard_cost">
+                <label class="form-label fw-bold small text-muted">Unit of Measure</label>
+                <select class="form-select" formControlName="unit">
+                  <option value="Bags">Bags</option>
+                  <option value="Kgs">Kgs</option>
+                  <option value="Tons">Tons</option>
+                  <option value="Liters">Liters</option>
+                  <option value="Pieces">Pieces</option>
+                  <option value="Meters">Meters</option>
+                  <option value="Sq.Ft">Sq.Ft</option>
+                  <option value="Cu.M">Cu.M</option>
+                </select>
               </div>
-            </div>
+              
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-muted">Standard Cost (₹)</label>
+                <input type="number" class="form-control" formControlName="standard_cost" min="0" step="0.01">
+              </div>
 
-            <div class="mb-4">
-              <label class="form-label small fw-bold">Description</label>
-              <textarea class="form-control" formControlName="description" rows="2"></textarea>
-            </div>
+              <div class="col-12">
+                <label class="form-label fw-bold small text-muted">Description</label>
+                <textarea class="form-control" formControlName="description" rows="3"></textarea>
+              </div>
 
-            <button class="btn btn-info text-white w-100 fw-bold" [disabled]="materialForm.invalid || loading" (click)="submitMaterial()">
-              <i class="fas fa-plus me-2"></i> Add Material to Database
-            </button>
+              <div class="col-12 mt-4 d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary fw-bold px-4" *ngIf="isEditingMaterial" (click)="resetMaterialForm()">Cancel</button>
+                <button type="submit" class="btn btn-primary fw-bold px-4" [disabled]="submittingMaterial || materialForm.invalid">
+                  <span *ngIf="!submittingMaterial">
+                    <i class="fas fa-save me-2"></i>{{ isEditingMaterial ? 'Update' : 'Save Material' }}
+                  </span>
+                  <span *ngIf="submittingMaterial"><i class="fas fa-spinner fa-spin me-2"></i>Saving...</span>
+                </button>
+              </div>
+
+            </div>
           </form>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<div class="modal fade shadow" [class.show]="showCategoryModal" [style.display]="showCategoryModal ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
-    <div class="modal-content border-0">
-      <div class="modal-header bg-light">
-        <h6 class="fw-bold mb-0"><i class="fas fa-tags text-info me-2"></i>Create New Category</h6>
-        <button type="button" class="btn-close" (click)="showCategoryModal = false"></button>
-      </div>
-      <div class="modal-body p-4">
-        <form [formGroup]="categoryForm">
-          <div class="mb-3">
-            <label class="form-label small fw-bold">Category Name *</label>
-            <input type="text" class="form-control" formControlName="name" placeholder="e.g. Electrical, Plumbing">
+  <div class="card shadow-sm border-0 mt-5">
+    <div class="card-header bg-white py-3 border-bottom-0 pt-4">
+      <h5 class="fw-bold mb-0">
+        <i class="fas fa-list text-primary me-2"></i>Material Master List
+      </h5>
+    </div>
+    
+    <div class="card-body p-4 pt-0">
+      
+      <div class="row align-items-center g-3 mb-3 bg-light p-3 rounded">
+        <div class="col-md-6">
+          <div class="input-group">
+            <span class="input-group-text bg-white border-end-0">
+              <i class="fas fa-search text-muted"></i>
+            </span>
+            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search materials by name or description..." 
+                   [(ngModel)]="materialSearchTerm" (input)="applyMaterialFilter()">
           </div>
-          <div class="mb-2">
-            <label class="form-label small fw-bold">Description (Optional)</label>
-            <textarea class="form-control" formControlName="description" rows="2"></textarea>
-          </div>
-        </form>
+        </div>
+        <div class="col-md-4">
+          <select class="form-select" [(ngModel)]="selectedCategoryId" (change)="applyMaterialFilter()">
+            <option value="">All Categories</option>
+            <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </div>
+        <div class="col-md-2 text-end">
+          <button class="btn btn-outline-secondary w-100 fw-bold bg-white" (click)="loadMaterials()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+        </div>
       </div>
-      <div class="modal-footer border-0 bg-light">
-        <button class="btn btn-secondary btn-sm" (click)="showCategoryModal = false">Cancel</button>
-        <button class="btn btn-info text-white btn-sm fw-bold" [disabled]="categoryForm.invalid || loading" (click)="submitCategory()">
-          Save Category
-        </button>
+
+      <div class="table-responsive">
+        <table mat-table [dataSource]="materialDataSource" matSort class="table table-hover align-middle mb-0 border">
+          
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted py-3 px-3">Material Name</th>
+            <td mat-cell *matCellDef="let element" class="py-3 px-3">
+              <strong class="text-dark d-block">{{ element.name }}</strong>
+              <small class="text-muted text-truncate d-inline-block" style="max-width: 250px;" *ngIf="element.description">{{ element.description }}</small>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted py-3 px-3">Category</th>
+            <td mat-cell *matCellDef="let element" class="py-3 px-3">
+              <span class="badge bg-secondary rounded-pill px-3 py-2">
+                {{ getCategoryName(element.category_id) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="unit">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted py-3 px-3">Unit</th>
+            <td mat-cell *matCellDef="let element" class="py-3 px-3">{{ element.unit || 'N/A' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="standard_cost">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted py-3 px-3">Std Cost</th>
+            <td mat-cell *matCellDef="let element" class="py-3 px-3 fw-bold text-success">
+              ₹{{ element.standard_cost | number:'1.2-2' }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted py-3 px-3 text-end">Actions</th>
+            <td mat-cell *matCellDef="let element" class="py-3 px-3 text-end">
+              <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary" (click)="editMaterial(element)" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" (click)="deleteMaterial(element.id)" title="Delete">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="materialColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: materialColumns;" class="border-bottom"></tr>
+        </table>
+
+        <div class="text-center py-5" *ngIf="materialDataSource.data.length === 0 && !loading">
+          <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+          <h5 class="fw-bold text-dark">No Materials Found</h5>
+          <p class="text-muted">Create a new material above or adjust your filters.</p>
+        </div>
       </div>
+      
+      <mat-paginator [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons class="border-top mt-2"></mat-paginator>
     </div>
   </div>
+
 </div>
+
+<ng-template #categoryDialog>
+  <div class="modal-header border-0 bg-light p-4">
+    <h5 class="modal-title fw-bold text-primary">
+      <i class="fas fa-tags me-2"></i>Add Category
+    </h5>
+    <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
+  </div>
+  <div class="modal-body p-4">
+    <form [formGroup]="categoryForm">
+      <div class="mb-3">
+        <label class="form-label fw-bold small text-muted">Category Name *</label>
+        <input type="text" class="form-control" formControlName="name">
+      </div>
+      <div class="mb-2">
+        <label class="form-label fw-bold small text-muted">Description</label>
+        <textarea class="form-control" formControlName="description" rows="3"></textarea>
+      </div>
+    </form>
+  </div>
+  <div class="modal-footer border-0 bg-light p-3">
+    <button type="button" class="btn btn-secondary fw-bold px-4" (click)="dialog.closeAll()">Cancel</button>
+    <button type="button" class="btn btn-primary fw-bold px-4" (click)="submitCategory()" [disabled]="categoryForm.invalid">Save Category</button>
+  </div>
+</ng-template>

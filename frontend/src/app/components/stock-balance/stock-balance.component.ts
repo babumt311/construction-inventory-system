@@ -72,7 +72,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.loadCategories();
     
     this.filterForm.valueChanges.subscribe(vals => {
-      // If dates changed, fetch new history. If only dropdowns changed, just filter locally.
       if (vals.start_date !== this.prevStart || vals.end_date !== this.prevEnd) {
         this.prevStart = vals.start_date;
         this.prevEnd = vals.end_date;
@@ -122,11 +121,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }
   }
 
-  // RESTORED METHOD FOR HTML
-  onSiteChange(siteId: any): void {
-    // The actual filtering is handled by valueChanges subscription above, 
-    // but this empty method satisfies the HTML template call!
-  }
+  onSiteChange(siteId: any): void {}
 
   fetchDateRangedData(): void {
     const start = this.filterForm.value.start_date;
@@ -153,7 +148,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
           }
         },
         error: () => {
-          // If a site fails, ensure the loading spinner still stops
           loaded++;
           if (loaded === this.sites.length) {
             this.loading = false;
@@ -181,7 +175,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.createStockChart(baseData);
   }
 
-  // --- TOP CARDS ALWAYS USE LATEST DATA ---
   get cardData() {
     const filters = this.filterForm.value;
     return this.allTimeBalances.filter(b => {
@@ -207,10 +200,13 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     return new Date(rawDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
+  // Still needed for the Modal view (since it pulls from the raw Material object)
   getCategoryName(categoryId: number | undefined): string {
+    if (!categoryId) return 'Unknown';
     const category = this.categories?.find((c: any) => c.id === categoryId);
     return category ? category.name : 'Unknown';
   }
+  
   getMaterial(materialId: number | undefined): any { return this.materials?.find(m => m.id === materialId); }
   
   getStockStatus(balance: any): string {
@@ -222,10 +218,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     return balance.has_negative_balance ? 'Negative Stock' : (balance.current_balance < 10 ? 'Low Stock' : 'In Stock');
   }
 
-  // RESTORED METHOD FOR MODAL
   getCurrentStock(materialId: number | undefined): number {
     if (!materialId) return 0;
-    // Uses the all-time list so the modal displays the real-time amount
     const balance = this.allTimeBalances.find(b => b.material_id === materialId);
     return balance ? balance.current_balance : 0;
   }
@@ -253,7 +247,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const ctx = document.getElementById('materialChart') as HTMLCanvasElement;
     const filters = this.filterForm.value;
     
-    // We pass the specific site ID if chosen, otherwise grab the first available site ID for this material
     let siteIdToFetch = filters.site_id;
     if (!siteIdToFetch) {
         const mat = this.allTimeBalances.find(b => b.material_id === materialId);
@@ -298,7 +291,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'Unknown';
     const rows = this.dataSource.data.map((item: any) => {
       const dateStr = this.getFormattedDate(item);
-      return [ projectName, item.site_name || 'N/A', item.material_name, this.getCategoryName(item.material_id), item.current_balance, item.opening_balance, item.total_received, item.total_used, dateStr, this.getStockStatusText(item) ];
+      // FIX: Use item.category directly instead of getting confused by IDs!
+      return [ projectName, item.site_name || 'N/A', item.material_name, item.category, item.current_balance, item.opening_balance, item.total_received, item.total_used, dateStr, this.getStockStatusText(item) ];
     });
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const a = document.createElement('a');

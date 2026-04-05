@@ -1,7 +1,7 @@
 """
 Stock calculation utilities
 """
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -29,6 +29,9 @@ class StockCalculator:
         if not as_of_date:
             as_of_date = datetime.now()
             
+        # Strip timezone from as_of_date just to be safe for local python math
+        as_of_date = as_of_date.replace(tzinfo=None) if getattr(as_of_date, 'tzinfo', None) else as_of_date
+            
         # 1. Fetch the entire ledger up to as_of_date in a single, fast query
         all_entries = db.query(models.StockEntry).filter(
             and_(
@@ -55,7 +58,10 @@ class StockCalculator:
         opening_balance = Decimal('0.00')
         
         for entry in all_entries:
-            if entry.entry_date <= yesterday_end:
+            # FIX: Strip timezone from DB date so Python can compare safely
+            safe_date = entry.entry_date.replace(tzinfo=None) if getattr(entry.entry_date, 'tzinfo', None) else entry.entry_date
+            
+            if safe_date <= yesterday_end:
                 if entry.entry_type in [schemas.StockEntryType.RECEIVED.value, schemas.StockEntryType.RETURNED_RECEIVED.value]:
                     opening_balance += entry.quantity
                 elif entry.entry_type in [schemas.StockEntryType.USED.value, schemas.StockEntryType.RETURNED_SUPPLIER.value]:
@@ -71,7 +77,10 @@ class StockCalculator:
         today_return_supplier = Decimal('0.00')
         
         for entry in all_entries:
-            if today_start <= entry.entry_date <= today_end:
+            # FIX: Strip timezone from DB date so Python can compare safely
+            safe_date = entry.entry_date.replace(tzinfo=None) if getattr(entry.entry_date, 'tzinfo', None) else entry.entry_date
+            
+            if today_start <= safe_date <= today_end:
                 if entry.entry_type == schemas.StockEntryType.RECEIVED.value:
                     today_received += entry.quantity
                 elif entry.entry_type == schemas.StockEntryType.USED.value:
@@ -90,8 +99,8 @@ class StockCalculator:
             "site_id": site_id,
             "as_of_date": as_of_date,
             "opening_balance": opening_balance,
-            "total_received": total_in_today,    # FIX: Strictly maps to today's incoming stock
-            "total_used": total_out_today,       # FIX: Strictly maps to today's outgoing stock
+            "total_received": total_in_today,
+            "total_used": total_out_today,
             "current_balance": current_balance,
             "has_negative_balance": current_balance < Decimal('0.00'),
             

@@ -166,7 +166,7 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3">Category</th>
             <td mat-cell *matCellDef="let balance" class="py-3">
               <span class="badge bg-secondary rounded-pill px-3 py-2">
-                {{ getCategoryName(balance.material_id) }}
+                {{ balance.category }}
               </span>
             </td>
           </ng-container>
@@ -263,7 +263,7 @@
               <div>
                 <h5 class="fw-bold text-dark mb-0">{{ balance.material_name }}</h5>
                 <div class="mt-1">
-                  <span class="badge bg-secondary rounded-pill me-1">{{ getCategoryName(balance.material_id) }}</span>
+                  <span class="badge bg-secondary rounded-pill me-1">{{ balance.category }}</span>
                   <span class="badge bg-light text-dark border rounded-pill"><i class="fas fa-map-marker-alt text-danger me-1"></i>{{ balance.site_name || 'N/A' }}</span>
                 </div>
               </div>
@@ -327,7 +327,7 @@
           <div class="card-body">
             <h6 class="fw-bold text-muted mb-3 text-uppercase">Material Information</h6>
             <div class="mb-2"><strong class="text-dark w-50 d-inline-block">Name:</strong> {{ selectedMaterial?.name }}</div>
-            <div class="mb-2"><strong class="text-dark w-50 d-inline-block">Category:</strong> <span class="badge bg-secondary rounded-pill">{{ getCategoryName(selectedMaterial?.id) }}</span></div>
+            <div class="mb-2"><strong class="text-dark w-50 d-inline-block">Category:</strong> <span class="badge bg-secondary rounded-pill">{{ getCategoryName(selectedMaterial?.category_id) }}</span></div>
             <div><strong class="text-dark w-50 d-inline-block">Standard Cost:</strong> ₹{{ selectedMaterial?.standard_cost | number:'1.2-2' }}</div>
           </div>
         </div>

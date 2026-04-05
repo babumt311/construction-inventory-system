@@ -53,7 +53,7 @@
               </div>
               <div class="col-12">
                 <label class="form-label fw-bold small text-muted">Material *</label>
-                <select class="form-select" formControlName="material_id" [class.is-invalid]="stockForm.get('material_id')?.invalid && stockForm.get('material_id')?.touched">
+                <select class="form-select" formControlName="material_id" (change)="onMaterialChange($any($event.target).value)" [class.is-invalid]="stockForm.get('material_id')?.invalid && stockForm.get('material_id')?.touched">
                   <option value="">Select Material</option>
                   <option *ngFor="let m of filteredMaterialsForStock" [value]="m.id">{{ m.name }}</option>
                 </select>

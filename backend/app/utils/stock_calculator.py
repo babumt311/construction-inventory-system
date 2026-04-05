@@ -323,5 +323,36 @@ class StockCalculator:
         quantity: Decimal
     ) -> bool:
         if entry_type == schemas.StockEntryType.USED.value:
-            current_balance = StockCalculator.calculate_balance(
-                db
+            calc_result = StockCalculator.calculate_balance(db, site_id, material_id)
+            current_balance = calc_result["current_balance"]
+            
+            if current_balance < quantity:
+                logger.warning(f"Insufficient stock for usage. Balance: {current_balance}, Requested: {quantity}")
+        return True
+
+# --- RESTORED CLI FUNCTIONS ---
+def cli_calculate_stock(db: Session, site_id: int, material_id: int):
+    print(f"🧮 Calculating stock balance for site {site_id}, material {material_id}")
+    calculator = StockCalculator()
+    result = calculator.calculate_balance(db, site_id, material_id)
+    
+    print("📊 Stock Balance Result:")
+    print(f"  📦 Material ID: {result['material_id']}")
+    print(f"  🏢 Site ID: {result['site_id']}")
+    print(f"  📅 As of Date: {result['as_of_date']}")
+    print(f"  📈 Opening Balance: {result['opening_balance']}")
+    print(f"  📥 Total Received: {result['total_received']}")
+    print(f"  📤 Total Used: {result['total_used']}")
+    print(f"  📊 Current Balance: {result['current_balance']}")
+    
+    if result['has_negative_balance']:
+        print("  ⚠️  WARNING: Negative balance detected!")
+    
+    return result
+
+def cli_generate_daily_report(db: Session, site_id: int, report_date: date):
+    print(f"📋 Generating daily report for site {site_id} on {report_date}")
+    calculator = StockCalculator()
+    reports = calculator.generate_daily_report(db, site_id, report_date)
+    print(f"✅ Generated {len(reports)} daily reports")
+    return reports

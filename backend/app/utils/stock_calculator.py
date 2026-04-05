@@ -32,7 +32,6 @@ class StockCalculator:
         # Strip timezone from as_of_date just to be safe for local python math
         as_of_date = as_of_date.replace(tzinfo=None) if getattr(as_of_date, 'tzinfo', None) else as_of_date
             
-        # 1. Fetch the entire ledger up to as_of_date in a single, fast query
         all_entries = db.query(models.StockEntry).filter(
             and_(
                 models.StockEntry.site_id == site_id,
@@ -44,7 +43,6 @@ class StockCalculator:
         all_time_received = Decimal('0.00')
         all_time_used = Decimal('0.00')
         
-        # 2. Calculate the absolute True Current Balance
         for entry in all_entries:
             if entry.entry_type in [schemas.StockEntryType.RECEIVED.value, schemas.StockEntryType.RETURNED_RECEIVED.value]:
                 all_time_received += entry.quantity
@@ -53,7 +51,6 @@ class StockCalculator:
                 
         current_balance = all_time_received - all_time_used
         
-        # 3. Calculate Opening Balance (Everything up to 23:59:59 of yesterday)
         yesterday_end = datetime.combine((as_of_date - timedelta(days=1)).date(), datetime.max.time())
         opening_balance = Decimal('0.00')
         
@@ -66,7 +63,6 @@ class StockCalculator:
                 elif entry.entry_type in [schemas.StockEntryType.USED.value, schemas.StockEntryType.RETURNED_SUPPLIER.value]:
                     opening_balance -= entry.quantity
 
-        # 4. Calculate strictly Today's Activity
         today_start = datetime.combine(as_of_date.date(), datetime.min.time())
         today_end = datetime.combine(as_of_date.date(), datetime.max.time())
         
@@ -88,7 +84,6 @@ class StockCalculator:
                 elif entry.entry_type == schemas.StockEntryType.RETURNED_SUPPLIER.value:
                     today_return_supplier += entry.quantity
                     
-        # Total IN and OUT for the current day
         total_in_today = today_received + today_return_received
         total_out_today = today_used + today_return_supplier
                 
@@ -110,7 +105,6 @@ class StockCalculator:
             "total_received_today": total_in_today
         }
         
-        logger.debug(f"Stock calculation result: {result}")
         return result
     
     @staticmethod
@@ -119,11 +113,7 @@ class StockCalculator:
         site_id: int,
         report_date: date
     ) -> List[models.DailyStockReport]:
-        """
-        Generate daily stock reports for all materials at a site
-        """
         logger.info(f"Generating daily report for site {site_id} on {report_date}")
-        
         reports = []
         
         materials_query = db.query(models.Material).join(models.StockEntry).filter(
@@ -134,9 +124,6 @@ class StockCalculator:
         
         for material in materials:
             as_of_datetime = datetime.combine(report_date, datetime.max.time())
-            balance = StockCalculator.calculate_balance(
-                db, site_id, material.id, as_of_datetime
-            )
             
             previous_date = report_date - timedelta(days=1)
             previous_report = crud.crud_daily_report.get_latest_report(
@@ -201,8 +188,6 @@ class StockCalculator:
             reports.append(report)
         
         db.commit()
-        
-        logger.info(f"Generated {len(reports)} daily reports for site {site_id}")
         return reports
     
     @staticmethod
@@ -213,79 +198,102 @@ class StockCalculator:
         end_date: Optional[date] = None
     ) -> List[Dict[str, Any]]:
         """
-        Get stock summary for all materials at a site.
-        Dynamically handles partial dates (e.g. Start Date with no End Date)
+        Get stock summary for all materials.
+        If dates are provided, dynamically generates a DAY-BY-DAY ledger!
         """
-        logger.debug(f"Getting stock summary for site {site_id}, dates: {start_date} to {end_date}")
-        
         summary = []
         
-        materials_query = db.query(models.Material).join(models.StockEntry).filter(
+        materials = db.query(models.Material).join(models.StockEntry).filter(
             models.StockEntry.site_id == site_id
-        ).distinct()
+        ).distinct().all()
         
-        materials = materials_query.all()
-        
-        for material in materials:
-            # FIX: If EITHER a start date OR an end date is provided, generate the historical snapshot!
-            if start_date or end_date:
-                # Resolve missing dates safely
-                effective_start = start_date if start_date else date.min
-                effective_end = end_date if end_date else date.today()
+        if start_date or end_date:
+            # --- DATE RANGED DAILY LEDGER MODE ---
+            effective_start = start_date if start_date else date.min
+            effective_end = end_date if end_date else date.today()
+            
+            start_dt = datetime.combine(effective_start, datetime.min.time())
+            end_dt = datetime.combine(effective_end, datetime.max.time())
+            
+            for material in materials:
+                entries_in_range = db.query(models.StockEntry).filter(
+                    models.StockEntry.site_id == site_id,
+                    models.StockEntry.material_id == material.id,
+                    models.StockEntry.entry_date >= start_dt,
+                    models.StockEntry.entry_date <= end_dt
+                ).order_by(models.StockEntry.entry_date.asc()).all()
                 
-                start_dt = datetime.combine(effective_start, datetime.min.time())
-                end_dt = datetime.combine(effective_end, datetime.max.time())
+                # If no activity in this range, just show the static balance
+                if not entries_in_range:
+                    calc = StockCalculator.calculate_balance(db, site_id, material.id, end_dt)
+                    actual_last_date = db.query(func.max(models.StockEntry.entry_date)).filter(
+                        models.StockEntry.site_id == site_id,
+                        models.StockEntry.material_id == material.id,
+                        models.StockEntry.entry_date <= end_dt
+                    ).scalar()
+                    
+                    summary.append({
+                        "material_id": material.id,
+                        "material_name": material.name,
+                        "category": material.category.name if material.category else "N/A",
+                        "unit": material.unit or "N/A",
+                        "current_balance": calc["current_balance"],
+                        "opening_balance": calc["current_balance"],
+                        "total_received": Decimal('0.00'),
+                        "total_used": Decimal('0.00'),
+                        "has_negative_balance": calc["current_balance"] < 0,
+                        "last_updated": actual_last_date
+                    })
+                    continue
                 
-                # 1. Opening balance is anything strictly BEFORE the start_dt
-                if start_date:
-                    opening_dt = start_dt - timedelta(microseconds=1)
+                # Group entries by exact Day
+                entries_by_date = {}
+                for e in entries_in_range:
+                    safe_date = e.entry_date.replace(tzinfo=None) if getattr(e.entry_date, 'tzinfo', None) else e.entry_date
+                    d_key = safe_date.date()
+                    if d_key not in entries_by_date:
+                        entries_by_date[d_key] = []
+                    entries_by_date[d_key].append((e, safe_date))
+                    
+                # Generate a separate row for EACH active day
+                for d_key, daily_data in entries_by_date.items():
+                    day_start = datetime.combine(d_key, datetime.min.time())
+                    opening_dt = day_start - timedelta(microseconds=1)
+                    
                     opening_calc = StockCalculator.calculate_balance(db, site_id, material.id, opening_dt)
                     opening_bal = opening_calc["current_balance"]
-                else:
-                    opening_bal = Decimal('0.00') # If no start date, opening balance is 0 at beginning of time
-                
-                # 2. Sum up transactions strictly WITHIN the date range
-                all_entries = db.query(models.StockEntry).filter(
-                    models.StockEntry.site_id == site_id,
-                    models.StockEntry.material_id == material.id
-                ).all()
-                
-                range_received = Decimal('0.00')
-                range_used = Decimal('0.00')
-                latest_entry_date = None
-                
-                for e in all_entries:
-                    safe_date = e.entry_date.replace(tzinfo=None) if getattr(e.entry_date, 'tzinfo', None) else e.entry_date
                     
-                    if start_dt <= safe_date <= end_dt:
-                        # Capture the last transaction date inside this specific date window
-                        if latest_entry_date is None or safe_date > latest_entry_date:
-                            latest_entry_date = safe_date
+                    day_received = Decimal('0.00')
+                    day_used = Decimal('0.00')
+                    latest_in_day = None
+                    
+                    for e, safe_date in daily_data:
+                        if latest_in_day is None or safe_date > latest_in_day:
+                            latest_in_day = safe_date
                             
                         if e.entry_type in [schemas.StockEntryType.RECEIVED.value, schemas.StockEntryType.RETURNED_RECEIVED.value]:
-                            range_received += e.quantity
+                            day_received += e.quantity
                         elif e.entry_type in [schemas.StockEntryType.USED.value, schemas.StockEntryType.RETURNED_SUPPLIER.value]:
-                            range_used += e.quantity
+                            day_used += e.quantity
                             
-                # 3. Calculate Closing Balance at the end of the range
-                current_bal = opening_bal + range_received - range_used
-                
-                summary.append({
-                    "material_id": material.id,
-                    "material_name": material.name,
-                    "category": material.category.name if material.category else "N/A",
-                    "unit": material.unit or "N/A",
-                    "current_balance": current_bal,
-                    "opening_balance": opening_bal,
-                    "total_received": range_received,
-                    "total_used": range_used,
-                    "has_negative_balance": current_bal < Decimal('0.00'),
-                    "last_updated": latest_entry_date if latest_entry_date else (start_dt if start_date else None)
-                })
-            else:
-                # --- ALL-TIME LATEST MODE (Used by Summary Cards when no dates are picked) ---
+                    closing_bal = opening_bal + day_received - day_used
+                    
+                    summary.append({
+                        "material_id": material.id,
+                        "material_name": material.name,
+                        "category": material.category.name if material.category else "N/A",
+                        "unit": material.unit or "N/A",
+                        "current_balance": closing_bal,
+                        "opening_balance": opening_bal,
+                        "total_received": day_received,
+                        "total_used": day_used,
+                        "has_negative_balance": closing_bal < 0,
+                        "last_updated": latest_in_day
+                    })
+        else:
+            # --- ALL-TIME LATEST MODE (Used by Summary Cards) ---
+            for material in materials:
                 balance = StockCalculator.calculate_balance(db, site_id, material.id)
-                
                 latest_entry_date = db.query(func.max(models.StockEntry.entry_date)).filter(
                     models.StockEntry.site_id == site_id,
                     models.StockEntry.material_id == material.id
@@ -314,38 +322,10 @@ class StockCalculator:
         entry_type: str,
         quantity: Decimal
     ) -> bool:
-        logger.debug(f"Validating stock entry: site={site_id}, material={material_id}, type={entry_type}, qty={quantity}")
         if entry_type == schemas.StockEntryType.USED.value:
             current_balance = StockCalculator.calculate_balance(
                 db, site_id, material_id
             )["current_balance"]
-            
             if current_balance < quantity:
                 logger.warning(f"Insufficient stock for usage. Balance: {current_balance}, Requested: {quantity}")
         return True
-
-def cli_calculate_stock(db: Session, site_id: int, material_id: int):
-    print(f"🧮 Calculating stock balance for site {site_id}, material {material_id}")
-    calculator = StockCalculator()
-    result = calculator.calculate_balance(db, site_id, material_id)
-    
-    print("📊 Stock Balance Result:")
-    print(f"  📦 Material ID: {result['material_id']}")
-    print(f"  🏢 Site ID: {result['site_id']}")
-    print(f"  📅 As of Date: {result['as_of_date']}")
-    print(f"  📈 Opening Balance: {result['opening_balance']}")
-    print(f"  📥 Total Received: {result['total_received']}")
-    print(f"  📤 Total Used: {result['total_used']}")
-    print(f"  📊 Current Balance: {result['current_balance']}")
-    
-    if result['has_negative_balance']:
-        print("  ⚠️  WARNING: Negative balance detected!")
-    
-    return result
-
-def cli_generate_daily_report(db: Session, site_id: int, report_date: date):
-    print(f"📋 Generating daily report for site {site_id} on {report_date}")
-    calculator = StockCalculator()
-    reports = calculator.generate_daily_report(db, site_id, report_date)
-    print(f"✅ Generated {len(reports)} daily reports")
-    return reports

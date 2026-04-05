@@ -122,6 +122,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }
   }
 
+  // RESTORED METHOD FOR HTML
+  onSiteChange(siteId: any): void {
+    // The actual filtering is handled by valueChanges subscription above, 
+    // but this empty method satisfies the HTML template call!
+  }
+
   fetchDateRangedData(): void {
     const start = this.filterForm.value.start_date;
     const end = this.filterForm.value.end_date;
@@ -140,6 +146,14 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         next: (balances) => {
           const tagged = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
           this.dateRangedBalances = [...(this.dateRangedBalances || []), ...tagged];
+          loaded++;
+          if (loaded === this.sites.length) {
+            this.loading = false;
+            this.updateTable();
+          }
+        },
+        error: () => {
+          // If a site fails, ensure the loading spinner still stops
           loaded++;
           if (loaded === this.sites.length) {
             this.loading = false;
@@ -198,6 +212,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     return category ? category.name : 'Unknown';
   }
   getMaterial(materialId: number | undefined): any { return this.materials?.find(m => m.id === materialId); }
+  
   getStockStatus(balance: any): string {
     if (!balance) return 'secondary';
     return balance.has_negative_balance ? 'danger' : (balance.current_balance < 10 ? 'warning' : 'success');
@@ -205,6 +220,14 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   getStockStatusText(balance: any): string {
     if (!balance) return 'Unknown';
     return balance.has_negative_balance ? 'Negative Stock' : (balance.current_balance < 10 ? 'Low Stock' : 'In Stock');
+  }
+
+  // RESTORED METHOD FOR MODAL
+  getCurrentStock(materialId: number | undefined): number {
+    if (!materialId) return 0;
+    // Uses the all-time list so the modal displays the real-time amount
+    const balance = this.allTimeBalances.find(b => b.material_id === materialId);
+    return balance ? balance.current_balance : 0;
   }
 
   createStockChart(balances: any[]): void {
@@ -229,8 +252,17 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.destroyChart('materialChart');
     const ctx = document.getElementById('materialChart') as HTMLCanvasElement;
     const filters = this.filterForm.value;
-    if (!ctx || !filters.site_id) return; // Requires a specific site for chart history
-    this.stockService.getStockEntries({ site_id: filters.site_id, material_id: materialId, limit: 30 }).subscribe({
+    
+    // We pass the specific site ID if chosen, otherwise grab the first available site ID for this material
+    let siteIdToFetch = filters.site_id;
+    if (!siteIdToFetch) {
+        const mat = this.allTimeBalances.find(b => b.material_id === materialId);
+        if (mat) siteIdToFetch = mat.site_id;
+    }
+    
+    if (!ctx || !siteIdToFetch) return; 
+
+    this.stockService.getStockEntries({ site_id: siteIdToFetch, material_id: materialId, limit: 30 }).subscribe({
       next: (entries) => {
         const labels = entries.map(e => new Date(e.entry_date).toLocaleDateString()).reverse();
         const quantities = entries.map(e => (e.entry_type === 'used' || e.entry_type === 'returned_supplier') ? -e.quantity : e.quantity).reverse();

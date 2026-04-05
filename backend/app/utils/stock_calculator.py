@@ -219,12 +219,15 @@ class StockCalculator:
     @staticmethod
     def get_site_stock_summary(
         db: Session,
-        site_id: int
+        site_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None
     ) -> List[Dict[str, Any]]:
         """
-        Get stock summary for all materials at a site
+        Get stock summary for all materials at a site.
+        If dates are provided, generates a historical snapshot for that specific date range.
         """
-        logger.debug(f"Getting stock summary for site {site_id}")
+        logger.debug(f"Getting stock summary for site {site_id}, dates: {start_date} to {end_date}")
         
         summary = []
         
@@ -235,25 +238,77 @@ class StockCalculator:
         materials = materials_query.all()
         
         for material in materials:
-            balance = StockCalculator.calculate_balance(db, site_id, material.id)
-            
-            latest_entry_date = db.query(func.max(models.StockEntry.entry_date)).filter(
-                models.StockEntry.site_id == site_id,
-                models.StockEntry.material_id == material.id
-            ).scalar()
-            
-            summary.append({
-                "material_id": material.id,
-                "material_name": material.name,
-                "category": material.category.name if material.category else "N/A",
-                "unit": material.unit or "N/A",
-                "current_balance": balance["current_balance"],
-                "opening_balance": balance["opening_balance"],
-                "total_received": balance["total_received"],
-                "total_used": balance["total_used"],
-                "has_negative_balance": balance["has_negative_balance"],
-                "last_updated": latest_entry_date 
-            })
+            if start_date and end_date:
+                # --- DATE RANGE MODE ---
+                # 1. Calculate the opening balance (state of the inventory strictly BEFORE start_date)
+                start_dt = datetime.combine(start_date, datetime.min.time())
+                opening_dt = start_dt - timedelta(microseconds=1)
+                
+                opening_calc = StockCalculator.calculate_balance(db, site_id, material.id, opening_dt)
+                opening_bal = opening_calc["current_balance"]
+                
+                # 2. Sum up transactions strictly WITHIN the date range
+                end_dt = datetime.combine(end_date, datetime.max.time())
+                
+                all_entries = db.query(models.StockEntry).filter(
+                    models.StockEntry.site_id == site_id,
+                    models.StockEntry.material_id == material.id
+                ).all()
+                
+                range_received = Decimal('0.00')
+                range_used = Decimal('0.00')
+                latest_entry_date = None
+                
+                for e in all_entries:
+                    # Strip timezone for safe comparison
+                    safe_date = e.entry_date.replace(tzinfo=None) if getattr(e.entry_date, 'tzinfo', None) else e.entry_date
+                    
+                    if start_dt <= safe_date <= end_dt:
+                        # Track the most recent transaction inside this date window
+                        if latest_entry_date is None or safe_date > latest_entry_date:
+                            latest_entry_date = safe_date
+                            
+                        if e.entry_type in [schemas.StockEntryType.RECEIVED.value, schemas.StockEntryType.RETURNED_RECEIVED.value]:
+                            range_received += e.quantity
+                        elif e.entry_type in [schemas.StockEntryType.USED.value, schemas.StockEntryType.RETURNED_SUPPLIER.value]:
+                            range_used += e.quantity
+                            
+                # 3. Calculate Closing Balance at the end of the range
+                current_bal = opening_bal + range_received - range_used
+                
+                summary.append({
+                    "material_id": material.id,
+                    "material_name": material.name,
+                    "category": material.category.name if material.category else "N/A",
+                    "unit": material.unit or "N/A",
+                    "current_balance": current_bal,
+                    "opening_balance": opening_bal,
+                    "total_received": range_received,
+                    "total_used": range_used,
+                    "has_negative_balance": current_bal < Decimal('0.00'),
+                    "last_updated": latest_entry_date
+                })
+            else:
+                # --- ALL-TIME LATEST MODE (Used by Summary Cards) ---
+                balance = StockCalculator.calculate_balance(db, site_id, material.id)
+                
+                latest_entry_date = db.query(func.max(models.StockEntry.entry_date)).filter(
+                    models.StockEntry.site_id == site_id,
+                    models.StockEntry.material_id == material.id
+                ).scalar()
+                
+                summary.append({
+                    "material_id": material.id,
+                    "material_name": material.name,
+                    "category": material.category.name if material.category else "N/A",
+                    "unit": material.unit or "N/A",
+                    "current_balance": balance["current_balance"],
+                    "opening_balance": balance["opening_balance"],
+                    "total_received": balance["total_received"],
+                    "total_used": balance["total_used"],
+                    "has_negative_balance": balance["has_negative_balance"],
+                    "last_updated": latest_entry_date 
+                })
         
         return summary
     

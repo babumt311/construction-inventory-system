@@ -45,23 +45,19 @@ export class StockService {
     return this.api.get<StockBalance>('stock/balance', params);
   }
 
-  getSiteStockSummary(siteId: number): Observable<any[]> {
-    return this.api.get<any[]>(`stock/site-summary/${siteId}`);
+  // FIX: Updated to natively accept and pass Date Ranges to your backend!
+  getSiteStockSummary(siteId: number, startDate?: string, endDate?: string): Observable<any[]> {
+    const params: any = {};
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    
+    return this.api.get<any[]>(`stock/site-summary/${siteId}`, params);
   }
 
   // Daily Reports
   getDailyReports(siteId: number, params?: any): Observable<DailyStockReport[]> {
     return this.api.get<DailyStockReport[]>(`stock/daily-reports/${siteId}`, params);
   }
-
- // generateDailyReport(siteId: number, reportDate?: Date): Observable<any> {
- //   const params: any = {};
- //   if (reportDate) {
- //     params.report_date = reportDate.toISOString().split('T')[0];
- //   }
- //   return this.api.post<any>(`stock/generate-daily-report/${siteId}`, {}, params);
-// }
-
 
   generateDailyReport(siteId: number, reportDate?: Date): Observable<any> {
     let url = `stock/generate-daily-report/${siteId}`;
@@ -75,7 +71,6 @@ export class StockService {
     // Now call .post() with only 2 arguments: (URL, Body)
     return this.api.post<any>(url, {});
   }
-
 
   // Excel Upload for Stock Entries
   uploadStockEntries(file: File, siteId: number): Observable<any> {

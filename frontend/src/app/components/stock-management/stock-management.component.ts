@@ -1,56 +1,81 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, TemplateRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { MatTableDataSource } from '@angular/material/table';
+import { MatPaginator } from '@angular/material/paginator';
+import { MatSort } from '@angular/material/sort';
+import { MatDialog } from '@angular/material/dialog';
 import { ToastrService } from 'ngx-toastr';
+
 import { StockService } from '../../services/stock.service';
-import { ProjectService } from '../../services/project.service';
 import { MaterialService } from '../../services/material.service';
-import { Project, Site } from '../../models/project.model';
-import { Material } from '../../models/material.model';
+import { ProjectService } from '../../services/project.service';
 
 @Component({
   selector: 'app-stock-management',
-  templateUrl: './stock-management.component.html'
+  templateUrl: './stock-management.component.html',
+  styleUrls: ['./stock-management.component.scss']
 })
 export class StockManagementComponent implements OnInit {
-  entryForm: FormGroup;
+  // Forms
+  stockForm: FormGroup;
   materialForm: FormGroup;
-  categoryForm: FormGroup; 
+  categoryForm: FormGroup;
 
-  projects: Project[] = [];
-  entrySites: Site[] = [];
-  materials: Material[] = [];
-  filteredMaterials: Material[] = []; // NEW: Array for filtered dropdown
+  // Form Dropdown Data
+  projects: any[] = [];
+  sites: any[] = [];
   categories: any[] = [];
-  
+  materials: any[] = [];
+  filteredMaterialsForStock: any[] = [];
+
+  // Material Table Data
+  materialColumns: string[] = ['name', 'category', 'unit', 'standard_cost', 'actions'];
+  materialDataSource = new MatTableDataSource<any>();
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild('categoryDialog') categoryDialog!: TemplateRef<any>;
+
+  // UI State
   loading = false;
-  showCategoryModal = false;
+  submittingStock = false;
+  submittingMaterial = false;
+  isEditingMaterial = false;
+  editingMaterialId: number | null = null;
+  
+  // Table Filters
+  materialSearchTerm = '';
+  selectedCategoryId = '';
 
   constructor(
     private fb: FormBuilder,
     private stockService: StockService,
-    private projectService: ProjectService,
     private materialService: MaterialService,
-    private toastr: ToastrService
+    private projectService: ProjectService,
+    private toastr: ToastrService,
+    public dialog: MatDialog
   ) {
-    this.entryForm = this.fb.group({
+    // 1. Record Stock Transaction Form
+    this.stockForm = this.fb.group({
       project_id: ['', Validators.required],
       site_id: ['', Validators.required],
-      entry_category_id: [''], // NEW: Form control for the category filter
+      category_filter: [''], // UI helper, not sent to backend
       material_id: ['', Validators.required],
       entry_type: ['received', Validators.required],
       quantity: ['', [Validators.required, Validators.min(0.01)]],
-      reference: [''],
+      reference_no: [''],
       remarks: ['']
     });
 
+    // 2. Create/Edit Material Form
     this.materialForm = this.fb.group({
       name: ['', Validators.required],
       category_id: ['', Validators.required],
-      unit: ['bags', Validators.required],
+      unit: ['Bags'],
       standard_cost: [0, Validators.min(0)],
       description: ['']
     });
 
+    // 3. Add Category Form (Modal)
     this.categoryForm = this.fb.group({
       name: ['', Validators.required],
       description: ['']
@@ -58,106 +83,209 @@ export class StockManagementComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadInitialData();
+    this.loadProjects();
+    this.loadCategories();
+    this.loadMaterials();
   }
 
-  loadInitialData(): void {
-    this.projectService.getProjects().subscribe(p => this.projects = p);
-    this.materialService.getMaterials().subscribe(m => {
-      this.materials = m;
-      this.filteredMaterials = m; // Load all materials by default
+  // ==========================================
+  // DATA LOADING
+  // ==========================================
+  loadProjects(): void {
+    this.projectService.getProjects().subscribe(res => this.projects = res);
+  }
+
+  loadCategories(): void {
+    this.materialService.getCategories().subscribe(res => this.categories = res);
+  }
+
+  loadMaterials(): void {
+    this.loading = true;
+    this.materialService.getMaterials().subscribe({
+      next: (res) => {
+        this.materials = res;
+        this.filteredMaterialsForStock = res; // Populate dropdown
+        
+        // Populate Table
+        this.materialDataSource.data = res;
+        this.materialDataSource.paginator = this.paginator;
+        this.materialDataSource.sort = this.sort;
+        
+        // Strict typing for filter
+        this.materialDataSource.filterPredicate = (data: any, filter: string): boolean => {
+          try {
+            const searchTerms = JSON.parse(filter);
+            const textMatch = Boolean(
+              !searchTerms.text || 
+              data.name.toLowerCase().includes(searchTerms.text) || 
+              (data.description ? data.description.toLowerCase().includes(searchTerms.text) : false)
+            );
+            const categoryMatch = Boolean(
+              !searchTerms.category || 
+              data.category_id.toString() === searchTerms.category
+            );
+            return textMatch && categoryMatch;
+          } catch (e) {
+            return true; 
+          }
+        };
+        this.loading = false;
+      },
+      error: () => {
+        this.toastr.error('Failed to load materials');
+        this.loading = false;
+      }
     });
-    this.materialService.getCategories().subscribe(c => this.categories = c);
   }
 
+  // ==========================================
+  // STOCK TRANSACTION LOGIC
+  // ==========================================
   onProjectChange(projectId: any): void {
-    const id = Number(projectId);
-    this.entrySites = [];
-    if (id) {
-      this.projectService.getProjectSites(id).subscribe(sites => this.entrySites = sites);
+    this.sites = [];
+    this.stockForm.patchValue({ site_id: '' });
+    if (projectId) {
+      this.projectService.getProjectSites(Number(projectId)).subscribe(res => this.sites = res);
     }
   }
 
-  // NEW: Filtering logic for the Material dropdown
-  onEntryCategoryChange(categoryId: any): void {
-    const catId = Number(categoryId);
-    this.entryForm.patchValue({ material_id: '' }); // Reset material selection to blank
-
-    if (catId) {
-      // Filter materials matching the selected category
-      this.filteredMaterials = this.materials.filter(m => Number(m.category_id) === catId);
+  onStockCategoryFilterChange(categoryId: any): void {
+    this.stockForm.patchValue({ material_id: '' });
+    if (categoryId) {
+      this.filteredMaterialsForStock = this.materials.filter(m => m.category_id === Number(categoryId));
     } else {
-      // Show all if "All Categories" is selected
-      this.filteredMaterials = this.materials;
+      this.filteredMaterialsForStock = this.materials;
     }
   }
 
-  submitStockEntry(): void {
-    if (this.entryForm.invalid) return;
-    this.loading = true;
-
-    // We strip out 'entry_category_id' because the backend doesn't expect it in the payload
-    const payload = { ...this.entryForm.value };
-    delete payload.entry_category_id;
-
-    this.stockService.createStockEntry(payload).subscribe({
+  submitStockTransaction(): void {
+    if (this.stockForm.invalid) {
+      this.stockForm.markAllAsTouched();
+      return;
+    }
+    this.submittingStock = true;
+    this.stockService.createStockEntry(this.stockForm.value).subscribe({
       next: () => {
-        this.toastr.success('Stock entry recorded successfully!');
-        this.entryForm.reset({ entry_type: 'received', entry_category_id: '' });
-        this.filteredMaterials = this.materials; // Reset filter back to all
-        this.loading = false;
+        this.toastr.success('Stock transaction recorded successfully');
+        this.stockForm.reset({ entry_type: 'received' }); 
+        this.filteredMaterialsForStock = this.materials; 
+        this.submittingStock = false;
       },
       error: () => {
-        this.toastr.error('Failed to record entry.');
-        this.loading = false;
+        this.toastr.error('Failed to record transaction');
+        this.submittingStock = false;
       }
     });
   }
 
+  // ==========================================
+  // MATERIAL MANAGEMENT LOGIC
+  // ==========================================
   submitMaterial(): void {
-    if (this.materialForm.invalid) return;
-    this.loading = true;
+    if (this.materialForm.invalid) {
+      this.materialForm.markAllAsTouched();
+      return;
+    }
     
-    this.materialService.createMaterial(this.materialForm.value).subscribe({
-      next: () => {
-        this.toastr.success('New Material created successfully!');
-        this.materialForm.reset({ unit: 'bags', standard_cost: 0 });
-        this.loadInitialData(); 
-        this.loading = false;
-      },
-      error: () => {
-        this.toastr.error('Failed to create material.');
-        this.loading = false;
-      }
-    });
+    this.submittingMaterial = true;
+    const payload = this.materialForm.value;
+
+    if (this.isEditingMaterial && this.editingMaterialId) {
+      this.materialService.updateMaterial(this.editingMaterialId, payload).subscribe({
+        next: () => {
+          this.toastr.success('Material updated successfully');
+          this.resetMaterialForm();
+          this.loadMaterials(); // Refresh table
+        },
+        error: () => {
+          this.toastr.error('Failed to update material');
+          this.submittingMaterial = false;
+        }
+      });
+    } else {
+      this.materialService.createMaterial(payload).subscribe({
+        next: () => {
+          this.toastr.success('Material created successfully');
+          this.resetMaterialForm();
+          this.loadMaterials(); // Refresh table
+        },
+        error: () => {
+          this.toastr.error('Failed to create material');
+          this.submittingMaterial = false;
+        }
+      });
+    }
   }
 
-  openCategoryModal(): void {
+  editMaterial(material: any): void {
+    this.isEditingMaterial = true;
+    this.editingMaterialId = material.id;
+    this.materialForm.patchValue({
+      name: material.name,
+      category_id: material.category_id,
+      unit: material.unit,
+      standard_cost: material.standard_cost,
+      description: material.description
+    });
+    // Scroll up to the form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  deleteMaterial(id: number): void {
+    if (confirm('Are you sure you want to delete this material?')) {
+      this.materialService.deleteMaterial(id).subscribe({
+        next: () => {
+          this.toastr.success('Material deleted successfully');
+          this.loadMaterials();
+        },
+        error: () => this.toastr.error('Failed to delete material')
+      });
+    }
+  }
+
+  resetMaterialForm(): void {
+    this.isEditingMaterial = false;
+    this.editingMaterialId = null;
+    this.submittingMaterial = false;
+    this.materialForm.reset({ unit: 'Bags', standard_cost: 0 });
+  }
+
+  // ==========================================
+  // TABLE FILTERING
+  // ==========================================
+  applyMaterialFilter(): void {
+    const filterValue = {
+      text: this.materialSearchTerm.trim().toLowerCase(),
+      category: this.selectedCategoryId
+    };
+    this.materialDataSource.filter = JSON.stringify(filterValue);
+    if (this.materialDataSource.paginator) {
+      this.materialDataSource.paginator.firstPage();
+    }
+  }
+
+  getCategoryName(categoryId: number): string {
+    const category = this.categories.find(c => c.id === categoryId);
+    return category ? category.name : 'Unknown';
+  }
+
+  // ==========================================
+  // CATEGORY DIALOG
+  // ==========================================
+  openCategoryDialog(): void {
     this.categoryForm.reset();
-    this.showCategoryModal = true;
+    this.dialog.open(this.categoryDialog, { width: '400px' });
   }
 
   submitCategory(): void {
     if (this.categoryForm.invalid) return;
-    this.loading = true;
-
     this.materialService.createCategory(this.categoryForm.value).subscribe({
-      next: (newCategory) => {
-        this.toastr.success('Category created!');
-        this.showCategoryModal = false;
-        
-        this.materialService.getCategories().subscribe(c => {
-          this.categories = c;
-          if (newCategory && newCategory.id) {
-            this.materialForm.patchValue({ category_id: newCategory.id });
-          }
-          this.loading = false;
-        });
+      next: () => {
+        this.toastr.success('Category created');
+        this.loadCategories();
+        this.dialog.closeAll();
       },
-      error: () => {
-        this.toastr.error('Failed to create category.');
-        this.loading = false;
-      }
+      error: () => this.toastr.error('Failed to create category')
     });
   }
 }

@@ -25,8 +25,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   projects: Project[] = [];
   sites: Site[] = [];
-  materials: Material[] = [];
   categories: any[] = [];
+  materials: Material[] = [];
+  filteredMaterials: Material[] = []; // Used for the dropdown
   
   // SEPARATED DATA ARRAYS
   allTimeBalances: any[] = []; 
@@ -59,6 +60,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.filterForm = this.fb.group({
       project_id: [''],
       site_id: [''],
+      category_id: [''], // Added Category Filter
       material_id: [''],
       start_date: [''],
       end_date: [''],
@@ -68,8 +70,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadProjects();
-    this.loadMaterials();
     this.loadCategories();
+    this.loadMaterials();
     
     this.filterForm.valueChanges.subscribe(vals => {
       if (vals.start_date !== this.prevStart || vals.end_date !== this.prevEnd) {
@@ -83,8 +85,14 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
 
   loadProjects(): void { this.projectService.getProjects().subscribe(p => this.projects = p); }
-  loadMaterials(): void { this.materialService.getMaterials().subscribe(m => this.materials = m); }
   loadCategories(): void { this.materialService.getCategories().subscribe(c => this.categories = c); }
+  
+  loadMaterials(): void { 
+    this.materialService.getMaterials().subscribe(m => {
+      this.materials = m;
+      this.filteredMaterials = m;
+    }); 
+  }
 
   onProjectChange(projectId: any): void {
     const id = projectId ? Number(projectId) : 0;
@@ -122,6 +130,17 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
 
   onSiteChange(siteId: any): void {}
+
+  // Handle Category Selection to filter the Material Dropdown
+  onCategoryChange(categoryId: any): void {
+    this.filterForm.patchValue({ material_id: '' }, { emitEvent: false }); // Clear selected material
+    if (categoryId) {
+      this.filteredMaterials = this.materials.filter(m => m.category_id === Number(categoryId));
+    } else {
+      this.filteredMaterials = this.materials;
+    }
+    this.updateTable(); // Trigger table update manually since we suppressed the emitEvent
+  }
 
   fetchDateRangedData(): void {
     const start = this.filterForm.value.start_date;
@@ -166,6 +185,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
       if (filters.material_id && b.material_id !== Number(filters.material_id)) return false;
       if (filters.show_negative_only && !b.has_negative_balance) return false;
+      
+      // New Category Filter Logic
+      if (filters.category_id) {
+        const mat = this.materials.find(m => m.id === b.material_id);
+        if (!mat || mat.category_id !== Number(filters.category_id)) return false;
+      }
       return true;
     });
 
@@ -181,6 +206,11 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
       if (filters.material_id && b.material_id !== Number(filters.material_id)) return false;
       if (filters.show_negative_only && !b.has_negative_balance) return false;
+      
+      if (filters.category_id) {
+        const mat = this.materials.find(m => m.id === b.material_id);
+        if (!mat || mat.category_id !== Number(filters.category_id)) return false;
+      }
       return true;
     });
   }
@@ -200,7 +230,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     return new Date(rawDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
-  // Still needed for the Modal view (since it pulls from the raw Material object)
   getCategoryName(categoryId: number | undefined): string {
     if (!categoryId) return 'Unknown';
     const category = this.categories?.find((c: any) => c.id === categoryId);
@@ -291,7 +320,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'Unknown';
     const rows = this.dataSource.data.map((item: any) => {
       const dateStr = this.getFormattedDate(item);
-      // FIX: Use item.category directly instead of getting confused by IDs!
       return [ projectName, item.site_name || 'N/A', item.material_name, item.category, item.current_balance, item.opening_balance, item.total_received, item.total_used, dateStr, this.getStockStatusText(item) ];
     });
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');

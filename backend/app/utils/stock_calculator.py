@@ -324,8 +324,4 @@ class StockCalculator:
     ) -> bool:
         if entry_type == schemas.StockEntryType.USED.value:
             current_balance = StockCalculator.calculate_balance(
-                db, site_id, material_id
-            )["current_balance"]
-            if current_balance < quantity:
-                logger.warning(f"Insufficient stock for usage. Balance: {current_balance}, Requested: {quantity}")
-        return True
+                db

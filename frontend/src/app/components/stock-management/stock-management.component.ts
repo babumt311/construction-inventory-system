@@ -286,9 +286,17 @@ export class StockManagementComponent implements OnInit {
   }
 
   deleteCategory(id: number): void {
-    if (confirm('Delete this category? Ensure no materials are attached.')) {
-      // Replace with your service's delete endpoint if you have one
-      this.toastr.info('Delete functionality to be connected to API');
+    if (confirm('Are you sure you want to delete this category? Please ensure no materials are attached to it.')) {
+      this.materialService.deleteCategory(id).subscribe({
+        next: () => { 
+          this.toastr.success('Category deleted successfully', 'Success'); 
+          this.loadCategories(); // Refresh the table
+        },
+        error: (err) => { 
+          // Will show the exact error from the backend (e.g., if materials are still attached)
+          this.toastr.error(err.error?.detail || 'Failed to delete category', 'Error'); 
+        }
+      });
     }
   }
 

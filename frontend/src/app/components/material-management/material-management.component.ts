@@ -25,7 +25,7 @@ export class MaterialManagementComponent implements OnInit {
   categories: Category[] = [];
   
   // Table
-  displayedColumns: string[] = ['id', 'name', 'category', 'unit', 'standard_cost', 'actions'];
+  displayedColumns: string[] = ['name', 'category', 'unit', 'standard_cost', 'actions'];
   dataSource = new MatTableDataSource<Material>();
   
   // Forms
@@ -41,7 +41,7 @@ export class MaterialManagementComponent implements OnInit {
   
   // Filters
   searchTerm = '';
-  selectedCategoryId: string = ''; // Added for Category Filter
+  selectedCategoryId = '';
 
   constructor(
     private fb: FormBuilder,
@@ -52,7 +52,7 @@ export class MaterialManagementComponent implements OnInit {
     this.materialForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2)]],
       category_id: ['', Validators.required],
-      unit: [''],
+      unit: ['Bags'],
       description: [''],
       standard_cost: [0, [Validators.min(0)]]
     });
@@ -77,7 +77,7 @@ export class MaterialManagementComponent implements OnInit {
         this.dataSource.paginator = this.paginator;
         this.dataSource.sort = this.sort;
         
-        // Custom filter logic (Strictly typed to return boolean)
+        // Custom filter logic strictly returning boolean
         this.dataSource.filterPredicate = (data: Material, filter: string): boolean => {
           try {
             const searchTerms = JSON.parse(filter);
@@ -95,14 +95,13 @@ export class MaterialManagementComponent implements OnInit {
             
             return textMatch && categoryMatch;
           } catch (e) {
-            // Fallback just in case the JSON.parse fails during initialization
             return true; 
           }
         };
 
         this.loading = false;
       },
-      error: (error) => {
+      error: () => {
         this.toastr.error('Failed to load materials', 'Error');
         this.loading = false;
       }
@@ -111,17 +110,12 @@ export class MaterialManagementComponent implements OnInit {
 
   loadCategories(): void {
     this.materialService.getCategories().subscribe({
-      next: (categories) => {
-        this.categories = categories;
-      },
-      error: (error) => {
-        this.toastr.error('Failed to load categories', 'Error');
-      }
+      next: (categories) => this.categories = categories,
+      error: () => this.toastr.error('Failed to load categories', 'Error')
     });
   }
 
   applyFilter(): void {
-    // Combine both filters into a JSON string since MatTable filter only accepts a single string
     const filterValue = {
       text: this.searchTerm.trim().toLowerCase(),
       category: this.selectedCategoryId
@@ -140,10 +134,8 @@ export class MaterialManagementComponent implements OnInit {
       return;
     }
 
-    const materialData = this.materialForm.value;
     this.loading = true;
-
-    this.materialService.createMaterial(materialData).subscribe({
+    this.materialService.createMaterial(this.materialForm.value).subscribe({
       next: () => {
         this.toastr.success('Material created successfully', 'Success');
         this.loadMaterials();
@@ -167,19 +159,14 @@ export class MaterialManagementComponent implements OnInit {
       standard_cost: material.standard_cost || 0
     });
     
-    // Smooth scroll back up to the form
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   updateMaterial(): void {
-    if (this.materialForm.invalid || !this.currentMaterialId) {
-      return;
-    }
+    if (this.materialForm.invalid || !this.currentMaterialId) return;
 
-    const materialData = this.materialForm.value;
     this.loading = true;
-
-    this.materialService.updateMaterial(this.currentMaterialId, materialData).subscribe({
+    this.materialService.updateMaterial(this.currentMaterialId, this.materialForm.value).subscribe({
       next: () => {
         this.toastr.success('Material updated successfully', 'Success');
         this.loadMaterials();
@@ -193,25 +180,20 @@ export class MaterialManagementComponent implements OnInit {
   }
 
   deleteMaterial(id: number): void {
-    if (confirm('Are you sure you want to delete this material? This action cannot be undone.')) {
+    if (confirm('Are you sure you want to delete this material?')) {
       this.materialService.deleteMaterial(id).subscribe({
         next: () => {
           this.toastr.success('Material deleted successfully', 'Success');
           this.loadMaterials();
         },
-        error: (error) => {
-          this.toastr.error(error.message || 'Failed to delete material', 'Error');
-        }
+        error: (error) => this.toastr.error(error.message || 'Failed to delete material', 'Error')
       });
     }
   }
 
   resetForm(): void {
     this.materialForm.reset({
-      name: '',
-      category_id: '',
-      unit: '',
-      description: '',
+      unit: 'Bags',
       standard_cost: 0
     });
     this.isEditing = false;
@@ -225,10 +207,8 @@ export class MaterialManagementComponent implements OnInit {
       return;
     }
 
-    const categoryData = this.categoryForm.value;
     this.loading = true;
-
-    this.materialService.createCategory(categoryData).subscribe({
+    this.materialService.createCategory(this.categoryForm.value).subscribe({
       next: () => {
         this.toastr.success('Category created successfully', 'Success');
         this.loadCategories();
@@ -246,16 +226,12 @@ export class MaterialManagementComponent implements OnInit {
   openUploadDialog(): void {
     this.selectedFile = null;
     this.uploadProgress = 0;
-    this.dialog.open(this.uploadDialog, {
-      width: '500px'
-    });
+    this.dialog.open(this.uploadDialog, { width: '500px' });
   }
 
   openCategoryDialog(): void {
     this.categoryForm.reset();
-    this.dialog.open(this.categoryDialog, {
-      width: '400px'
-    });
+    this.dialog.open(this.categoryDialog, { width: '400px' });
   }
 
   onFileSelected(event: any): void {
@@ -268,7 +244,6 @@ export class MaterialManagementComponent implements OnInit {
         this.toastr.error('Invalid file type. Please upload Excel or CSV file.', 'Error');
         return;
       }
-
       this.selectedFile = file;
     }
   }
@@ -283,21 +258,14 @@ export class MaterialManagementComponent implements OnInit {
     this.loading = true;
 
     const progressInterval = setInterval(() => {
-      if (this.uploadProgress < 90) {
-        this.uploadProgress += 10;
-      }
+      if (this.uploadProgress < 90) this.uploadProgress += 10;
     }, 200);
 
     this.materialService.uploadMaterials(this.selectedFile).subscribe({
       next: (response) => {
         clearInterval(progressInterval);
         this.uploadProgress = 100;
-        
-        this.toastr.success(
-          `File uploaded successfully! Processed: ${response.rows_processed}, Successful: ${response.rows_successful}, Failed: ${response.rows_failed}`,
-          'Success'
-        );
-        
+        this.toastr.success(`Uploaded successfully! Processed: ${response.rows_processed}`, 'Success');
         this.loadMaterials();
         this.dialog.closeAll();
         this.loading = false;
@@ -316,9 +284,7 @@ export class MaterialManagementComponent implements OnInit {
         saveAs(blob, 'material_template.xlsx');
         this.toastr.success('Template downloaded successfully', 'Success');
       },
-      error: (error) => {
-        this.toastr.error(error.message || 'Failed to download template', 'Error');
-      }
+      error: (error) => this.toastr.error(error.message || 'Failed to download template', 'Error')
     });
   }
 
@@ -330,9 +296,7 @@ export class MaterialManagementComponent implements OnInit {
   private markFormGroupTouched(formGroup: FormGroup): void {
     Object.values(formGroup.controls).forEach(control => {
       control.markAsTouched();
-      if (control instanceof FormGroup) {
-        this.markFormGroupTouched(control);
-      }
+      if (control instanceof FormGroup) this.markFormGroupTouched(control);
     });
   }
 }

@@ -1,5 +1,4 @@
 <div class="material-management-container">
-  <!-- Header Section -->
   <div class="header-section mb-4">
     <div class="d-flex justify-content-between align-items-center">
       <div>
@@ -17,19 +16,18 @@
     </div>
   </div>
 
-  <!-- Material Form -->
-  <div class="card mb-4">
+  <div class="card mb-4 shadow-sm border-0">
     <div class="card-header bg-light">
-      <h5 class="mb-0">
-        <i class="fas" [class.fa-edit]="isEditing" [class.fa-plus]="!isEditing"></i>
+      <h5 class="mb-0 fw-bold">
+        <i class="fas text-primary me-2" [class.fa-edit]="isEditing" [class.fa-plus-circle]="!isEditing"></i>
         {{ isEditing ? 'Edit Material' : 'Add New Material' }}
       </h5>
     </div>
-    <div class="card-body">
+    <div class="card-body p-4">
       <form [formGroup]="materialForm" (ngSubmit)="isEditing ? updateMaterial() : createMaterial()">
-        <div class="row">
-          <div class="col-md-6 mb-3">
-            <label class="form-label">Material Name *</label>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold small text-muted">Material Name *</label>
             <input type="text" class="form-control" formControlName="name" 
                    [class.is-invalid]="materialForm.get('name')?.invalid && materialForm.get('name')?.touched">
             <div class="invalid-feedback" *ngIf="materialForm.get('name')?.errors?.['required']">
@@ -37,9 +35,9 @@
             </div>
           </div>
 
-          <div class="col-md-6 mb-3">
-            <label class="form-label">Category *</label>
-            <select class="form-control" formControlName="category_id"
+          <div class="col-md-6">
+            <label class="form-label fw-bold small text-muted">Category *</label>
+            <select class="form-control form-select" formControlName="category_id"
                     [class.is-invalid]="materialForm.get('category_id')?.invalid && materialForm.get('category_id')?.touched">
               <option value="">Select Category</option>
               <option *ngFor="let category of categories" [value]="category.id">
@@ -51,14 +49,14 @@
             </div>
           </div>
 
-          <div class="col-md-4 mb-3">
-            <label class="form-label">Unit</label>
+          <div class="col-md-4">
+            <label class="form-label fw-bold small text-muted">Unit</label>
             <input type="text" class="form-control" formControlName="unit" 
                    placeholder="e.g., kg, meter, piece">
           </div>
 
-          <div class="col-md-4 mb-3">
-            <label class="form-label">Standard Cost (₹)</label>
+          <div class="col-md-4">
+            <label class="form-label fw-bold small text-muted">Standard Cost (₹)</label>
             <input type="number" step="0.01" class="form-control" formControlName="standard_cost"
                    [class.is-invalid]="materialForm.get('standard_cost')?.invalid && materialForm.get('standard_cost')?.touched">
             <div class="invalid-feedback" *ngIf="materialForm.get('standard_cost')?.errors?.['min']">
@@ -66,19 +64,19 @@
             </div>
           </div>
 
-          <div class="col-md-12 mb-3">
-            <label class="form-label">Description</label>
-            <textarea class="form-control" formControlName="description" rows="3"></textarea>
+          <div class="col-md-12">
+            <label class="form-label fw-bold small text-muted">Description</label>
+            <textarea class="form-control" formControlName="description" rows="2"></textarea>
           </div>
         </div>
 
-        <div class="d-flex justify-content-end gap-2">
-          <button type="button" class="btn btn-secondary" (click)="resetForm()" *ngIf="isEditing">
-            Cancel
+        <div class="d-flex justify-content-end gap-2 mt-4">
+          <button type="button" class="btn btn-outline-secondary px-4 fw-bold" (click)="resetForm()" *ngIf="isEditing">
+            Cancel Edit
           </button>
-          <button type="submit" class="btn btn-primary" [disabled]="materialForm.invalid || loading">
+          <button type="submit" class="btn btn-primary px-4 fw-bold" [disabled]="materialForm.invalid || loading">
             <span *ngIf="!loading">
-              {{ isEditing ? 'Update Material' : 'Create Material' }}
+              {{ isEditing ? 'Update Material' : 'Save Material' }}
             </span>
             <span *ngIf="loading">
               <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -90,172 +88,183 @@
     </div>
   </div>
 
-  <!-- Search and Filters -->
-  <div class="card mb-4">
-    <div class="card-body">
-      <div class="row align-items-center">
-        <div class="col-md-6">
+  <div class="card mb-4 shadow-sm border-0 bg-light">
+    <div class="card-body p-4">
+      <div class="row align-items-center g-3">
+        
+        <div class="col-md-5">
+          <label class="form-label small fw-bold text-muted mb-1">Search Materials</label>
           <div class="input-group">
-            <span class="input-group-text">
-              <i class="fas fa-search"></i>
+            <span class="input-group-text bg-white border-end-0">
+              <i class="fas fa-search text-muted"></i>
             </span>
-            <input type="text" class="form-control" placeholder="Search materials..." 
+            <input type="text" class="form-control border-start-0 ps-0" placeholder="Type name or description..." 
                    [(ngModel)]="searchTerm" (input)="applyFilter()">
           </div>
         </div>
-        <div class="col-md-6 text-end">
-          <button class="btn btn-outline-secondary" (click)="loadMaterials()" [disabled]="loading">
-            <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i> Refresh
+
+        <div class="col-md-4">
+          <label class="form-label small fw-bold text-muted mb-1">Filter by Category</label>
+          <select class="form-select" [(ngModel)]="selectedCategoryId" (change)="applyFilter()">
+            <option value="">All Categories</option>
+            <option *ngFor="let category of categories" [value]="category.id">
+              {{ category.name }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="col-md-3 text-end mt-auto">
+          <button class="btn btn-outline-secondary w-100 fw-bold bg-white" (click)="loadMaterials()" [disabled]="loading">
+            <i class="fas fa-sync-alt me-1" [class.fa-spin]="loading"></i> Refresh List
           </button>
         </div>
+
       </div>
     </div>
   </div>
 
-  <!-- Materials Table -->
-  <div class="card">
+  <div class="card shadow-sm border-0">
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table mat-table [dataSource]="dataSource" matSort class="w-100">
+        <table mat-table [dataSource]="dataSource" matSort class="table table-hover align-middle mb-0 w-100">
           
-          <!-- ID Column -->
           <ng-container matColumnDef="id">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>ID</th>
-            <td mat-cell *matCellDef="let material">
-              <span class="badge bg-secondary">#{{ material.id }}</span>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted py-3">ID</th>
+            <td mat-cell *matCellDef="let material" class="py-3">
+              <span class="badge bg-light text-dark border">#{{ material.id }}</span>
             </td>
           </ng-container>
 
-          <!-- Name Column -->
           <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Material Name</th>
-            <td mat-cell *matCellDef="let material">
-              <strong>{{ material.name }}</strong>
-              <small class="d-block text-muted" *ngIf="material.description">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted py-3">Material Name</th>
+            <td mat-cell *matCellDef="let material" class="py-3">
+              <strong class="text-dark">{{ material.name }}</strong>
+              <small class="d-block text-muted mt-1" *ngIf="material.description">
                 {{ material.description | truncate:50 }}
               </small>
             </td>
           </ng-container>
 
-          <!-- Category Column -->
           <ng-container matColumnDef="category">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
-            <td mat-cell *matCellDef="let material">
-              <span class="badge bg-info">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted py-3">Category</th>
+            <td mat-cell *matCellDef="let material" class="py-3">
+              <span class="badge bg-secondary rounded-pill px-3 py-2">
                 {{ getCategoryName(material.category_id) }}
               </span>
             </td>
           </ng-container>
 
-          <!-- Unit Column -->
           <ng-container matColumnDef="unit">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Unit</th>
-            <td mat-cell *matCellDef="let material">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted py-3">Unit</th>
+            <td mat-cell *matCellDef="let material" class="py-3">
               {{ material.unit || 'N/A' }}
             </td>
           </ng-container>
 
-          <!-- Cost Column -->
           <ng-container matColumnDef="standard_cost">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Standard Cost</th>
-            <td mat-cell *matCellDef="let material">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted py-3">Standard Cost</th>
+            <td mat-cell *matCellDef="let material" class="py-3 fw-bold text-success">
               ₹{{ material.standard_cost | number:'1.2-2' }}
             </td>
           </ng-container>
 
-          <!-- Actions Column -->
           <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef class="text-end">Actions</th>
-            <td mat-cell *matCellDef="let material" class="text-end">
-              <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-primary" (click)="editMaterial(material)" title="Edit">
+            <th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted py-3 text-end pe-4">Actions</th>
+            <td mat-cell *matCellDef="let material" class="py-3 text-end pe-4">
+              <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary" (click)="editMaterial(material)" title="Edit">
                   <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-outline-danger" (click)="deleteMaterial(material.id)" title="Delete">
-                  <i class="fas fa-trash"></i>
+                <button class="btn btn-sm btn-outline-danger" (click)="deleteMaterial(material.id)" title="Delete">
+                  <i class="fas fa-trash-alt"></i>
                 </button>
               </div>
             </td>
           </ng-container>
 
           <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="border-bottom"></tr>
         </table>
 
-        <!-- Empty State -->
-        <div class="text-center py-5" *ngIf="dataSource.data.length === 0">
-          <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
-          <h5>No Materials Found</h5>
-          <p class="text-muted">Start by adding your first material or upload an Excel file.</p>
-          <button class="btn btn-primary" (click)="openUploadDialog()">
-            <i class="fas fa-file-excel me-2"></i>Upload Materials
+        <div class="text-center py-5" *ngIf="dataSource.data.length === 0 && !loading">
+          <div class="bg-light rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style="width: 100px; height: 100px;">
+            <i class="fas fa-box-open fa-3x text-muted"></i>
+          </div>
+          <h4 class="fw-bold text-dark">No Materials Found</h4>
+          <p class="text-muted lead mb-4">Start by adding your first material or adjust your filters.</p>
+          <button class="btn btn-primary fw-bold px-4" (click)="openUploadDialog()">
+            <i class="fas fa-file-excel me-2"></i>Bulk Upload
           </button>
         </div>
 
-        <!-- Loading State -->
         <div class="text-center py-5" *ngIf="loading && dataSource.data.length === 0">
-          <div class="spinner-border text-primary" role="status">
+          <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
             <span class="visually-hidden">Loading...</span>
           </div>
-          <p class="mt-2">Loading materials...</p>
+          <h5 class="text-muted fw-bold">Loading materials...</h5>
         </div>
       </div>
 
-      <!-- Paginator -->
-      <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons 
+      <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons class="border-top"
                      aria-label="Select page of materials" *ngIf="dataSource.data.length > 0">
       </mat-paginator>
     </div>
   </div>
 </div>
 
-<!-- Upload Dialog -->
 <ng-template #uploadDialog>
-  <div class="modal-header">
-    <h5 class="modal-title">
+  <div class="modal-header border-0 bg-light p-4">
+    <h5 class="modal-title fw-bold">
       <i class="fas fa-file-excel me-2 text-success"></i>Upload Materials
     </h5>
     <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
   </div>
-  <div class="modal-body">
-    <div class="mb-3">
-      <label class="form-label">Select Excel/CSV File</label>
+  <div class="modal-body p-4">
+    <div class="mb-4">
+      <label class="form-label fw-bold text-muted">Select Excel/CSV File</label>
       <div class="input-group">
         <input type="file" class="form-control" accept=".xlsx,.xls,.csv" (change)="onFileSelected($event)">
-        <button class="btn btn-outline-secondary" type="button" (click)="downloadTemplate()">
-          <i class="fas fa-download"></i> Template
+        <button class="btn btn-outline-secondary fw-bold" type="button" (click)="downloadTemplate()">
+          <i class="fas fa-download me-1"></i> Template
         </button>
       </div>
-      <small class="form-text text-muted">
-        Supported formats: .xlsx, .xls, .csv. Max file size: 10MB
+      <small class="form-text text-muted mt-2 d-block">
+        <i class="fas fa-info-circle me-1"></i> Supported formats: .xlsx, .xls, .csv. Max file size: 10MB
       </small>
     </div>
 
-    <div *ngIf="selectedFile" class="alert alert-info">
-      <i class="fas fa-file me-2"></i>
-      Selected: {{ selectedFile.name }} ({{ selectedFile.size | filesize }})
+    <div *ngIf="selectedFile" class="alert alert-info border-0 shadow-sm d-flex align-items-center">
+      <i class="fas fa-file-alt fa-2x me-3 text-primary"></i>
+      <div>
+        <strong class="d-block text-dark">{{ selectedFile.name }}</strong>
+        <small>{{ selectedFile.size | filesize }}</small>
+      </div>
     </div>
 
-    <div class="mb-3" *ngIf="uploadProgress > 0">
-      <label class="form-label">Upload Progress</label>
-      <div class="progress">
-        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+    <div class="mb-4" *ngIf="uploadProgress > 0">
+      <div class="d-flex justify-content-between mb-1">
+        <label class="form-label fw-bold text-muted mb-0">Upload Progress</label>
+        <small class="fw-bold">{{ uploadProgress }}%</small>
+      </div>
+      <div class="progress" style="height: 10px;">
+        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
              role="progressbar" [style.width.%]="uploadProgress">
-          {{ uploadProgress }}%
         </div>
       </div>
     </div>
 
-    <div class="alert alert-light">
-      <h6><i class="fas fa-info-circle me-2"></i>Excel Format</h6>
-      <p class="mb-1">Required columns: <code>category</code>, <code>material_name</code>, <code>unit</code></p>
-      <p class="mb-0">Optional columns: <code>description</code>, <code>standard_cost</code></p>
+    <div class="card bg-light border-0">
+      <div class="card-body">
+        <h6 class="fw-bold"><i class="fas fa-table me-2 text-primary"></i>Excel Format</h6>
+        <p class="mb-1 small">Required columns: <code class="bg-white px-1 rounded">category</code>, <code class="bg-white px-1 rounded">material_name</code>, <code class="bg-white px-1 rounded">unit</code></p>
+        <p class="mb-0 small">Optional columns: <code class="bg-white px-1 rounded">description</code>, <code class="bg-white px-1 rounded">standard_cost</code></p>
+      </div>
     </div>
   </div>
-  <div class="modal-footer">
-    <button type="button" class="btn btn-secondary" (click)="dialog.closeAll()">Cancel</button>
-    <button type="button" class="btn btn-primary" (click)="uploadFile()" [disabled]="!selectedFile || loading">
-      <span *ngIf="!loading">Upload</span>
+  <div class="modal-footer border-0 bg-light p-3">
+    <button type="button" class="btn btn-secondary fw-bold px-4" (click)="dialog.closeAll()">Cancel</button>
+    <button type="button" class="btn btn-primary fw-bold px-4" (click)="uploadFile()" [disabled]="!selectedFile || loading">
+      <span *ngIf="!loading"><i class="fas fa-upload me-2"></i>Upload Data</span>
       <span *ngIf="loading">
         <span class="spinner-border spinner-border-sm me-2" role="status"></span>
         Uploading...
@@ -264,18 +273,17 @@
   </div>
 </ng-template>
 
-<!-- Category Dialog -->
 <ng-template #categoryDialog>
-  <div class="modal-header">
-    <h5 class="modal-title">
-      <i class="fas fa-tag me-2 text-primary"></i>Add New Category
+  <div class="modal-header border-0 bg-light p-4">
+    <h5 class="modal-title fw-bold">
+      <i class="fas fa-tags me-2 text-primary"></i>Add New Category
     </h5>
     <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
   </div>
-  <div class="modal-body">
+  <div class="modal-body p-4">
     <form [formGroup]="categoryForm">
-      <div class="mb-3">
-        <label class="form-label">Category Name *</label>
+      <div class="mb-4">
+        <label class="form-label fw-bold text-muted small">Category Name *</label>
         <input type="text" class="form-control" formControlName="name"
                [class.is-invalid]="categoryForm.get('name')?.invalid && categoryForm.get('name')?.touched">
         <div class="invalid-feedback" *ngIf="categoryForm.get('name')?.errors?.['required']">
@@ -283,20 +291,20 @@
         </div>
       </div>
 
-      <div class="mb-3">
-        <label class="form-label">Description</label>
+      <div class="mb-2">
+        <label class="form-label fw-bold text-muted small">Description</label>
         <textarea class="form-control" formControlName="description" rows="3"></textarea>
       </div>
     </form>
   </div>
-  <div class="modal-footer">
-    <button type="button" class="btn btn-secondary" (click)="dialog.closeAll()">Cancel</button>
-    <button type="button" class="btn btn-primary" (click)="createCategory()" 
+  <div class="modal-footer border-0 bg-light p-3">
+    <button type="button" class="btn btn-secondary fw-bold px-4" (click)="dialog.closeAll()">Cancel</button>
+    <button type="button" class="btn btn-primary fw-bold px-4" (click)="createCategory()" 
             [disabled]="categoryForm.invalid || loading">
-      <span *ngIf="!loading">Create Category</span>
+      <span *ngIf="!loading"><i class="fas fa-plus me-2"></i>Create</span>
       <span *ngIf="loading">
         <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-        Creating...
+        Saving...
       </span>
     </button>
   </div>

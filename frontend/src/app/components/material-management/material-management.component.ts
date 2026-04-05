@@ -38,7 +38,10 @@ export class MaterialManagementComponent implements OnInit {
   currentMaterialId?: number;
   selectedFile: File | null = null;
   uploadProgress = 0;
+  
+  // Filters
   searchTerm = '';
+  selectedCategoryId: string = ''; // Added for Category Filter
 
   constructor(
     private fb: FormBuilder,
@@ -73,6 +76,19 @@ export class MaterialManagementComponent implements OnInit {
         this.dataSource.data = materials;
         this.dataSource.paginator = this.paginator;
         this.dataSource.sort = this.sort;
+        
+        // Custom filter logic to handle BOTH search text and category dropdown
+        this.dataSource.filterPredicate = (data: Material, filter: string) => {
+          const searchTerms = JSON.parse(filter);
+          const textMatch = !searchTerms.text || 
+                            data.name.toLowerCase().includes(searchTerms.text) || 
+                            (data.description && data.description.toLowerCase().includes(searchTerms.text));
+          const categoryMatch = !searchTerms.category || 
+                                data.category_id.toString() === searchTerms.category;
+          
+          return textMatch && categoryMatch;
+        };
+
         this.loading = false;
       },
       error: (error) => {
@@ -94,7 +110,13 @@ export class MaterialManagementComponent implements OnInit {
   }
 
   applyFilter(): void {
-    this.dataSource.filter = this.searchTerm.trim().toLowerCase();
+    // Combine both filters into a JSON string since MatTable filter only accepts a single string
+    const filterValue = {
+      text: this.searchTerm.trim().toLowerCase(),
+      category: this.selectedCategoryId
+    };
+    
+    this.dataSource.filter = JSON.stringify(filterValue);
 
     if (this.dataSource.paginator) {
       this.dataSource.paginator.firstPage();
@@ -133,6 +155,9 @@ export class MaterialManagementComponent implements OnInit {
       description: material.description,
       standard_cost: material.standard_cost || 0
     });
+    
+    // Smooth scroll back up to the form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   updateMaterial(): void {

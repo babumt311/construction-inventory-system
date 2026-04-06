@@ -75,13 +75,12 @@ class StockCalculator:
                 if entry.entry_type == schemas.StockEntryType.RECEIVED.value:
                     today_received += entry.quantity
                 elif entry.entry_type == schemas.StockEntryType.USED.value:
-                    # Filter out Site Transfers from actual Consumption
                     if entry.remarks and 'Transfer OUT' in entry.remarks:
                         today_transfer_out += entry.quantity
                     else:
                         today_used += entry.quantity
                 elif entry.entry_type == schemas.StockEntryType.RETURNED_RECEIVED.value:
-                    today_transfer_in += entry.quantity # Group all site returns/transfers in here
+                    today_transfer_in += entry.quantity 
                 elif entry.entry_type == schemas.StockEntryType.RETURNED_SUPPLIER.value:
                     today_return_supplier += entry.quantity
                     

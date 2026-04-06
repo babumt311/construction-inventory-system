@@ -120,7 +120,7 @@
   <div class="card shadow-sm border-0" *ngIf="viewMode === 'table'">
     <div class="card-body p-0">
       <div class="table-responsive overflow-x-auto">
-        <table mat-table [dataSource]="dataSource" matSort class="table table-hover align-middle mb-0" style="min-width: 1400px;">
+        <table mat-table [dataSource]="dataSource" matSort class="table table-hover align-middle mb-0" style="min-width: 1500px;">
           
           <ng-container matColumnDef="material">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3" style="min-width: 250px;">Material</th>
@@ -163,8 +163,24 @@
           </ng-container>
 
           <ng-container matColumnDef="total_used">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Used</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Consumed</th>
             <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap"><span class="text-danger fw-bold"><i class="fas fa-arrow-up me-1"></i> {{ balance.total_used | number:'1.2-2' }}</span></td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_transfer_out">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Sent to Site</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
+              <span class="text-info text-dark fw-bold" *ngIf="balance.total_transfer_out > 0"><i class="fas fa-sign-out-alt me-1"></i> {{ balance.total_transfer_out | number:'1.2-2' }}</span>
+              <span class="text-muted" *ngIf="!balance.total_transfer_out || balance.total_transfer_out == 0">0.00</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_transfer_in">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Received from Site</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
+              <span class="text-primary fw-bold" *ngIf="balance.total_transfer_in > 0"><i class="fas fa-sign-in-alt me-1"></i> {{ balance.total_transfer_in | number:'1.2-2' }}</span>
+              <span class="text-muted" *ngIf="!balance.total_transfer_in || balance.total_transfer_in == 0">0.00</span>
+            </td>
           </ng-container>
 
           <ng-container matColumnDef="total_returned_supplier">
@@ -172,14 +188,6 @@
             <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
               <span class="text-warning text-dark fw-bold" *ngIf="balance.total_returned_supplier > 0"><i class="fas fa-undo me-1"></i> {{ balance.total_returned_supplier | number:'1.2-2' }}</span>
               <span class="text-muted" *ngIf="!balance.total_returned_supplier || balance.total_returned_supplier == 0">0.00</span>
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="total_returned_received">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Ret. (Site)</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
-              <span class="text-info fw-bold" *ngIf="balance.total_returned_received > 0"><i class="fas fa-reply me-1"></i> {{ balance.total_returned_received | number:'1.2-2' }}</span>
-              <span class="text-muted" *ngIf="!balance.total_returned_received || balance.total_returned_received == 0">0.00</span>
             </td>
           </ng-container>
 
@@ -226,11 +234,30 @@
           </div>
 
           <div class="row g-2 mt-4 text-center border-top pt-3 mb-2">
-            <div class="col border-end px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">OPEN</small><span class="text-dark">{{ balance.opening_balance | number:'1.2-2' }}</span></div>
-            <div class="col border-end px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">IN</small><span class="text-success"><i class="fas fa-arrow-down me-1"></i>{{ balance.total_received | number:'1.2-2' }}</span></div>
-            <div class="col border-end px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">USED</small><span class="text-danger"><i class="fas fa-arrow-up me-1"></i>{{ balance.total_used | number:'1.2-2' }}</span></div>
-            <div class="col border-end px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">RET. OUT</small><span class="text-warning text-dark"><i class="fas fa-undo me-1"></i>{{ balance.total_returned_supplier || 0 | number:'1.2-2' }}</span></div>
-            <div class="col px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">RET. IN</small><span class="text-info text-dark"><i class="fas fa-reply me-1"></i>{{ balance.total_returned_received || 0 | number:'1.2-2' }}</span></div>
+            <div class="col-4 border-end pb-2">
+              <small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">OPEN</small>
+              <span class="text-dark">{{ balance.opening_balance | number:'1.2-2' }}</span>
+            </div>
+            <div class="col-4 border-end pb-2">
+              <small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">IN (DELIVERY)</small>
+              <span class="text-success"><i class="fas fa-arrow-down me-1"></i>{{ balance.total_received | number:'1.2-2' }}</span>
+            </div>
+            <div class="col-4 pb-2 border-bottom">
+              <small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">OUT (USED)</small>
+              <span class="text-danger"><i class="fas fa-arrow-up me-1"></i>{{ balance.total_used | number:'1.2-2' }}</span>
+            </div>
+            <div class="col-4 border-end pt-2">
+              <small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">SENT TO SITE</small>
+              <span class="text-info text-dark"><i class="fas fa-sign-out-alt me-1"></i>{{ balance.total_transfer_out || 0 | number:'1.2-2' }}</span>
+            </div>
+            <div class="col-4 border-end pt-2">
+              <small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">RCVD FROM SITE</small>
+              <span class="text-primary"><i class="fas fa-sign-in-alt me-1"></i>{{ balance.total_transfer_in || 0 | number:'1.2-2' }}</span>
+            </div>
+            <div class="col-4 pt-2">
+              <small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">RET. SUPPLIER</small>
+              <span class="text-warning text-dark"><i class="fas fa-undo me-1"></i>{{ balance.total_returned_supplier || 0 | number:'1.2-2' }}</span>
+            </div>
           </div>
         </div>
       </div>

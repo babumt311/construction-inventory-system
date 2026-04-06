@@ -103,11 +103,21 @@ export class StockManagementComponent implements OnInit {
     this.loadProjects();
     this.loadCategories();
     this.loadMaterials();
+
+    // --- NEW FIX: Restore the active tab from the browser session after a refresh ---
+    const savedTab = sessionStorage.getItem('activeInventoryTab');
+    if (savedTab && ['stock', 'category', 'material'].includes(savedTab)) {
+      this.switchTab(savedTab as 'stock' | 'category' | 'material');
+    }
   }
 
   // TAB SWITCHER LOGIC
   switchTab(tab: 'stock' | 'category' | 'material'): void {
     this.activeTab = tab;
+    
+    // --- NEW FIX: Save the active tab to browser session so it survives a refresh ---
+    sessionStorage.setItem('activeInventoryTab', tab);
+
     // Re-bind paginators after Angular re-renders the DOM for the new tab
     setTimeout(() => {
       if (tab === 'stock') {
@@ -194,10 +204,8 @@ export class StockManagementComponent implements OnInit {
 
   onMaterialChange(materialId: any): void {
     if (materialId) {
-      // Find the material the user just selected
       const selectedMat = this.materials.find(m => m.id === Number(materialId));
       if (selectedMat) {
-        // Auto-fill the category dropdown to match!
         this.stockForm.patchValue({ category_filter: selectedMat.category_id });
       }
     }
@@ -265,12 +273,9 @@ export class StockManagementComponent implements OnInit {
     if (this.categoryForm.invalid) { this.categoryForm.markAllAsTouched(); return; }
     this.submittingCategory = true;
     
-    // Check if updating or creating (You'll need to add updateCategory to your materialService if it exists)
-    // For now, assuming you have create and update endpoints. If not, adapt accordingly.
     const payload = this.categoryForm.value;
-    
     const request = (this.isEditingCategory && this.editingCategoryId)
-      ? this.materialService.createCategory(payload) // Replace with updateCategory if you have it backend
+      ? this.materialService.createCategory(payload) 
       : this.materialService.createCategory(payload);
 
     request.subscribe({
@@ -301,10 +306,9 @@ export class StockManagementComponent implements OnInit {
       this.materialService.deleteCategory(id).subscribe({
         next: () => { 
           this.toastr.success('Category deleted successfully', 'Success'); 
-          this.loadCategories(); // Refresh the table
+          this.loadCategories(); 
         },
         error: (err) => { 
-          // Will show the exact error from the backend (e.g., if materials are still attached)
           this.toastr.error(err.error?.detail || 'Failed to delete category', 'Error'); 
         }
       });
@@ -316,9 +320,10 @@ export class StockManagementComponent implements OnInit {
   // ==========================================
   submitMaterial(): void {
     if (this.materialForm.invalid) { this.materialForm.markAllAsTouched(); return; }
-    this.submittingMaterial = true;
+    
     const payload = this.materialForm.value;
 
+    // --- NEW FIX: Check for duplicates before submitting ---
     const isDuplicate = this.materials.some(existingMaterial => {
       if (this.isEditingMaterial && this.editingMaterialId === existingMaterial.id) {
         return false; 
@@ -328,8 +333,10 @@ export class StockManagementComponent implements OnInit {
 
     if (isDuplicate) {
       this.toastr.warning('A material with this exact name already exists!', 'Duplicate Prevented');
+      this.submittingMaterial = false; // EXPLICITLY UNFREEZE THE BUTTON HERE!
       return; 
     }
+    // ---------------------------------------------------------
 
     this.submittingMaterial = true;
 

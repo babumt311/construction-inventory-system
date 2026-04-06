@@ -1,11 +1,11 @@
 """
 Stock calculation utilities
 """
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 import logging
 from app import models, schemas, crud
 
@@ -21,11 +21,15 @@ class StockCalculator:
         material_id: int,
         as_of_date: Optional[datetime] = None
     ) -> Dict[str, Any]:
+        """
+        Calculate true current stock balance for a material at a site.
+        """
         logger.debug(f"Calculating stock balance for site {site_id}, material {material_id}")
         
         if not as_of_date:
             as_of_date = datetime.now()
             
+        # Strip timezone from as_of_date just to be safe for local python math
         as_of_date = as_of_date.replace(tzinfo=None) if getattr(as_of_date, 'tzinfo', None) else as_of_date
             
         all_entries = db.query(models.StockEntry).filter(
@@ -80,7 +84,9 @@ class StockCalculator:
                 elif entry.entry_type == schemas.StockEntryType.RETURNED_SUPPLIER.value:
                     today_return_supplier += entry.quantity
                     
-        # Explicitly separate out "Used" and "Returned"
+        total_in_today = today_received + today_return_received
+        total_out_today = today_used + today_return_supplier
+                
         result = {
             "material_id": material_id,
             "site_id": site_id,
@@ -91,10 +97,101 @@ class StockCalculator:
             "total_returned_supplier": today_return_supplier,
             "total_returned_received": today_return_received,
             "current_balance": current_balance,
-            "has_negative_balance": current_balance < Decimal('0.00')
+            "has_negative_balance": current_balance < Decimal('0.00'),
+            
+            # Backwards compatibility keys
+            "today_raw_received": today_received,
+            "today_raw_used": today_used,
+            "total_return_received": today_return_received,
+            "total_return_supplier": today_return_supplier,
+            "total_moved": Decimal('0.00'), 
+            "total_received_today": total_in_today
         }
         
         return result
+    
+    @staticmethod
+    def generate_daily_report(
+        db: Session,
+        site_id: int,
+        report_date: date
+    ) -> List[models.DailyStockReport]:
+        logger.info(f"Generating daily report for site {site_id} on {report_date}")
+        reports = []
+        
+        materials_query = db.query(models.Material).join(models.StockEntry).filter(
+            models.StockEntry.site_id == site_id
+        ).distinct()
+        
+        materials = materials_query.all()
+        
+        for material in materials:
+            as_of_datetime = datetime.combine(report_date, datetime.max.time())
+            
+            previous_date = report_date - timedelta(days=1)
+            previous_report = crud.crud_daily_report.get_latest_report(
+                db, site_id, material.id
+            )
+            
+            opening_stock = Decimal('0.00')
+            if previous_report and previous_report.report_date.date() == previous_date:
+                opening_stock = previous_report.closing_stock
+            
+            today_start = datetime.combine(report_date, datetime.min.time())
+            today_end = datetime.combine(report_date, datetime.max.time())
+            
+            today_entries = db.query(models.StockEntry).filter(
+                and_(
+                    models.StockEntry.site_id == site_id,
+                    models.StockEntry.material_id == material.id,
+                    models.StockEntry.entry_date >= today_start,
+                    models.StockEntry.entry_date <= today_end
+                )
+            ).all()
+            
+            daily_received = Decimal('0.00')
+            daily_used = Decimal('0.00')
+            daily_return_received = Decimal('0.00')
+            daily_return_supplier = Decimal('0.00')
+            
+            for entry in today_entries:
+                if entry.entry_type == schemas.StockEntryType.RECEIVED.value:
+                    daily_received += entry.quantity
+                elif entry.entry_type == schemas.StockEntryType.USED.value:
+                    daily_used += entry.quantity
+                elif entry.entry_type == schemas.StockEntryType.RETURNED_RECEIVED.value:
+                    daily_return_received += entry.quantity
+                elif entry.entry_type == schemas.StockEntryType.RETURNED_SUPPLIER.value:
+                    daily_return_supplier += entry.quantity
+            
+            closing_stock = (
+                opening_stock +
+                daily_received -
+                daily_used +
+                daily_return_received -
+                daily_return_supplier
+            )
+            
+            total_received_today = daily_received - daily_used + daily_return_received
+            
+            report = models.DailyStockReport(
+                site_id=site_id,
+                material_id=material.id,
+                report_date=today_end,
+                opening_stock=opening_stock,
+                received=daily_received,
+                used=daily_used,
+                returned_received=daily_return_received,
+                returned_supplier=daily_return_supplier,
+                closing_stock=closing_stock,
+                total_received=total_received_today
+            )
+            
+            db.add(report)
+            reports.append(report)
+        
+        db.commit()
+        return reports
     
     @staticmethod
     def get_site_stock_summary(
@@ -103,6 +200,10 @@ class StockCalculator:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None
     ) -> List[Dict[str, Any]]:
+        """
+        Get stock summary for all materials.
+        If dates are provided, dynamically generates a DAY-BY-DAY ledger!
+        """
         summary = []
         
         materials = db.query(models.Material).join(models.StockEntry).filter(
@@ -110,8 +211,10 @@ class StockCalculator:
         ).distinct().all()
         
         if start_date or end_date:
+            # --- DATE RANGED DAILY LEDGER MODE ---
             effective_start = start_date if start_date else date.min
             effective_end = end_date if end_date else date.today()
+            
             start_dt = datetime.combine(effective_start, datetime.min.time())
             end_dt = datetime.combine(effective_end, datetime.max.time())
             
@@ -123,6 +226,7 @@ class StockCalculator:
                     models.StockEntry.entry_date <= end_dt
                 ).order_by(models.StockEntry.entry_date.asc()).all()
                 
+                # If no activity in this range, just show the static balance
                 if not entries_in_range:
                     calc = StockCalculator.calculate_balance(db, site_id, material.id, end_dt)
                     actual_last_date = db.query(func.max(models.StockEntry.entry_date)).filter(
@@ -146,6 +250,7 @@ class StockCalculator:
                     })
                     continue
                 
+                # Group entries by exact Day
                 entries_by_date = {}
                 for e in entries_in_range:
                     safe_date = e.entry_date.replace(tzinfo=None) if getattr(e.entry_date, 'tzinfo', None) else e.entry_date
@@ -154,6 +259,7 @@ class StockCalculator:
                         entries_by_date[d_key] = []
                     entries_by_date[d_key].append((e, safe_date))
                     
+                # Generate a separate row for EACH active day
                 for d_key, daily_data in entries_by_date.items():
                     day_start = datetime.combine(d_key, datetime.min.time())
                     opening_dt = day_start - timedelta(microseconds=1)
@@ -193,6 +299,7 @@ class StockCalculator:
                         "last_updated": latest_in_day
                     })
         else:
+            # --- ALL-TIME LATEST MODE (Used by Summary Cards) ---
             for material in materials:
                 balance = StockCalculator.calculate_balance(db, site_id, material.id)
                 latest_entry_date = db.query(func.max(models.StockEntry.entry_date)).filter(
@@ -224,10 +331,38 @@ class StockCalculator:
         entry_type: str,
         quantity: Decimal
     ) -> bool:
-        if entry_type == schemas.StockEntryType.USED.value or entry_type == schemas.StockEntryType.RETURNED_SUPPLIER.value:
+        if entry_type in [schemas.StockEntryType.USED.value, schemas.StockEntryType.RETURNED_SUPPLIER.value]:
             calc_result = StockCalculator.calculate_balance(db, site_id, material_id)
             current_balance = calc_result["current_balance"]
             
             if current_balance < quantity:
                 logger.warning(f"Insufficient stock. Balance: {current_balance}, Requested: {quantity}")
         return True
+
+# --- RESTORED CLI FUNCTIONS ---
+def cli_calculate_stock(db: Session, site_id: int, material_id: int):
+    print(f"🧮 Calculating stock balance for site {site_id}, material {material_id}")
+    calculator = StockCalculator()
+    result = calculator.calculate_balance(db, site_id, material_id)
+    
+    print("📊 Stock Balance Result:")
+    print(f"  📦 Material ID: {result['material_id']}")
+    print(f"  🏢 Site ID: {result['site_id']}")
+    print(f"  📅 As of Date: {result['as_of_date']}")
+    print(f"  📈 Opening Balance: {result['opening_balance']}")
+    print(f"  📥 Total Received: {result['total_received']}")
+    print(f"  📤 Total Used: {result['total_used']}")
+    print(f"  ↩️ Total Returned (Supplier): {result.get('total_returned_supplier', Decimal('0.00'))}")
+    print(f"  📊 Current Balance: {result['current_balance']}")
+    
+    if result['has_negative_balance']:
+        print("  ⚠️  WARNING: Negative balance detected!")
+    
+    return result
+
+def cli_generate_daily_report(db: Session, site_id: int, report_date: date):
+    print(f"📋 Generating daily report for site {site_id} on {report_date}")
+    calculator = StockCalculator()
+    reports = calculator.generate_daily_report(db, site_id, report_date)
+    print(f"✅ Generated {len(reports)} daily reports")
+    return reports

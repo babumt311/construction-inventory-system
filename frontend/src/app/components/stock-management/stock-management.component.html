@@ -37,13 +37,32 @@
                   <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
                 </select>
               </div>
-              <div class="col-12">
+
+              <div class="col-12" *ngIf="stockForm.get('entry_type')?.value !== 'returned_received'">
                 <label class="form-label fw-bold small text-muted">Site *</label>
                 <select class="form-select" formControlName="site_id" (change)="onSiteChange($any($event.target).value)" [class.is-invalid]="stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched">
                   <option value="">Select Site</option>
                   <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
                 </select>
               </div>
+
+              <ng-container *ngIf="stockForm.get('entry_type')?.value === 'returned_received'">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-danger">From Site *</label>
+                  <select class="form-select border-danger" formControlName="from_site_id" [class.is-invalid]="stockForm.get('from_site_id')?.invalid && stockForm.get('from_site_id')?.touched">
+                    <option value="">Select Origin</option>
+                    <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold small text-muted text-success">To Site *</label>
+                  <select class="form-select border-success" formControlName="to_site_id" (change)="onSiteChange($any($event.target).value)" [class.is-invalid]="stockForm.get('to_site_id')?.invalid && stockForm.get('to_site_id')?.touched">
+                    <option value="">Select Destination</option>
+                    <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
+                  </select>
+                </div>
+              </ng-container>
+
               <div class="col-12">
                 <label class="form-label fw-bold small text-muted">Category Filter (Optional)</label>
                 <select class="form-select" formControlName="category_filter" (change)="onCategoryFilterChange($any($event.target).value)">
@@ -64,7 +83,7 @@
                   <option value="received">Received (Delivery IN)</option>
                   <option value="used">Used (Consumed OUT)</option>
                   <option value="returned_supplier">Returned to Supplier (OUT)</option>
-                  <option value="returned_received">Returned from Site (IN)</option>
+                  <option value="returned_received">Returned from Site / Transfer (IN)</option>
                 </select>
               </div>
               <div class="col-12">
@@ -74,6 +93,10 @@
               <div class="col-12">
                 <label class="form-label fw-bold small text-muted">Reference / Invoice # (Optional)</label>
                 <input type="text" class="form-control" formControlName="reference_no">
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-bold small text-muted">Remarks</label>
+                <textarea class="form-control" formControlName="remarks" rows="2"></textarea>
               </div>
               <div class="col-12 mt-4">
                 <button type="submit" class="btn btn-success fw-bold w-100 py-2" [disabled]="submittingStock || stockForm.invalid">
@@ -107,7 +130,7 @@
           <div class="table-responsive" [hidden]="!selectedSiteId || loadingStockEntries">
             <table mat-table [dataSource]="stockDataSource" #stockSort="matSort" matSort class="table table-hover align-middle mb-0">
               <ng-container matColumnDef="entry_date"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Date</th><td mat-cell *matCellDef="let element" class="px-3 text-muted"><small>{{ element.entry_date | date:'MMM d, y, h:mm a' }}</small></td></ng-container>
-              <ng-container matColumnDef="material_name"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Material</th><td mat-cell *matCellDef="let element" class="px-3 fw-bold">{{ element.material_name }}</td></ng-container>
+              <ng-container matColumnDef="material_name"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Material</th><td mat-cell *matCellDef="let element" class="px-3 fw-bold">{{ element.material_name }}<small class="d-block text-muted" *ngIf="element.remarks">{{ element.remarks }}</small></td></ng-container>
               <ng-container matColumnDef="entry_type"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Type</th><td mat-cell *matCellDef="let element" class="px-3"><span class="badge" [ngClass]="getEntryBadge(element.entry_type)">{{ formatEntryType(element.entry_type) }}</span></td></ng-container>
               <ng-container matColumnDef="quantity"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Qty</th><td mat-cell *matCellDef="let element" class="px-3 fw-bold">{{ element.quantity }}</td></ng-container>
               <ng-container matColumnDef="reference_no"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted px-3">Ref</th><td mat-cell *matCellDef="let element" class="px-3 text-muted">{{ element.reference_no || '-' }}</td></ng-container>
@@ -230,5 +253,4 @@
       </div>
     </div>
   </div>
-
 </div>

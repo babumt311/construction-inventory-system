@@ -36,7 +36,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   selectedMaterial: Material | null = null;
   filterForm: FormGroup;
   
-  displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'updated_at', 'status'];
+  displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'total_returned_supplier', 'updated_at', 'status'];
   dataSource = new MatTableDataSource<any>();
   
   stockChart: Chart | null = null;
@@ -316,11 +316,11 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       this.toastr.warning('No data to export', 'Warning');
       return;
     }
-    const headers = ['Project', 'Site', 'Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Date', 'Status'];
+    const headers = ['Project', 'Site', 'Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Returned to Supplier', 'Date', 'Status'];
     const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'Unknown';
     const rows = this.dataSource.data.map((item: any) => {
       const dateStr = this.getFormattedDate(item);
-      return [ projectName, item.site_name || 'N/A', item.material_name, item.category, item.current_balance, item.opening_balance, item.total_received, item.total_used, dateStr, this.getStockStatusText(item) ];
+      return [ projectName, item.site_name || 'N/A', item.material_name, item.category, item.current_balance, item.opening_balance, item.total_received, item.total_used, item.total_returned_supplier || 0, dateStr, this.getStockStatusText(item) ];
     });
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const a = document.createElement('a');

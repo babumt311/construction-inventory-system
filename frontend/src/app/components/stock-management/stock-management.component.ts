@@ -319,6 +319,20 @@ export class StockManagementComponent implements OnInit {
     this.submittingMaterial = true;
     const payload = this.materialForm.value;
 
+    const isDuplicate = this.materials.some(existingMaterial => {
+      if (this.isEditingMaterial && this.editingMaterialId === existingMaterial.id) {
+        return false; 
+      }
+      return existingMaterial.name.toLowerCase().trim() === payload.name.toLowerCase().trim();
+    });
+
+    if (isDuplicate) {
+      this.toastr.warning('A material with this exact name already exists!', 'Duplicate Prevented');
+      return; 
+    }
+
+    this.submittingMaterial = true;
+
     if (this.isEditingMaterial && this.editingMaterialId) {
       this.materialService.updateMaterial(this.editingMaterialId, payload).subscribe({
         next: () => {

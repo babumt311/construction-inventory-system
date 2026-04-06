@@ -181,7 +181,6 @@ export class StockManagementComponent implements OnInit {
 
   deleteStockEntry(id: number): void { if (confirm('Delete this transaction?')) { this.stockService.deleteStockEntry(id).subscribe({ next: () => { this.toastr.success('Transaction deleted'); this.loadStockEntries(); }, error: () => this.toastr.error('Failed to delete') }); } }
 
-  // --- NEW LEDGER DISPLAY FIXES ---
   formatEntryType(type: string, remarks?: string): string {
     if (type === 'used' && remarks?.includes('Transfer OUT')) return 'SENT TO SITE';
     if (type === 'returned_received' && remarks?.includes('Transfer IN')) return 'RECEIVED FROM SITE';
@@ -201,9 +200,6 @@ export class StockManagementComponent implements OnInit {
     }
   }
 
-  // --- TAB 2 & 3 OMmitted for brevity, they are identical to before ---
-  // (Paste your existing TAB 2 & 3 logic here from the previous successful version)
-  
   submitCategory(): void {
     if (this.categoryForm.invalid) { this.categoryForm.markAllAsTouched(); return; }
     this.submittingCategory = true;
@@ -213,7 +209,7 @@ export class StockManagementComponent implements OnInit {
   }
   editCategory(category: any): void { this.isEditingCategory = true; this.editingCategoryId = category.id; this.categoryForm.patchValue({ name: category.name, description: category.description }); }
   resetCategoryForm(): void { this.isEditingCategory = false; this.editingCategoryId = null; this.categoryForm.reset(); }
-  deleteCategory(id: number): void { if (confirm('Are you sure you want to delete this category?')) { this.materialService.deleteCategory(id).subscribe({ next: () => { this.toastr.success('Category deleted'); this.loadCategories(); }, error: (err) => { this.toastr.error(err.error?.detail || 'Failed to delete category'); } }); } }
+  deleteCategory(id: number): void { if (confirm('Are you sure you want to delete this category? Please ensure no materials are attached to it.')) { this.materialService.deleteCategory(id).subscribe({ next: () => { this.toastr.success('Category deleted successfully', 'Success'); this.loadCategories(); }, error: (err) => { this.toastr.error(err.error?.detail || 'Failed to delete category', 'Error'); } }); } }
 
   submitMaterial(): void {
     if (this.materialForm.invalid) { this.materialForm.markAllAsTouched(); return; }

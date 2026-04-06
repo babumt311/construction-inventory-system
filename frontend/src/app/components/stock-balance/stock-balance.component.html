@@ -300,17 +300,21 @@
           </div>
 
           <div class="row g-2 mt-4 text-center border-top pt-3 mb-2">
-            <div class="col-4 border-end">
-              <small class="text-muted d-block fw-bold mb-1">OPENING</small>
+            <div class="col-3 border-end">
+              <small class="text-muted d-block fw-bold mb-1">OPEN</small>
               <span class="text-dark">{{ balance.opening_balance | number:'1.2-2' }}</span>
             </div>
-            <div class="col-4 border-end">
+            <div class="col-3 border-end">
               <small class="text-muted d-block fw-bold mb-1">IN</small>
               <span class="text-success"><i class="fas fa-arrow-down me-1"></i>{{ balance.total_received | number:'1.2-2' }}</span>
             </div>
-            <div class="col-4">
-              <small class="text-muted d-block fw-bold mb-1">OUT</small>
+            <div class="col-3 border-end">
+              <small class="text-muted d-block fw-bold mb-1">USED</small>
               <span class="text-danger"><i class="fas fa-arrow-up me-1"></i>{{ balance.total_used | number:'1.2-2' }}</span>
+            </div>
+            <div class="col-3">
+              <small class="text-muted d-block fw-bold mb-1">RETURN</small>
+              <span class="text-warning text-dark"><i class="fas fa-undo me-1"></i>{{ balance.total_returned_supplier || 0 | number:'1.2-2' }}</span>
             </div>
           </div>
         </div>

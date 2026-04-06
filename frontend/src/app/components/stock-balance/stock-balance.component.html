@@ -23,7 +23,6 @@
   <div class="card shadow-sm border-0 mb-4">
     <div class="card-body p-4">
       <form [formGroup]="filterForm">
-        
         <div class="row g-4 align-items-end mb-3">
           <div class="col-md-3">
             <label class="form-label small fw-bold">Project</label>
@@ -32,7 +31,6 @@
               <option *ngFor="let project of projects" [value]="project.id">{{ project.name }}</option>
             </select>
           </div>
-          
           <div class="col-md-3">
             <label class="form-label small fw-bold">Site</label>
             <select class="form-select" formControlName="site_id" (change)="onSiteChange($any($event.target).value)">
@@ -40,7 +38,6 @@
               <option *ngFor="let site of sites" [value]="site.id">{{ site.name }}</option>
             </select>
           </div>
-
           <div class="col-md-3">
             <label class="form-label small fw-bold">Category</label>
             <select class="form-select" formControlName="category_id" (change)="onCategoryChange($any($event.target).value)">
@@ -48,7 +45,6 @@
               <option *ngFor="let category of categories" [value]="category.id">{{ category.name }}</option>
             </select>
           </div>
-          
           <div class="col-md-3">
             <label class="form-label small fw-bold">Material</label>
             <select class="form-select" formControlName="material_id">
@@ -57,7 +53,6 @@
             </select>
           </div>
         </div>
-        
         <div class="row g-4 align-items-center">
           <div class="col-md-4">
             <label class="form-label small fw-bold">Start Date</label>
@@ -76,7 +71,6 @@
             </div>
           </div>
         </div>
-
       </form>
     </div>
   </div>
@@ -85,55 +79,32 @@
     <div class="col-md-3">
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body p-4 d-flex justify-content-between align-items-center">
-          <div>
-            <h6 class="text-muted fw-bold mb-2">TOTAL MATERIALS</h6>
-            <h2 class="mb-0 fw-bold">{{ cardData.length }}</h2>
-          </div>
-          <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;">
-            <i class="fas fa-boxes fa-lg"></i>
-          </div>
+          <div><h6 class="text-muted fw-bold mb-2">TOTAL MATERIALS</h6><h2 class="mb-0 fw-bold">{{ cardData.length }}</h2></div>
+          <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;"><i class="fas fa-boxes fa-lg"></i></div>
         </div>
       </div>
     </div>
-    
     <div class="col-md-3">
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body p-4 d-flex justify-content-between align-items-center">
-          <div>
-            <h6 class="text-muted fw-bold mb-2">IN STOCK</h6>
-             <h2 class="mb-0 fw-bold">{{ getHealthyStockCount(cardData) }}</h2>
-          </div>
-          <div class="bg-success text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;">
-            <i class="fas fa-check-circle fa-lg"></i>
-          </div>
+          <div><h6 class="text-muted fw-bold mb-2">IN STOCK</h6><h2 class="mb-0 fw-bold">{{ getHealthyStockCount(cardData) }}</h2></div>
+          <div class="bg-success text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;"><i class="fas fa-check-circle fa-lg"></i></div>
         </div>
       </div>
     </div>
-    
     <div class="col-md-3">
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body p-4 d-flex justify-content-between align-items-center">
-          <div>
-            <h6 class="text-muted fw-bold mb-2">LOW STOCK</h6>
-            <h2 class="mb-0 fw-bold">{{ getLowStockCount(cardData) }}</h2>
-          </div>
-          <div class="bg-warning text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;">
-            <i class="fas fa-exclamation-triangle fa-lg"></i>
-          </div>
+          <div><h6 class="text-muted fw-bold mb-2">LOW STOCK</h6><h2 class="mb-0 fw-bold">{{ getLowStockCount(cardData) }}</h2></div>
+          <div class="bg-warning text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;"><i class="fas fa-exclamation-triangle fa-lg"></i></div>
         </div>
       </div>
     </div>
-    
     <div class="col-md-3">
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body p-4 d-flex justify-content-between align-items-center">
-          <div>
-            <h6 class="text-muted fw-bold mb-2">STOCK VALUE</h6>
-            <h2 class="mb-0 fw-bold">₹{{ calculateStockValue(cardData) | number:'1.2-2' }}</h2>
-          </div>
-          <div class="bg-info text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;">
-            <i class="fas fa-rupee-sign fa-lg"></i>
-          </div>
+          <div><h6 class="text-muted fw-bold mb-2">STOCK VALUE</h6><h2 class="mb-0 fw-bold">₹{{ calculateStockValue(cardData) | number:'1.2-2' }}</h2></div>
+          <div class="bg-info text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;"><i class="fas fa-rupee-sign fa-lg"></i></div>
         </div>
       </div>
     </div>
@@ -141,52 +112,34 @@
 
   <div class="card shadow-sm border-0 mb-4" [hidden]="dataSource.data.length === 0">
     <div class="card-body p-4">
-      <h5 class="card-title fw-bold mb-4">
-        <i class="fas fa-chart-bar text-primary me-2"></i>
-        Stock Balance Overview
-      </h5>
-      <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
-        <canvas id="stockChart"></canvas>
-      </div>
+      <h5 class="card-title fw-bold mb-4"><i class="fas fa-chart-bar text-primary me-2"></i>Stock Balance Overview</h5>
+      <div class="chart-container" style="position: relative; height: 300px; width: 100%;"><canvas id="stockChart"></canvas></div>
     </div>
   </div>
 
   <div class="card shadow-sm border-0" *ngIf="viewMode === 'table'">
     <div class="card-body p-0">
-      
       <div class="table-responsive overflow-x-auto">
-        
-        <table mat-table [dataSource]="dataSource" matSort class="table table-hover align-middle mb-0" style="min-width: 1300px;">
+        <table mat-table [dataSource]="dataSource" matSort class="table table-hover align-middle mb-0" style="min-width: 1400px;">
           
           <ng-container matColumnDef="material">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3" style="min-width: 250px;">Material</th>
             <td mat-cell *matCellDef="let balance" class="py-3 text-wrap">
               <div class="d-flex align-items-center">
-                <div class="bg-light text-primary rounded-circle d-flex justify-content-center align-items-center me-3 flex-shrink-0" style="width: 40px; height: 40px;">
-                  <i class="fas fa-box"></i>
-                </div>
-                <div>
-                  <strong class="d-block text-dark">{{ balance.material_name }}</strong>
-                  <small class="text-muted">ID: {{ balance.material_id }}</small>
-                </div>
+                <div class="bg-light text-primary rounded-circle d-flex justify-content-center align-items-center me-3 flex-shrink-0" style="width: 40px; height: 40px;"><i class="fas fa-box"></i></div>
+                <div><strong class="d-block text-dark">{{ balance.material_name }}</strong><small class="text-muted">ID: {{ balance.material_id }}</small></div>
               </div>
             </td>
           </ng-container>
 
           <ng-container matColumnDef="category">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Category</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
-              <span class="badge bg-secondary rounded-pill px-3 py-2">
-                {{ balance.category }}
-              </span>
-            </td>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap"><span class="badge bg-secondary rounded-pill px-3 py-2">{{ balance.category }}</span></td>
           </ng-container>
 
           <ng-container matColumnDef="site">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Site</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
-              <span class="badge bg-light text-dark border"><i class="fas fa-map-marker-alt text-danger me-1"></i> {{ balance.site_name || 'N/A' }}</span>
-            </td>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap"><span class="badge bg-light text-dark border"><i class="fas fa-map-marker-alt text-danger me-1"></i> {{ balance.site_name || 'N/A' }}</span></td>
           </ng-container>
 
           <ng-container matColumnDef="current_balance">
@@ -194,79 +147,59 @@
             <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
               <div class="d-flex align-items-center">
                 <span class="me-3 fw-bold fs-5 text-dark">{{ balance.current_balance | number:'1.2-2' }}</span>
-                <span class="badge rounded-pill px-3 py-2" [ngClass]="'bg-' + getStockStatus(balance)">
-                  {{ getStockStatusText(balance) }}
-                </span>
+                <span class="badge rounded-pill px-3 py-2" [ngClass]="'bg-' + getStockStatus(balance)">{{ getStockStatusText(balance) }}</span>
               </div>
             </td>
           </ng-container>
 
           <ng-container matColumnDef="opening_balance">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Opening Balance</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 text-muted text-nowrap">
-              {{ balance.opening_balance | number:'1.2-2' }}
-            </td>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Opening</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-muted text-nowrap">{{ balance.opening_balance | number:'1.2-2' }}</td>
           </ng-container>
 
           <ng-container matColumnDef="total_received">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Total Received</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
-              <span class="text-success fw-bold">
-                <i class="fas fa-arrow-down me-1"></i> {{ balance.total_received | number:'1.2-2' }}
-              </span>
-            </td>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Received</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap"><span class="text-success fw-bold"><i class="fas fa-arrow-down me-1"></i> {{ balance.total_received | number:'1.2-2' }}</span></td>
           </ng-container>
 
           <ng-container matColumnDef="total_used">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Total Used</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
-              <span class="text-danger fw-bold">
-                <i class="fas fa-arrow-up me-1"></i> {{ balance.total_used | number:'1.2-2' }}
-              </span>
-            </td>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Used</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap"><span class="text-danger fw-bold"><i class="fas fa-arrow-up me-1"></i> {{ balance.total_used | number:'1.2-2' }}</span></td>
           </ng-container>
 
           <ng-container matColumnDef="total_returned_supplier">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Returned</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Ret. (Supplier)</th>
             <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
-              <span class="text-warning text-dark fw-bold" *ngIf="balance.total_returned_supplier > 0">
-                <i class="fas fa-undo me-1"></i> {{ balance.total_returned_supplier | number:'1.2-2' }}
-              </span>
+              <span class="text-warning text-dark fw-bold" *ngIf="balance.total_returned_supplier > 0"><i class="fas fa-undo me-1"></i> {{ balance.total_returned_supplier | number:'1.2-2' }}</span>
               <span class="text-muted" *ngIf="!balance.total_returned_supplier || balance.total_returned_supplier == 0">0.00</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_returned_received">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Ret. (Site)</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
+              <span class="text-info fw-bold" *ngIf="balance.total_returned_received > 0"><i class="fas fa-reply me-1"></i> {{ balance.total_returned_received | number:'1.2-2' }}</span>
+              <span class="text-muted" *ngIf="!balance.total_returned_received || balance.total_returned_received == 0">0.00</span>
             </td>
           </ng-container>
 
           <ng-container matColumnDef="updated_at">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Date</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 text-muted text-nowrap">
-              <i class="far fa-calendar-alt me-1"></i> 
-              {{ getFormattedDate(balance) }}
-            </td>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-muted text-nowrap"><i class="far fa-calendar-alt me-1"></i> {{ getFormattedDate(balance) }}</td>
           </ng-container>
 
           <ng-container matColumnDef="status">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-center" style="min-width: 120px;">Actions</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 text-center">
-              <button class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold text-nowrap" 
-                      (click)="showMaterialDetails(getMaterial(balance.material_id))">
-                <i class="fas fa-chart-line me-1"></i> History
-              </button>
-            </td>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-center"><button class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold text-nowrap" (click)="showMaterialDetails(getMaterial(balance.material_id))"><i class="fas fa-chart-line me-1"></i> History</button></td>
           </ng-container>
 
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="border-bottom"></tr>
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr><tr mat-row *matRowDef="let row; columns: displayedColumns;" class="border-bottom"></tr>
         </table>
 
         <div class="text-center py-5" *ngIf="dataSource.data.length === 0">
-          <div class="bg-light rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style="width: 100px; height: 100px;">
-            <i class="fas fa-box-open fa-3x text-muted"></i>
-          </div>
+          <div class="bg-light rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style="width: 100px; height: 100px;"><i class="fas fa-box-open fa-3x text-muted"></i></div>
           <h4 class="fw-bold text-dark">No Stock Data Available</h4>
-          <p class="text-muted lead" *ngIf="!selectedProjectId">Please select a Project from the dropdown above.</p>
-          <p class="text-muted lead" *ngIf="selectedProjectId">No stock entries found for this filter criteria.</p>
         </div>
-
       </div>
       <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons class="border-top" *ngIf="dataSource.data.length > 0"></mat-paginator>
     </div>
@@ -278,71 +211,36 @@
         <div class="card-body p-4 pb-2">
           <div class="d-flex justify-content-between align-items-start mb-3">
             <div class="d-flex align-items-center">
-              <div class="bg-light text-primary rounded-circle d-flex justify-content-center align-items-center me-3 flex-shrink-0" style="width: 45px; height: 45px;">
-                <i class="fas fa-box"></i>
-              </div>
+              <div class="bg-light text-primary rounded-circle d-flex justify-content-center align-items-center me-3 flex-shrink-0" style="width: 45px; height: 45px;"><i class="fas fa-box"></i></div>
               <div>
                 <h5 class="fw-bold text-dark mb-0">{{ balance.material_name }}</h5>
-                <div class="mt-1">
-                  <span class="badge bg-secondary rounded-pill me-1">{{ balance.category }}</span>
-                  <span class="badge bg-light text-dark border rounded-pill"><i class="fas fa-map-marker-alt text-danger me-1"></i>{{ balance.site_name || 'N/A' }}</span>
-                </div>
+                <div class="mt-1"><span class="badge bg-secondary rounded-pill me-1">{{ balance.category }}</span><span class="badge bg-light text-dark border rounded-pill"><i class="fas fa-map-marker-alt text-danger me-1"></i>{{ balance.site_name || 'N/A' }}</span></div>
               </div>
             </div>
-            <button class="btn btn-sm btn-light text-info rounded-circle flex-shrink-0" (click)="showMaterialDetails(getMaterial(balance.material_id))" title="View History">
-              <i class="fas fa-chart-line"></i>
-            </button>
+            <button class="btn btn-sm btn-light text-info rounded-circle flex-shrink-0" (click)="showMaterialDetails(getMaterial(balance.material_id))"><i class="fas fa-chart-line"></i></button>
           </div>
           
           <div class="text-center my-4">
             <h1 class="display-4 fw-bold mb-0" [ngClass]="'text-' + getStockStatus(balance)">{{ balance.current_balance | number:'1.2-2' }}</h1>
-            <span class="badge rounded-pill px-3 py-2 mt-2" [ngClass]="'bg-' + getStockStatus(balance)">
-              {{ getStockStatusText(balance) }}
-            </span>
+            <span class="badge rounded-pill px-3 py-2 mt-2" [ngClass]="'bg-' + getStockStatus(balance)">{{ getStockStatusText(balance) }}</span>
           </div>
 
           <div class="row g-2 mt-4 text-center border-top pt-3 mb-2">
-            <div class="col-3 border-end">
-              <small class="text-muted d-block fw-bold mb-1">OPEN</small>
-              <span class="text-dark">{{ balance.opening_balance | number:'1.2-2' }}</span>
-            </div>
-            <div class="col-3 border-end">
-              <small class="text-muted d-block fw-bold mb-1">IN</small>
-              <span class="text-success"><i class="fas fa-arrow-down me-1"></i>{{ balance.total_received | number:'1.2-2' }}</span>
-            </div>
-            <div class="col-3 border-end">
-              <small class="text-muted d-block fw-bold mb-1">USED</small>
-              <span class="text-danger"><i class="fas fa-arrow-up me-1"></i>{{ balance.total_used | number:'1.2-2' }}</span>
-            </div>
-            <div class="col-3">
-              <small class="text-muted d-block fw-bold mb-1">RETURN</small>
-              <span class="text-warning text-dark"><i class="fas fa-undo me-1"></i>{{ balance.total_returned_supplier || 0 | number:'1.2-2' }}</span>
-            </div>
+            <div class="col border-end px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">OPEN</small><span class="text-dark">{{ balance.opening_balance | number:'1.2-2' }}</span></div>
+            <div class="col border-end px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">IN</small><span class="text-success"><i class="fas fa-arrow-down me-1"></i>{{ balance.total_received | number:'1.2-2' }}</span></div>
+            <div class="col border-end px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">USED</small><span class="text-danger"><i class="fas fa-arrow-up me-1"></i>{{ balance.total_used | number:'1.2-2' }}</span></div>
+            <div class="col border-end px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">RET. OUT</small><span class="text-warning text-dark"><i class="fas fa-undo me-1"></i>{{ balance.total_returned_supplier || 0 | number:'1.2-2' }}</span></div>
+            <div class="col px-1"><small class="text-muted d-block fw-bold mb-1" style="font-size: 0.7rem;">RET. IN</small><span class="text-info text-dark"><i class="fas fa-reply me-1"></i>{{ balance.total_returned_received || 0 | number:'1.2-2' }}</span></div>
           </div>
         </div>
-        <div class="card-footer bg-transparent border-0 pt-0 text-muted small text-end">
-           <i class="far fa-calendar-alt me-1"></i> Date: {{ getFormattedDate(balance) }}
-        </div>
       </div>
-    </div>
-    
-    <div class="col-12 text-center py-5" *ngIf="dataSource.data.length === 0">
-      <div class="bg-light rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style="width: 100px; height: 100px;">
-        <i class="fas fa-box-open fa-3x text-muted"></i>
-      </div>
-      <h4 class="fw-bold text-dark">No Stock Data Available</h4>
-      <p class="text-muted lead">Adjust your filters to see material cards.</p>
     </div>
   </div>
-
 </div>
 
 <ng-template #materialDetails>
   <div class="modal-header border-0 bg-light p-4">
-    <h5 class="modal-title fw-bold">
-      <i class="fas fa-box text-primary me-2"></i>
-      {{ selectedMaterial?.name }} - Stock History
-    </h5>
+    <h5 class="modal-title fw-bold"><i class="fas fa-box text-primary me-2"></i>{{ selectedMaterial?.name }} - Stock History</h5>
     <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
   </div>
   <div class="modal-body p-4">
@@ -366,13 +264,10 @@
         </div>
       </div>
     </div>
-    
     <div class="card border-0 shadow-sm mt-4">
       <div class="card-body p-4">
         <h6 class="fw-bold mb-4"><i class="fas fa-calendar-alt text-primary me-2"></i>Stock History (Last 30 Days)</h6>
-        <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
-          <canvas id="materialChart"></canvas>
-        </div>
+        <div class="chart-container" style="position: relative; height: 300px; width: 100%;"><canvas id="materialChart"></canvas></div>
       </div>
     </div>
   </div>

@@ -261,3 +261,25 @@ class DailyStockReport(Base):
     __table_args__ = (
         UniqueConstraint('site_id', 'material_id', 'report_date', name='unique_daily_report'),
     )
+
+
+    # Additional models for report caching
+class ReportCache(Base):
+    """Report caching model"""
+    __tablename__ = "report_cache"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    report_type = Column(String(100), nullable=False, index=True)
+    parameters = Column(Text)  # JSON string of report parameters
+    data = Column(Text)  # JSON string of report data
+    generated_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True))
+    
+    def __repr__(self):
+        return f"<ReportCache(id={self.id}, type={self.report_type})>"
+
+# 👇 ADD THIS MISSING FUNCTION AT THE VERY BOTTOM 👇
+def log_model_creation():
+    """Log model creation for debugging"""
+    logger.info("Database models initialized successfully")
+    logger.info(f"Tables created: {Base.metadata.tables.keys()}")

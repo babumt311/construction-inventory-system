@@ -38,7 +38,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   
   filterForm: FormGroup;
   
-  // ADDED received_cost AND used_cost TO COLUMNS
   displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier', 'updated_at', 'status'];
   dataSource = new MatTableDataSource<any>();
   
@@ -60,6 +59,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   ) {
     Chart.register(...registerables);
     
+    // Configured to sort by the immutable values sent from the backend
     this.dataSource.sortingDataAccessor = (item, property) => {
       switch(property) {
         case 'material': return (item.material_name || '').toLowerCase();
@@ -68,9 +68,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         case 'current_balance': return Number(item.current_balance || 0);
         case 'opening_balance': return Number(item.opening_balance || 0);
         case 'total_received': return Number(item.total_received || 0);
-        case 'received_cost': return this.getReceivedCost(item); // Sort by calculated cost
+        case 'received_cost': return Number(item.received_value || 0); 
         case 'total_used': return Number(item.total_used || 0);
-        case 'used_cost': return this.getUsedCost(item); // Sort by calculated cost
+        case 'used_cost': return Number(item.used_value || 0); 
         case 'total_transfer_out': return Number(item.total_transfer_out || 0);
         case 'total_transfer_in': return Number(item.total_transfer_in || 0);
         case 'total_returned_supplier': return Number(item.total_returned_supplier || 0);
@@ -191,19 +191,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }, 0);
   }
 
-  // --- NEW COST CALCULATION HELPERS ---
-  getReceivedCost(balance: any): number {
-    const material = this.getMaterial(balance.material_id);
-    const standardCost = material ? Number(material.standard_cost) : 0;
-    return Number(balance.total_received || 0) * standardCost;
-  }
-
-  getUsedCost(balance: any): number {
-    const material = this.getMaterial(balance.material_id);
-    const standardCost = material ? Number(material.standard_cost) : 0;
-    return Number(balance.total_used || 0) * standardCost;
-  }
-
   getFormattedDate(balance: any): string {
     const rawDate = balance.updated_at || balance.created_at || balance.last_updated || balance.entry_date || balance.report_date;
     if (!rawDate) return 'N/A';
@@ -300,7 +287,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   exportStockReport(): void {
     if (this.dataSource.data.length === 0) { this.toastr.warning('No data to export', 'Warning'); return; }
     
-    // UPDATED HEADERS TO INCLUDE COSTS
     const headers = ['Project', 'Site', 'Material', 'Category', 'Current Balance', 'Opening Balance', 'Received Qty', 'Received Cost', 'Used Qty', 'Used Cost', 'Sent to Site', 'Received from Site', 'Returned (OUT to Supplier)', 'Date', 'Status'];
     const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'Unknown';
     
@@ -309,8 +295,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       return [ 
         projectName, item.site_name || 'N/A', item.material_name, item.category, 
         item.current_balance, item.opening_balance, 
-        item.total_received, this.getReceivedCost(item), // Added Recv Cost
-        item.total_used, this.getUsedCost(item),         // Added Used Cost
+        item.total_received, item.received_value || 0, // Using Immutable DB value
+        item.total_used, item.used_value || 0,         // Using Immutable DB value
         item.total_transfer_out || 0, item.total_transfer_in || 0, 
         item.total_returned_supplier || 0, dateStr, this.getStockStatusText(item) 
       ];

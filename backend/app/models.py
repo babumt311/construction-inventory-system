@@ -247,15 +247,17 @@ class DailyStockReport(Base):
     opening_stock = Column(Numeric(10, 2), default=0.00)
     received = Column(Numeric(10, 2), default=0.00)
     used = Column(Numeric(10, 2), default=0.00)
-    returned_received = Column(Numeric(10, 2), default=0.00)  # rr
-    returned_supplier = Column(Numeric(10, 2), default=0.00)  # rs
+    returned_received = Column(Numeric(10, 2), default=0.00)  
+    returned_supplier = Column(Numeric(10, 2), default=0.00)  
     closing_stock = Column(Numeric(10, 2), default=0.00)
-    total_received = Column(Numeric(10, 2), default=0.00)  # TR
+    total_received = Column(Numeric(10, 2), default=0.00)  
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
     site = relationship("Site", back_populates="daily_reports")
     material = relationship("Material", back_populates="daily_reports")
     
-    # Unique constraint
-    __table
+    # Unique constraint (Notice the comma at the end!)
+    __table_args__ = (
+        UniqueConstraint('site_id', 'material_id', 'report_date', name='unique_daily_report'),
+    )

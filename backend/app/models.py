@@ -101,10 +101,8 @@ class Project(Base):
     name = Column(String(200), nullable=False, index=True)
     code = Column(String(50), unique=True, index=True)
     
-    # --- ADDED FIELDS ---
     client = Column(String(200))
     budget = Column(Numeric(15, 2), default=0.00)
-    # --------------------
     
     description = Column(Text)
     start_date = Column(DateTime(timezone=True))
@@ -118,8 +116,52 @@ class Project(Base):
     sites = relationship("Site", back_populates="project", cascade="all, delete-orphan")
     po_entries = relationship("POEntry", back_populates="project")
     
+    # --- NEW RELATIONSHIPS ADDED HERE ---
+    team_members = relationship("ProjectTeamMember", back_populates="project", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    
     def __repr__(self):
         return f"<Project(id={self.id}, name={self.name}, code={self.code})>"
+
+# --- NEW MODEL: TEAM MEMBERS ---
+class ProjectTeamMember(Base):
+    """Project Team Member model"""
+    __tablename__ = "project_team_members"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    email = Column(String(255), nullable=False)
+    role = Column(String(100), nullable=False)
+    status = Column(String(50), default="Active")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    project = relationship("Project", back_populates="team_members")
+
+    def __repr__(self):
+        return f"<ProjectTeamMember(id={self.id}, name={self.name}, role={self.role})>"
+
+# --- NEW MODEL: TASKS ---
+class Task(Base):
+    """Project Task model"""
+    __tablename__ = "tasks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text)
+    priority = Column(String(50), default="Medium")
+    estimated_hours = Column(Float, default=0.0)
+    due_date = Column(DateTime(timezone=True))
+    status = Column(String(50), default="TO DO")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    project = relationship("Project", back_populates="tasks")
+
+    def __repr__(self):
+        return f"<Task(id={self.id}, title={self.title}, status={self.status})>"
 
 class Site(Base):
     """Site/Sub-project model"""
@@ -216,51 +258,4 @@ class DailyStockReport(Base):
     material = relationship("Material", back_populates="daily_reports")
     
     # Unique constraint
-    __table_args__ = (
-        (UniqueConstraint('site_id', 'material_id', 'report_date', name='unique_daily_report')),
-    )
-    
-    def __repr__(self):
-        return f"<DailyStockReport(site={self.site_id}, material={self.material_id}, date={self.report_date})>"
-
-class AuditLog(Base):
-    """Audit Log model for tracking user activities"""
-    __tablename__ = "audit_logs"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    action = Column(String(100), nullable=False)  # CREATE, UPDATE, DELETE, LOGIN, etc.
-    table_name = Column(String(100), nullable=False)
-    record_id = Column(Integer, nullable=True)
-    old_values = Column(Text)  # JSON string of old values
-    new_values = Column(Text)  # JSON string of new values
-    ip_address = Column(String(50))
-    user_agent = Column(String(500))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relationships
-    user = relationship("User", back_populates="logs")
-    
-    def __repr__(self):
-        return f"<AuditLog(id={self.id}, user={self.user_id}, action={self.action})>"
-
-# Additional models for report caching
-class ReportCache(Base):
-    """Report caching model"""
-    __tablename__ = "report_cache"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    report_type = Column(String(100), nullable=False, index=True)
-    parameters = Column(Text)  # JSON string of report parameters
-    data = Column(Text)  # JSON string of report data
-    generated_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(DateTime(timezone=True))
-    
-    def __repr__(self):
-        return f"<ReportCache(id={self.id}, type={self.report_type})>"
-
-# CLI Output helper
-def log_model_creation():
-    """Log model creation for debugging"""
-    logger.info("Database models initialized successfully")
-    logger.info(f"Tables created: {Base.metadata.tables.keys()}")
+    __table

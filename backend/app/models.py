@@ -253,6 +253,35 @@ class ReportCache(Base):
     def __repr__(self):
         return f"<ReportCache(id={self.id}, type={self.report_type})>"
 
+class Task(Base):
+    """Project Task model"""
+    __tablename__ = "tasks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text)
+    priority = Column(String(50), default="Medium")
+    status = Column(String(50), default="TO DO")
+    estimated_hours = Column(Float, default=0.0)
+    due_date = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    project = relationship("Project", backref="tasks")
+
+class ProjectTeam(Base):
+    """Project Team Member model"""
+    __tablename__ = "project_teams"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    full_name = Column(String(200), nullable=False)
+    email_address = Column(String(200), nullable=False)
+    project_role = Column(String(100))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    project = relationship("Project", backref="team_members")
+
 # CLI Output helper
 def log_model_creation():
     """Log model creation for debugging"""

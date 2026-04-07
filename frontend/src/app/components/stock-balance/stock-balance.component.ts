@@ -37,7 +37,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier', 'updated_at', 'status'];
   dataSource = new MatTableDataSource<any>();
   
-  stockChart: Chart | null = null;
   materialChart: Chart | null = null;
   loading = false;
   selectedProjectId?: number;
@@ -193,7 +192,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.dataSource.data = baseData;
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
-    this.createStockChart(baseData);
   }
 
   get cardData() {
@@ -247,24 +245,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     if (!materialId) return 0;
     const balance = this.allTimeBalances.find(b => b.material_id === materialId);
     return balance ? balance.current_balance : 0;
-  }
-
-  createStockChart(balances: any[]): void {
-    this.destroyChart('stockChart');
-    const ctx = document.getElementById('stockChart') as HTMLCanvasElement;
-    if (!ctx || balances.length === 0) return;
-    const topMaterials = balances.filter(b => b.current_balance > 0).sort((a, b) => b.current_balance - a.current_balance).slice(0, 15);
-    this.stockChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: topMaterials.map(b => `${b.material_name} (${b.site_name || 'Site'})`),
-        datasets: [
-          { label: 'Current Stock', data: topMaterials.map(b => b.current_balance), backgroundColor: 'rgba(63, 81, 181, 0.7)', borderColor: 'rgb(63, 81, 181)', borderWidth: 1 },
-          { label: 'Opening Stock', data: topMaterials.map(b => b.opening_balance), backgroundColor: 'rgba(76, 175, 80, 0.7)', borderColor: 'rgb(76, 175, 80)', borderWidth: 1 }
-        ]
-      },
-      options: { responsive: true, maintainAspectRatio: false }
-    });
   }
 
   createMaterialChart(materialId: number): void {
@@ -330,7 +310,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const canvas = document.getElementById(chartId) as HTMLCanvasElement;
     if (canvas) { const chart = Chart.getChart(canvas); if (chart) chart.destroy(); }
   }
-  ngOnDestroy(): void { this.destroyChart('stockChart'); this.destroyChart('materialChart'); }
+  
+  ngOnDestroy(): void { this.destroyChart('materialChart'); }
   toggleViewMode(): void { this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; }
   refreshData(): void { if (this.selectedProjectId) this.onProjectChange(this.selectedProjectId); }
 }

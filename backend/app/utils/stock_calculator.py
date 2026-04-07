@@ -236,6 +236,59 @@ class StockCalculator:
         
         return summary
 
+@staticmethod
+    def generate_daily_report(db: Session, site_id: int, report_date: date) -> List[models.DailyStockReport]:
+        summary = StockCalculator.get_site_stock_summary(db, site_id, report_date, report_date)
+        reports_generated = []
+        
+        report_datetime = datetime.combine(report_date, datetime.min.time())
+        
+        for item in summary:
+            # Check if report already exists for this date
+            existing_report = db.query(models.DailyStockReport).filter(
+                models.DailyStockReport.site_id == site_id,
+                models.DailyStockReport.material_id == item["material_id"],
+                models.DailyStockReport.report_date == report_datetime
+            ).first()
+            
+            if existing_report:
+                existing_report.opening_stock = item["opening_balance"]
+                existing_report.received = item["total_received"]
+                existing_report.used = item["total_used"]
+                existing_report.returned_received = item["total_transfer_in"]
+                existing_report.returned_supplier = item["total_returned_supplier"]
+                existing_report.closing_stock = item["current_balance"]
+                
+                # --- NEW IMMUTABLE COSTS ---
+                existing_report.received_value = item["received_value"]
+                existing_report.used_value = item["used_value"]
+                # ---------------------------
+                
+                reports_generated.append(existing_report)
+            else:
+                new_report = models.DailyStockReport(
+                    site_id=site_id,
+                    material_id=item["material_id"],
+                    report_date=report_datetime,
+                    opening_stock=item["opening_balance"],
+                    received=item["total_received"],
+                    used=item["total_used"],
+                    returned_received=item["total_transfer_in"],
+                    returned_supplier=item["total_returned_supplier"],
+                    closing_stock=item["current_balance"],
+                    total_received=item["total_received"],
+                    
+                    # --- NEW IMMUTABLE COSTS ---
+                    received_value=item["received_value"],
+                    used_value=item["used_value"]
+                    # ---------------------------
+                )
+                db.add(new_report)
+                reports_generated.append(new_report)
+                
+        db.commit()
+        return reports_generated
+
 def cli_calculate_stock(db: Session, site_id: int, material_id: int):
     calculator = StockCalculator()
     return calculator.calculate_balance(db, site_id, material_id)

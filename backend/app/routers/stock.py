@@ -29,7 +29,7 @@ async def create_stock_entry(
     audit_log: dict = Depends(log_audit_action)
 ) -> Any:
     """
-    Create new stock entry and update total balance
+    Create new stock entry, lock in historical costs, and update total balance
     """
     logger.info(f"Creating stock entry by user: {current_user.username}")
     
@@ -65,9 +65,15 @@ async def create_stock_entry(
             detail="Stock entry validation failed"
         )
     
-    # 1. Create stock entry history
+    # 1. Create stock entry history with IMMUTABLE COSTS
     stock_data = stock_in.dict()
     stock_data["created_by"] = current_user.id
+    
+    # --- ENTERPRISE LEDGER PROTOCOL: LOCK IN CURRENT PRICE ---
+    current_unit_price = material.standard_cost or Decimal('0.00')
+    stock_data["unit_cost"] = current_unit_price
+    stock_data["total_cost"] = current_unit_price * Decimal(str(stock_in.quantity))
+    # ---------------------------------------------------------
     
     stock_entry = models.StockEntry(**stock_data)
     db.add(stock_entry)
@@ -233,6 +239,13 @@ async def update_stock_entry(
     
     # Update entry
     update_data = stock_in.dict(exclude_unset=True)
+    
+    # --- ENTERPRISE LEDGER PROTOCOL: RECALCULATE COST USING HISTORICAL UNIT PRICE ---
+    if "quantity" in update_data:
+        new_qty = Decimal(str(update_data["quantity"]))
+        historical_price = entry.unit_cost or Decimal('0.00')
+        update_data["total_cost"] = historical_price * new_qty
+    # --------------------------------------------------------------------------------
     
     for field, value in update_data.items():
         if hasattr(entry, field):
@@ -465,8 +478,8 @@ async def cli_calculate_stock(
     print(f"  📈 Opening Balance: {result['opening_balance']}")
     print(f"  📥 Total Received: {result['total_received']}")
     print(f"  📤 Total Used: {result['total_used']}")
-    print(f"  🔄 Return Received: {result['total_return_received']}")
-    print(f"  ↩️  Return to Supplier: {result['total_return_supplier']}")
+    print(f"  🔄 Return Received: {result.get('total_transfer_in', 0)}")
+    print(f"  ↩️  Return to Supplier: {result.get('total_returned_supplier', 0)}")
     print(f"  📊 Current Balance: {result['current_balance']}")
     
     if result['has_negative_balance']:

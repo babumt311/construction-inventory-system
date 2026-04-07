@@ -247,23 +247,46 @@ class DailyStockReport(Base):
     opening_stock = Column(Numeric(10, 2), default=0.00)
     received = Column(Numeric(10, 2), default=0.00)
     used = Column(Numeric(10, 2), default=0.00)
-    returned_received = Column(Numeric(10, 2), default=0.00)  
-    returned_supplier = Column(Numeric(10, 2), default=0.00)  
+    returned_received = Column(Numeric(10, 2), default=0.00)  # rr
+    returned_supplier = Column(Numeric(10, 2), default=0.00)  # rs
     closing_stock = Column(Numeric(10, 2), default=0.00)
-    total_received = Column(Numeric(10, 2), default=0.00)  
+    total_received = Column(Numeric(10, 2), default=0.00)  # TR
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
     site = relationship("Site", back_populates="daily_reports")
     material = relationship("Material", back_populates="daily_reports")
     
-    # Unique constraint (Notice the comma at the end!)
+    # Unique constraint
     __table_args__ = (
         UniqueConstraint('site_id', 'material_id', 'report_date', name='unique_daily_report'),
     )
+    
+    def __repr__(self):
+        return f"<DailyStockReport(site={self.site_id}, material={self.material_id}, date={self.report_date})>"
 
+class AuditLog(Base):
+    """Audit Log model for tracking user activities"""
+    __tablename__ = "audit_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action = Column(String(100), nullable=False)  # CREATE, UPDATE, DELETE, LOGIN, etc.
+    table_name = Column(String(100), nullable=False)
+    record_id = Column(Integer, nullable=True)
+    old_values = Column(Text)  # JSON string of old values
+    new_values = Column(Text)  # JSON string of new values
+    ip_address = Column(String(50))
+    user_agent = Column(String(500))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="logs")
+    
+    def __repr__(self):
+        return f"<AuditLog(id={self.id}, user={self.user_id}, action={self.action})>"
 
-    # Additional models for report caching
+# Additional models for report caching
 class ReportCache(Base):
     """Report caching model"""
     __tablename__ = "report_cache"
@@ -278,7 +301,7 @@ class ReportCache(Base):
     def __repr__(self):
         return f"<ReportCache(id={self.id}, type={self.report_type})>"
 
-# 👇 ADD THIS MISSING FUNCTION AT THE VERY BOTTOM 👇
+# CLI Output helper
 def log_model_creation():
     """Log model creation for debugging"""
     logger.info("Database models initialized successfully")

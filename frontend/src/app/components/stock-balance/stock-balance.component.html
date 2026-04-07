@@ -117,7 +117,7 @@
   <div class="card shadow-sm border-0" *ngIf="viewMode === 'table'">
     <div class="card-body p-0">
       <div class="table-responsive overflow-x-auto">
-        <table mat-table [dataSource]="dataSource" matSort class="table table-hover align-middle mb-0" style="min-width: 1500px;">
+        <table mat-table [dataSource]="dataSource" matSort class="table table-hover align-middle mb-0" style="min-width: 1700px;">
           
           <ng-container matColumnDef="material">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3" style="min-width: 250px;">Material</th>
@@ -155,13 +155,27 @@
           </ng-container>
 
           <ng-container matColumnDef="total_received">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Received</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Received Qty</th>
             <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap"><span class="text-success fw-bold"><i class="fas fa-arrow-down me-1"></i> {{ balance.total_received | number:'1.2-2' }}</span></td>
           </ng-container>
 
+          <ng-container matColumnDef="received_cost">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Recv. Cost</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
+              <span class="text-success fw-bold">₹{{ getReceivedCost(balance) | number:'1.2-2' }}</span>
+            </td>
+          </ng-container>
+
           <ng-container matColumnDef="total_used">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Consumed</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Consumed Qty</th>
             <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap"><span class="text-danger fw-bold"><i class="fas fa-arrow-up me-1"></i> {{ balance.total_used | number:'1.2-2' }}</span></td>
+          </ng-container>
+
+          <ng-container matColumnDef="used_cost">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Consumed Cost</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
+              <span class="text-danger fw-bold">₹{{ getUsedCost(balance) | number:'1.2-2' }}</span>
+            </td>
           </ng-container>
 
           <ng-container matColumnDef="total_transfer_out">

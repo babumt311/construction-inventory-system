@@ -54,8 +54,8 @@ class StockCalculator:
         
         today_received = Decimal('0.00')
         today_used = Decimal('0.00')
-        today_received_value = Decimal('0.00') # NEW: Immutable Cost
-        today_used_value = Decimal('0.00')     # NEW: Immutable Cost
+        today_received_value = Decimal('0.00') 
+        today_used_value = Decimal('0.00')     
         today_return_supplier = Decimal('0.00')
         today_transfer_in = Decimal('0.00')
         today_transfer_out = Decimal('0.00')
@@ -64,7 +64,7 @@ class StockCalculator:
             safe_date = entry.entry_date.replace(tzinfo=None) if getattr(entry.entry_date, 'tzinfo', None) else entry.entry_date
             
             if today_start <= safe_date <= today_end:
-                entry_cost = entry.total_cost or Decimal('0.00') # Pull locked cost from DB
+                entry_cost = entry.total_cost or Decimal('0.00') 
                 
                 if entry.entry_type == 'received':
                     today_received += entry.quantity
@@ -86,9 +86,9 @@ class StockCalculator:
             "as_of_date": as_of_date,
             "opening_balance": opening_balance,
             "total_received": today_received, 
-            "received_value": today_received_value, # Sent to frontend
+            "received_value": today_received_value, 
             "total_used": today_used, 
-            "used_value": today_used_value,         # Sent to frontend
+            "used_value": today_used_value,         
             "total_returned_supplier": today_return_supplier,
             "total_transfer_in": today_transfer_in,
             "total_transfer_out": today_transfer_out,
@@ -99,7 +99,6 @@ class StockCalculator:
     @staticmethod
     def get_site_stock_summary(db: Session, site_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> List[Dict[str, Any]]:
         summary = []
-        # Notice we don't filter by is_active here! We want to see historical materials too.
         materials = db.query(models.Material).join(models.StockEntry).filter(
             models.StockEntry.site_id == site_id
         ).distinct().all()
@@ -236,7 +235,7 @@ class StockCalculator:
         
         return summary
 
-@staticmethod
+    @staticmethod
     def generate_daily_report(db: Session, site_id: int, report_date: date) -> List[models.DailyStockReport]:
         summary = StockCalculator.get_site_stock_summary(db, site_id, report_date, report_date)
         reports_generated = []
@@ -244,7 +243,6 @@ class StockCalculator:
         report_datetime = datetime.combine(report_date, datetime.min.time())
         
         for item in summary:
-            # Check if report already exists for this date
             existing_report = db.query(models.DailyStockReport).filter(
                 models.DailyStockReport.site_id == site_id,
                 models.DailyStockReport.material_id == item["material_id"],
@@ -258,12 +256,8 @@ class StockCalculator:
                 existing_report.returned_received = item["total_transfer_in"]
                 existing_report.returned_supplier = item["total_returned_supplier"]
                 existing_report.closing_stock = item["current_balance"]
-                
-                # --- NEW IMMUTABLE COSTS ---
                 existing_report.received_value = item["received_value"]
                 existing_report.used_value = item["used_value"]
-                # ---------------------------
-                
                 reports_generated.append(existing_report)
             else:
                 new_report = models.DailyStockReport(
@@ -277,11 +271,8 @@ class StockCalculator:
                     returned_supplier=item["total_returned_supplier"],
                     closing_stock=item["current_balance"],
                     total_received=item["total_received"],
-                    
-                    # --- NEW IMMUTABLE COSTS ---
                     received_value=item["received_value"],
                     used_value=item["used_value"]
-                    # ---------------------------
                 )
                 db.add(new_report)
                 reports_generated.append(new_report)

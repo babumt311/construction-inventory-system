@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import engine, Base, get_db, test_database_connection
 from app.models import log_model_creation
+from app.routers import tasks, team
 from app.auth import create_admin_user
 from app import crud
 from app.routers import (
@@ -95,6 +96,8 @@ app.include_router(po.router, prefix="/api")
 app.include_router(stock.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(uploads.router, prefix="/api")
+app.include_router(tasks.router)
+app.include_router(team.router)
 
 # Root endpoint
 @app.get("/")

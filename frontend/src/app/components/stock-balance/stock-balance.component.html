@@ -195,7 +195,7 @@
 
           <ng-container matColumnDef="status">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-center" style="min-width: 120px;">Actions</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 text-center"><button class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold text-nowrap" (click)="showMaterialDetails(getMaterial(balance.material_id))"><i class="fas fa-chart-line me-1"></i> History</button></td>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-center"><button class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold text-nowrap" (click)="showMaterialDetails(balance)"><i class="fas fa-chart-line me-1"></i> History</button></td>
           </ng-container>
 
           <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr><tr mat-row *matRowDef="let row; columns: displayedColumns;" class="border-bottom"></tr>
@@ -222,7 +222,7 @@
                 <div class="mt-1"><span class="badge bg-secondary rounded-pill me-1">{{ balance.category }}</span><span class="badge bg-light text-dark border rounded-pill"><i class="fas fa-map-marker-alt text-danger me-1"></i>{{ balance.site_name || 'N/A' }}</span></div>
               </div>
             </div>
-            <button class="btn btn-sm btn-light text-info rounded-circle flex-shrink-0" (click)="showMaterialDetails(getMaterial(balance.material_id))"><i class="fas fa-chart-line"></i></button>
+            <button class="btn btn-sm btn-light text-info rounded-circle flex-shrink-0" (click)="showMaterialDetails(balance)"><i class="fas fa-chart-line"></i></button>
           </div>
           
           <div class="text-center my-4">
@@ -264,16 +264,19 @@
 
 <ng-template #materialDetails>
   <div class="modal-header border-0 bg-light p-4">
-    <h5 class="modal-title fw-bold"><i class="fas fa-box text-primary me-2"></i>{{ selectedMaterial?.name }} - Stock History</h5>
+    <h5 class="modal-title fw-bold">
+      <i class="fas fa-box text-primary me-2"></i>{{ selectedMaterial?.name }}
+      <span class="text-muted fs-6 ms-2">| {{ selectedSiteName }}</span>
+    </h5>
     <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
   </div>
+  
   <div class="modal-body p-4">
     <div class="row g-4 mb-4">
       <div class="col-md-6">
         <div class="card bg-light border-0 h-100">
           <div class="card-body">
             <h6 class="fw-bold text-muted mb-3 text-uppercase">Material Information</h6>
-            <div class="mb-2"><strong class="text-dark w-50 d-inline-block">Name:</strong> {{ selectedMaterial?.name }}</div>
             <div class="mb-2"><strong class="text-dark w-50 d-inline-block">Category:</strong> <span class="badge bg-secondary rounded-pill">{{ getCategoryName(selectedMaterial?.category_id) }}</span></div>
             <div><strong class="text-dark w-50 d-inline-block">Standard Cost:</strong> ₹{{ selectedMaterial?.standard_cost | number:'1.2-2' }}</div>
           </div>
@@ -288,13 +291,59 @@
         </div>
       </div>
     </div>
+
     <div class="card border-0 shadow-sm mt-4">
       <div class="card-body p-4">
-        <h6 class="fw-bold mb-4"><i class="fas fa-calendar-alt text-primary me-2"></i>Stock History (Last 30 Days)</h6>
-        <div class="chart-container" style="position: relative; height: 300px; width: 100%;"><canvas id="materialChart"></canvas></div>
+        <h6 class="fw-bold mb-4"><i class="fas fa-history text-primary me-2"></i>Recent Transactions (Last 15)</h6>
+        
+        <div *ngIf="isLoadingHistory" class="text-center py-5">
+          <div class="spinner-border text-primary"></div>
+          <p class="text-muted mt-2">Loading history...</p>
+        </div>
+
+        <div *ngIf="!isLoadingHistory && selectedMaterialHistory.length > 0">
+          <div class="chart-container mb-4 pb-4 border-bottom" style="position: relative; height: 200px; width: 100%;">
+            <canvas id="materialChart"></canvas>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="bg-light">
+                <tr>
+                  <th class="text-muted small py-2">Date</th>
+                  <th class="text-muted small py-2">Type</th>
+                  <th class="text-muted small py-2 text-end">Qty</th>
+                  <th class="text-muted small py-2">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let entry of selectedMaterialHistory">
+                  <td><small>{{ entry.entry_date | date:'MMM d, y, h:mm a' }}</small></td>
+                  <td>
+                    <span class="badge" [ngClass]="getEntryBadge(entry.entry_type, entry.remarks)">
+                      {{ formatEntryType(entry.entry_type, entry.remarks) }}
+                    </span>
+                  </td>
+                  <td class="text-end fw-bold" [ngClass]="{'text-success': isEntryIn(entry), 'text-danger': !isEntryIn(entry)}">
+                    {{ isEntryIn(entry) ? '+' : '-' }}{{ entry.quantity | number:'1.2-2' }}
+                  </td>
+                  <td><small class="text-muted">{{ entry.remarks || '-' }}</small></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div *ngIf="!isLoadingHistory && selectedMaterialHistory.length === 0" class="text-center py-5">
+          <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+          <h5 class="fw-bold text-dark">No Recent History</h5>
+          <p class="text-muted">No transactions have been recorded for this material at this site.</p>
+        </div>
+        
       </div>
     </div>
   </div>
+  
   <div class="modal-footer border-0 bg-light p-3">
     <button type="button" class="btn btn-secondary fw-bold px-4" (click)="dialog.closeAll()">Close</button>
   </div>

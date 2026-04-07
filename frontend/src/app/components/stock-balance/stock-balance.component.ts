@@ -32,15 +32,14 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   dateRangedBalances: any[] | null = null; 
   
   selectedMaterial: Material | null = null;
-  
-  // --- NEW VARS FOR MODAL HISTORY ---
   selectedMaterialHistory: any[] = [];
   selectedSiteName: string = '';
   isLoadingHistory: boolean = false;
   
   filterForm: FormGroup;
   
-  displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier', 'updated_at', 'status'];
+  // ADDED received_cost AND used_cost TO COLUMNS
+  displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier', 'updated_at', 'status'];
   dataSource = new MatTableDataSource<any>();
   
   materialChart: Chart | null = null;
@@ -69,7 +68,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         case 'current_balance': return Number(item.current_balance || 0);
         case 'opening_balance': return Number(item.opening_balance || 0);
         case 'total_received': return Number(item.total_received || 0);
+        case 'received_cost': return this.getReceivedCost(item); // Sort by calculated cost
         case 'total_used': return Number(item.total_used || 0);
+        case 'used_cost': return this.getUsedCost(item); // Sort by calculated cost
         case 'total_transfer_out': return Number(item.total_transfer_out || 0);
         case 'total_transfer_in': return Number(item.total_transfer_in || 0);
         case 'total_returned_supplier': return Number(item.total_returned_supplier || 0);
@@ -190,6 +191,19 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }, 0);
   }
 
+  // --- NEW COST CALCULATION HELPERS ---
+  getReceivedCost(balance: any): number {
+    const material = this.getMaterial(balance.material_id);
+    const standardCost = material ? Number(material.standard_cost) : 0;
+    return Number(balance.total_received || 0) * standardCost;
+  }
+
+  getUsedCost(balance: any): number {
+    const material = this.getMaterial(balance.material_id);
+    const standardCost = material ? Number(material.standard_cost) : 0;
+    return Number(balance.total_used || 0) * standardCost;
+  }
+
   getFormattedDate(balance: any): string {
     const rawDate = balance.updated_at || balance.created_at || balance.last_updated || balance.entry_date || balance.report_date;
     if (!rawDate) return 'N/A';
@@ -207,7 +221,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   getStockStatusText(balance: any): string { return balance?.has_negative_balance ? 'Negative Stock' : (balance?.current_balance < 10 ? 'Low Stock' : 'In Stock'); }
   getCurrentStock(materialId: number | undefined): number { const balance = this.allTimeBalances.find(b => b.material_id === materialId); return balance ? balance.current_balance : 0; }
 
-  // --- NEW HISTORY MODAL LOGIC ---
   showMaterialDetails(balanceRow: any): void {
     const material = this.getMaterial(balanceRow.material_id);
     if (!material) return;
@@ -217,10 +230,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.selectedMaterialHistory = [];
     this.isLoadingHistory = true;
 
-    // Open dialog FIRST
     const dialogRef = this.dialog.open(this.materialDetailsDialog, { width: '900px', maxHeight: '90vh' });
 
-    // Only fetch and draw AFTER dialog is physically open on screen
     dialogRef.afterOpened().subscribe(() => {
       this.fetchHistoryAndDrawChart(balanceRow.material_id, balanceRow.site_id);
     });
@@ -263,7 +274,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  // --- LEDGER BADGE HELPERS ---
   isEntryIn(entry: any): boolean {
     const isOut = ['used', 'returned_supplier'].includes(entry.entry_type) || (entry.remarks && entry.remarks.includes('Transfer OUT'));
     return !isOut;
@@ -289,11 +299,21 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   exportStockReport(): void {
     if (this.dataSource.data.length === 0) { this.toastr.warning('No data to export', 'Warning'); return; }
-    const headers = ['Project', 'Site', 'Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Sent to Site', 'Received from Site', 'Returned (OUT to Supplier)', 'Date', 'Status'];
+    
+    // UPDATED HEADERS TO INCLUDE COSTS
+    const headers = ['Project', 'Site', 'Material', 'Category', 'Current Balance', 'Opening Balance', 'Received Qty', 'Received Cost', 'Used Qty', 'Used Cost', 'Sent to Site', 'Received from Site', 'Returned (OUT to Supplier)', 'Date', 'Status'];
     const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'Unknown';
+    
     const rows = this.dataSource.data.map((item: any) => {
       const dateStr = this.getFormattedDate(item);
-      return [ projectName, item.site_name || 'N/A', item.material_name, item.category, item.current_balance, item.opening_balance, item.total_received, item.total_used, item.total_transfer_out || 0, item.total_transfer_in || 0, item.total_returned_supplier || 0, dateStr, this.getStockStatusText(item) ];
+      return [ 
+        projectName, item.site_name || 'N/A', item.material_name, item.category, 
+        item.current_balance, item.opening_balance, 
+        item.total_received, this.getReceivedCost(item), // Added Recv Cost
+        item.total_used, this.getUsedCost(item),         // Added Used Cost
+        item.total_transfer_out || 0, item.total_transfer_in || 0, 
+        item.total_returned_supplier || 0, dateStr, this.getStockStatusText(item) 
+      ];
     });
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const a = document.createElement('a');

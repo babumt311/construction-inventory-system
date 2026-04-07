@@ -1,6 +1,5 @@
-<!-- Loading Spinner -->
-<div *ngIf="isLoading" class="app-loading-overlay">
-  <div class="app-loading-content">
+<div *ngIf="isLoading" class="app-loading-overlay d-flex justify-content-center align-items-center min-vh-100 w-100">
+  <div class="app-loading-content text-center">
     <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
       <span class="visually-hidden">Loading...</span>
     </div>
@@ -11,26 +10,23 @@
   </div>
 </div>
 
-<!-- App Container -->
-<div class="app-container" [class.with-layout]="showLayout" *ngIf="!isLoading">
+<div class="app-container w-100 min-vh-100 m-0 p-0" [class.with-layout]="showLayout" *ngIf="!isLoading">
   
-  <!-- Layout for authenticated users -->
-  <div *ngIf="showLayout" class="layout-wrapper">
-    <app-header></app-header>
+  <div *ngIf="showLayout" class="layout-wrapper d-flex flex-column w-100 min-vh-100 m-0 p-0">
+    <app-header class="w-100 m-0 p-0"></app-header>
     
-    <div class="main-container">
+    <div class="main-container d-flex flex-row flex-grow-1 w-100 m-0 p-0" style="overflow-x: hidden;">
       <app-sidebar></app-sidebar>
       
-      <main class="main-content">
-        <div class="container-fluid py-4">
+      <main class="main-content flex-grow-1 w-100 m-0 p-0" style="background-color: var(--gray-100); overflow-y: auto;">
+        <div class="container-fluid w-100 px-4 py-4 m-0">
           <router-outlet></router-outlet>
         </div>
       </main>
     </div>
   </div>
   
-  <!-- Full-page for login and public pages -->
-  <div *ngIf="!showLayout" class="full-page">
+  <div *ngIf="!showLayout" class="full-page w-100 min-vh-100 m-0 p-0">
     <router-outlet></router-outlet>
   </div>
 </div>

@@ -175,7 +175,11 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   updateTable(): void {
     const filters = this.filterForm.value;
-    let baseData = this.dateRangedBalances !== null ? this.dateRangedBalances : this.allTimeBalances;
+    
+    // --- NEW LOGIC: Only use date-ranged data if we are actively viewing the Table ---
+    let baseData = (this.viewMode === 'table' && this.dateRangedBalances !== null) 
+                   ? this.dateRangedBalances 
+                   : this.allTimeBalances;
 
     baseData = baseData.filter(b => {
       if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
@@ -190,23 +194,16 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
 
     this.dataSource.data = baseData;
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
+    
+    if (this.viewMode === 'table') {
+        this.dataSource.paginator = this.paginator;
+        this.dataSource.sort = this.sort;
+    }
   }
 
   get cardData() {
-    const filters = this.filterForm.value;
-    return this.allTimeBalances.filter(b => {
-      if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
-      if (filters.material_id && b.material_id !== Number(filters.material_id)) return false;
-      if (filters.show_negative_only && !b.has_negative_balance) return false;
-      
-      if (filters.category_id) {
-        const mat = this.materials.find(m => m.id === b.material_id);
-        if (!mat || mat.category_id !== Number(filters.category_id)) return false;
-      }
-      return true;
-    });
+    // The top summary cards now perfectly mirror whatever view mode you are in!
+    return this.dataSource.data;
   }
 
   getHealthyStockCount(data: any[]): number { return data.filter(b => !b.has_negative_balance && b.current_balance > 0).length; }
@@ -312,6 +309,19 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
   
   ngOnDestroy(): void { this.destroyChart('materialChart'); }
-  toggleViewMode(): void { this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; }
+  
+  toggleViewMode(): void { 
+    this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; 
+    this.updateTable(); // Re-process data array based on new mode
+
+    // Rebind table paginator properly if returning to table mode
+    if (this.viewMode === 'table') {
+      setTimeout(() => {
+        this.dataSource.paginator = this.paginator;
+        this.dataSource.sort = this.sort;
+      });
+    }
+  }
+  
   refreshData(): void { if (this.selectedProjectId) this.onProjectChange(this.selectedProjectId); }
 }

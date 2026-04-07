@@ -54,6 +54,30 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     private toastr: ToastrService
   ) {
     Chart.register(...registerables);
+    
+    // --- NEW: Custom Sorting Logic ---
+    // This tells Angular exactly which property to look at for each column,
+    // and forces number columns to be treated as actual math numbers!
+    this.dataSource.sortingDataAccessor = (item, property) => {
+      switch(property) {
+        case 'material': return (item.material_name || '').toLowerCase();
+        case 'category': return (item.category || '').toLowerCase();
+        case 'site': return (item.site_name || '').toLowerCase();
+        case 'current_balance': return Number(item.current_balance || 0);
+        case 'opening_balance': return Number(item.opening_balance || 0);
+        case 'total_received': return Number(item.total_received || 0);
+        case 'total_used': return Number(item.total_used || 0);
+        case 'total_transfer_out': return Number(item.total_transfer_out || 0);
+        case 'total_transfer_in': return Number(item.total_transfer_in || 0);
+        case 'total_returned_supplier': return Number(item.total_returned_supplier || 0);
+        case 'updated_at': 
+          const dateStr = item.updated_at || item.created_at || item.last_updated || item.entry_date || item.report_date;
+          return dateStr ? new Date(dateStr).getTime() : 0;
+        default: return item[property];
+      }
+    };
+    // ----------------------------------
+
     this.filterForm = this.fb.group({
       project_id: [''],
       site_id: [''],

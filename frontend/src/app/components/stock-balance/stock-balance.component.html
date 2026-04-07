@@ -162,7 +162,7 @@
           <ng-container matColumnDef="received_cost">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Recv. Cost</th>
             <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
-              <span class="text-success fw-bold">₹{{ getReceivedCost(balance) | number:'1.2-2' }}</span>
+              <span class="text-success fw-bold">₹{{ balance.received_value || 0 | number:'1.2-2' }}</span>
             </td>
           </ng-container>
 
@@ -174,7 +174,7 @@
           <ng-container matColumnDef="used_cost">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap">Consumed Cost</th>
             <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap">
-              <span class="text-danger fw-bold">₹{{ getUsedCost(balance) | number:'1.2-2' }}</span>
+              <span class="text-danger fw-bold">₹{{ balance.used_value || 0 | number:'1.2-2' }}</span>
             </td>
           </ng-container>
 

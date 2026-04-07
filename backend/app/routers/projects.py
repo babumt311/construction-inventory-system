@@ -2,16 +2,16 @@
 Project and Site management router
 """
 
+import json
+import os
+import uuid
 from typing import Any, List, Optional
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
-from pydantic import BaseModel
 import logging
-
 from app import schemas, crud, models
 from app.database import get_db
-from app.models import Site, Task, ProjectTeamMember
+from app.models import Site
 from app.schemas import SiteCreate, SiteInDB
 from app.dependencies import (
     get_owner_or_admin_user_dependency,
@@ -23,6 +23,24 @@ from app.dependencies import (
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 logger = logging.getLogger(__name__)
+
+# ==========================================
+# PERSISTENT DOCKER VOLUME FOR TASKS & TEAMS
+# (Survives docker compose down/up!)
+# ==========================================
+DATA_DIR = "/app/data"
+os.makedirs(DATA_DIR, exist_ok=True)
+EC2_DATA_FILE = os.path.join(DATA_DIR, "ec2_persistent_data.json")
+
+def _load_data():
+    if not os.path.exists(EC2_DATA_FILE):
+        return {"tasks": [], "team": []}
+    with open(EC2_DATA_FILE, "r") as f:
+        return json.load(f)
+
+def _save_data(data):
+    with open(EC2_DATA_FILE, "w") as f:
+        json.dump(data, f)
 
 # ==========================================
 # PROJECTS API
@@ -141,141 +159,60 @@ def delete_site(site_id: int, db: Session = Depends(get_db)):
         db.commit()
     return {"message": "Site permanently deleted"}
 
-
 # ==========================================
-# FORGIVING SCHEMAS (Prevent 422 Crashes)
-# ==========================================
-class ForgivingTeamMemberCreate(BaseModel):
-    name: Optional[str] = None
-    full_name: Optional[str] = None
-    email: str
-    role: Optional[str] = None
-    project_role: Optional[str] = None
-
-class ForgivingTaskCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    priority: Optional[str] = "Medium"
-    estimated_hours: Optional[float] = 0.0
-    due_date: Optional[Any] = None
-    status: Optional[str] = "TO DO"
-
-class ForgivingTaskUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    priority: Optional[str] = None
-    estimated_hours: Optional[float] = None
-    due_date: Optional[Any] = None
-    status: Optional[str] = None
-
-def parse_forgiving_date(date_val: Any) -> Optional[datetime]:
-    if not date_val: return None
-    try:
-        if isinstance(date_val, str):
-            if "-" in date_val and len(date_val.split("-")[0]) == 2:
-                return datetime.strptime(date_val, "%d-%m-%Y")
-            return datetime.fromisoformat(date_val.replace('Z', ''))
-        return date_val
-    except Exception:
-        return None
-
-
-# ==========================================
-# TEAM API (POSTGRES PERSISTENT)
+# TEAM API (JSON PERSISTENT)
 # ==========================================
 @router.get("/{project_id}/team")
-def get_project_team(project_id: int, db: Session = Depends(get_db)):
-    return db.query(ProjectTeamMember).filter(ProjectTeamMember.project_id == project_id).all()
+def get_project_team(project_id: str):
+    data = _load_data()
+    return [t for t in data.get("team", []) if str(t.get("project_id")) == str(project_id)]
 
 @router.post("/{project_id}/team")
-def add_team_member(project_id: int, member: ForgivingTeamMemberCreate, db: Session = Depends(get_db)):
-    project = db.query(models.Project).filter(models.Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-        
-    actual_name = member.name or member.full_name or "Unknown User"
-    actual_role = member.role or member.project_role or "Member"
-        
-    db_member = ProjectTeamMember(
-        project_id=project_id,
-        name=actual_name,
-        email=member.email,
-        role=actual_role
-    )
-    db.add(db_member)
-    db.commit()
-    db.refresh(db_member)
-    return db_member
+def add_team_member(project_id: str, member: dict):
+    data = _load_data()
+    member["id"] = str(uuid.uuid4())
+    member["project_id"] = str(project_id)
+    data["team"].append(member)
+    _save_data(data)
+    return member
 
 @router.delete("/{project_id}/team/{member_id}")
-def delete_team_member(project_id: int, member_id: int, db: Session = Depends(get_db)):
-    member = db.query(ProjectTeamMember).filter(
-        ProjectTeamMember.id == member_id, 
-        ProjectTeamMember.project_id == project_id
-    ).first()
-    if not member:
-        raise HTTPException(status_code=404, detail="Team member not found")
-    db.delete(member)
-    db.commit()
+def delete_team_member(project_id: str, member_id: str):
+    data = _load_data()
+    data["team"] = [t for t in data.get("team", []) if str(t.get("id")) != str(member_id)]
+    _save_data(data)
     return {"message": "Deleted"}
 
 # ==========================================
-# TASKS API (POSTGRES PERSISTENT)
+# TASKS API (JSON PERSISTENT)
 # ==========================================
 @router.get("/{project_id}/tasks")
-def get_project_tasks(project_id: int, db: Session = Depends(get_db)):
-    return db.query(Task).filter(Task.project_id == project_id).all()
+def get_project_tasks(project_id: str):
+    data = _load_data()
+    return [t for t in data.get("tasks", []) if str(t.get("project_id")) == str(project_id)]
 
 @router.post("/{project_id}/tasks")
-def create_project_task(project_id: int, task: ForgivingTaskCreate, db: Session = Depends(get_db)):
-    project = db.query(models.Project).filter(models.Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-        
-    parsed_date = parse_forgiving_date(task.due_date)
-
-    db_task = Task(
-        project_id=project_id,
-        title=task.title,
-        description=task.description,
-        priority=task.priority,
-        estimated_hours=task.estimated_hours,
-        due_date=parsed_date,
-        status=task.status
-    )
-    db.add(db_task)
-    db.commit()
-    db.refresh(db_task)
-    return db_task
+def create_project_task(project_id: str, task: dict):
+    data = _load_data()
+    task["id"] = str(uuid.uuid4())
+    task["project_id"] = str(project_id)
+    data["tasks"].append(task)
+    _save_data(data)
+    return task
 
 @router.put("/{project_id}/tasks/{task_id}")
-def update_project_task(project_id: int, task_id: int, task_update: ForgivingTaskUpdate, db: Session = Depends(get_db)):
-    db_task = db.query(Task).filter(
-        Task.id == task_id, 
-        Task.project_id == project_id
-    ).first()
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Task not found")
-        
-    update_data = task_update.dict(exclude_unset=True)
-    if "due_date" in update_data:
-        update_data["due_date"] = parse_forgiving_date(update_data["due_date"])
-        
-    for key, value in update_data.items():
-        setattr(db_task, key, value)
-        
-    db.commit()
-    db.refresh(db_task)
-    return db_task
+def update_project_task(project_id: str, task_id: str, task_update: dict):
+    data = _load_data()
+    for t in data["tasks"]:
+        if str(t.get("id")) == str(task_id):
+            t.update(task_update)
+            break
+    _save_data(data)
+    return {"message": "Updated"}
 
 @router.delete("/{project_id}/tasks/{task_id}")
-def delete_project_task(project_id: int, task_id: int, db: Session = Depends(get_db)):
-    task = db.query(Task).filter(
-        Task.id == task_id, 
-        Task.project_id == project_id
-    ).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    db.delete(task)
-    db.commit()
+def delete_project_task(project_id: str, task_id: str):
+    data = _load_data()
+    data["tasks"] = [t for t in data.get("tasks", []) if str(t.get("id")) != str(task_id)]
+    _save_data(data)
     return {"message": "Deleted"}

@@ -11,7 +11,10 @@ import { ReportFilter, MaterialWiseReport, SupplierWiseReport, PeriodReport } fr
 import { Project, Site } from '../../models/project.model';
 import { Category } from '../../models/material.model';
 import { ToastrService } from 'ngx-toastr';
-import * as XLSX from 'xlsx';
+
+// NEW ENTERPRISE EXCEL IMPORTS
+import * as ExcelJS from 'exceljs';
+import * as saveAs from 'file-saver';
 
 @Component({
   selector: 'app-reports',
@@ -53,6 +56,12 @@ export class ReportsComponent implements OnInit {
   // UI State
   loading = false;
   showChart = true;
+
+  // ==========================================
+  // NEW: EXPORT MODAL STATE
+  // ==========================================
+  showExportModal = false;
+  exportColumns: { key: string, label: string, selected: boolean }[] = [];
 
   constructor(
     private fb: FormBuilder,
@@ -277,7 +286,6 @@ export class ReportsComponent implements OnInit {
 
     const ctx = document.getElementById('supplierChart') as HTMLCanvasElement;
     
-    // Group by supplier
     const supplierMap = new Map<string, number>();
     data.forEach(item => {
       const current = supplierMap.get(item.supplier_name) || 0;
@@ -336,42 +344,162 @@ export class ReportsComponent implements OnInit {
     }
   }
 
-  exportToExcel(): void {
+  // ==========================================
+  // NEW: MODAL AND CUSTOM EXPORT LOGIC
+  // ==========================================
+
+  formatLabel(key: string): string {
+    return key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  }
+
+  openExportModal(): void {
+    let rawKeys: string[] = [];
+    
+    // Determine available columns based on current report
+    switch (this.currentReportType) {
+      case 'material':
+        if (this.materialReportData.length === 0) return this.toastr.warning('No data to export');
+        rawKeys = Object.keys(this.materialReportData[0]);
+        break;
+      case 'supplier':
+        if (this.supplierReportData.length === 0) return this.toastr.warning('No data to export');
+        rawKeys = Object.keys(this.supplierReportData[0]);
+        break;
+      case 'period':
+        if (this.periodReportData.length === 0) return this.toastr.warning('No data to export');
+        rawKeys = Object.keys(this.periodReportData[0]);
+        break;
+      case 'custom':
+        if (this.customReportData.length === 0) return this.toastr.warning('No data to export');
+        rawKeys = Object.keys(this.customReportData[0]);
+        break;
+    }
+
+    // Build the column config for the modal
+    this.exportColumns = rawKeys.map(key => ({
+      key: key,
+      label: this.formatLabel(key),
+      selected: true // By default, select all
+    }));
+
+    this.showExportModal = true;
+  }
+
+  closeExportModal(): void {
+    this.showExportModal = false;
+  }
+
+  moveColumn(index: number, direction: number): void {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= this.exportColumns.length) return;
+    
+    const temp = this.exportColumns[index];
+    this.exportColumns[index] = this.exportColumns[newIndex];
+    this.exportColumns[newIndex] = temp;
+  }
+
+  async confirmAndExport(): Promise<void> {
+    const selectedCols = this.exportColumns.filter(c => c.selected);
+    
+    if (selectedCols.length === 0) {
+      this.toastr.warning('You must select at least one column to export.');
+      return;
+    }
+
     let data: any[] = [];
+    let title = '';
     let filename = '';
     
     switch (this.currentReportType) {
       case 'material':
         data = this.materialReportData;
+        title = 'Material Stock Report';
         filename = 'material_wise_report';
         break;
       case 'supplier':
         data = this.supplierReportData;
+        title = 'Supplier Purchases Report';
         filename = 'supplier_wise_report';
         break;
       case 'period':
         data = this.periodReportData;
+        title = 'Period Stock Balance Report';
         filename = 'period_report';
         break;
       case 'custom':
         data = this.customReportData;
+        title = 'Custom Stock Report';
         filename = 'custom_report';
         break;
     }
 
-    if (data.length === 0) {
-      this.toastr.warning('No data to export');
-      return;
-    }
+    // Create ExcelJS Workbook
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Report Data');
 
-    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data);
-    const wb: XLSX.WorkBook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Report');
-    
+    // Add a Main Title Row
+    worksheet.mergeCells(`A1:${String.fromCharCode(64 + selectedCols.length)}1`);
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = `Enterprise System: ${title}`;
+    titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }; // Dark Blue
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getRow(1).height = 30;
+
+    // Add Subtitle (Date)
     const dateStr = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `${filename}_${dateStr}.xlsx`);
-    
-    this.toastr.success('Report exported successfully');
+    worksheet.mergeCells(`A2:${String.fromCharCode(64 + selectedCols.length)}2`);
+    const dateCell = worksheet.getCell('A2');
+    dateCell.value = `Generated on: ${new Date().toLocaleString()}`;
+    dateCell.font = { name: 'Arial', size: 10, italic: true };
+    dateCell.alignment = { horizontal: 'right' };
+
+    // Spacer Row
+    worksheet.addRow([]);
+
+    // Add Headers
+    const headerRow = worksheet.addRow(selectedCols.map(c => c.label));
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } }; // Light Blue
+      cell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    });
+
+    // Add Data
+    data.forEach((item, index) => {
+      const rowData = selectedCols.map(c => item[c.key]);
+      const row = worksheet.addRow(rowData);
+      
+      // Alternating row colors for readability
+      if (index % 2 === 0) {
+        row.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+        });
+      }
+    });
+
+    // Adjust Column Widths
+    worksheet.columns.forEach(column => {
+      column.width = 22;
+    });
+
+    // Generate Excel File
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `${filename}_${dateStr}.xlsx`);
+
+    this.toastr.success('Enterprise Report generated successfully!');
+    this.closeExportModal();
+  }
+
+  // NOTE: You must update your 'Export' button in reports.component.html 
+  // to call openExportModal() instead of exportToExcel()
+  exportToExcel(): void {
+    this.openExportModal();
   }
 
   exportFromBackend(): void {

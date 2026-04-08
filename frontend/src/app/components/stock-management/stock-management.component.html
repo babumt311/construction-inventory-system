@@ -1,263 +1,168 @@
-<div class="container-fluid p-4">
-  
-  <div class="mb-4">
-    <h2 class="fw-bold"><i class="fas fa-boxes text-primary me-2"></i>Inventory Control Center</h2>
-    <p class="text-muted">Manage your daily transactions, categories, and material master list in one place.</p>
-  </div>
+<div *ngIf="activeTab === 'stock'" class="animate__animated animate__fadeIn">
+    
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-light py-3 border-bottom-0">
+        <h5 class="fw-bold mb-0 text-success"><i class="fas fa-plus-circle me-2"></i>Record Transaction</h5>
+      </div>
+      <div class="card-body p-4 pt-3">
+        <form [formGroup]="stockForm" (ngSubmit)="submitStock()">
+          
+          <div class="row g-3 mb-4 bg-light p-3 rounded">
+            <h6 class="fw-bold text-primary mb-2 border-bottom pb-2">Common Transaction Details</h6>
+            <div class="col-md-3">
+              <label class="form-label fw-bold small text-muted">Project *</label>
+              <select class="form-select" formControlName="project_id" (change)="onProjectChange($any($event.target).value)" [class.is-invalid]="stockForm.get('project_id')?.invalid && stockForm.get('project_id')?.touched">
+                <option value="">Select Project</option>
+                <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
+              </select>
+            </div>
 
-  <ul class="nav nav-tabs mb-4 border-bottom-2">
-    <li class="nav-item">
-      <a class="nav-link fw-bold px-4 py-3" [class.active]="activeTab === 'stock'" (click)="switchTab('stock')" style="cursor: pointer; font-size: 1.1rem;">
-        <i class="fas fa-exchange-alt me-2" [class.text-primary]="activeTab === 'stock'"></i> Stock Entry
-      </a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link fw-bold px-4 py-3" [class.active]="activeTab === 'category'" (click)="switchTab('category')" style="cursor: pointer; font-size: 1.1rem;">
-        <i class="fas fa-tags me-2" [class.text-primary]="activeTab === 'category'"></i> Categories
-      </a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link fw-bold px-4 py-3" [class.active]="activeTab === 'material'" (click)="switchTab('material')" style="cursor: pointer; font-size: 1.1rem;">
-        <i class="fas fa-box-open me-2" [class.text-primary]="activeTab === 'material'"></i> Materials Master
-      </a>
-    </li>
-  </ul>
+            <div class="col-md-3">
+              <label class="form-label fw-bold small text-muted">Transaction Type *</label>
+              <select class="form-select border-primary bg-white" formControlName="entry_type">
+                <option value="received">Received (Delivery IN)</option>
+                <option value="used">Used (Consumed OUT)</option>
+                <option value="returned_supplier">Returned to Supplier (OUT)</option>
+                <option value="transfer">Site-to-Site Transfer</option>
+              </select>
+            </div>
 
-  <div *ngIf="activeTab === 'stock'" class="row g-4 animate__animated animate__fadeIn">
-    <div class="col-lg-4">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-header bg-light py-3 border-bottom-0"><h5 class="fw-bold mb-0 text-success"><i class="fas fa-plus-circle me-2"></i>Record Transaction</h5></div>
-        <div class="card-body p-4 pt-3">
-          <form [formGroup]="stockForm" (ngSubmit)="submitStock()">
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label fw-bold small text-muted">Project *</label>
-                <select class="form-select" formControlName="project_id" (change)="onProjectChange($any($event.target).value)" [class.is-invalid]="stockForm.get('project_id')?.invalid && stockForm.get('project_id')?.touched">
-                  <option value="">Select Project</option>
-                  <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
-                </select>
-              </div>
+            <div class="col-md-3" *ngIf="stockForm.get('entry_type')?.value !== 'transfer'">
+              <label class="form-label fw-bold small text-muted">Site *</label>
+              <select class="form-select" formControlName="site_id" (change)="onSiteChange($any($event.target).value)" [class.is-invalid]="stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched">
+                <option value="">Select Site</option>
+                <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
+              </select>
+            </div>
 
-              <div class="col-12" *ngIf="stockForm.get('entry_type')?.value !== 'transfer'">
-                <label class="form-label fw-bold small text-muted">Site *</label>
-                <select class="form-select" formControlName="site_id" (change)="onSiteChange($any($event.target).value)" [class.is-invalid]="stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched">
-                  <option value="">Select Site</option>
+            <ng-container *ngIf="stockForm.get('entry_type')?.value === 'transfer'">
+              <div class="col-md-3">
+                <label class="form-label fw-bold small text-muted text-danger">From Site *</label>
+                <select class="form-select border-danger" formControlName="from_site_id" [class.is-invalid]="stockForm.get('from_site_id')?.invalid && stockForm.get('from_site_id')?.touched">
+                  <option value="">Select Origin</option>
                   <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
                 </select>
               </div>
+              <div class="col-md-3">
+                <label class="form-label fw-bold small text-muted text-success">To Site *</label>
+                <select class="form-select border-success" formControlName="to_site_id" (change)="onSiteChange($any($event.target).value)" [class.is-invalid]="stockForm.get('to_site_id')?.invalid && stockForm.get('to_site_id')?.touched">
+                  <option value="">Select Destination</option>
+                  <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
+                </select>
+              </div>
+            </ng-container>
 
-              <ng-container *ngIf="stockForm.get('entry_type')?.value === 'transfer'">
-                <div class="col-md-6">
-                  <label class="form-label fw-bold small text-muted text-danger">From Site *</label>
-                  <select class="form-select border-danger" formControlName="from_site_id" [class.is-invalid]="stockForm.get('from_site_id')?.invalid && stockForm.get('from_site_id')?.touched">
-                    <option value="">Select Origin</option>
-                    <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label fw-bold small text-muted text-success">To Site *</label>
-                  <select class="form-select border-success" formControlName="to_site_id" (change)="onSiteChange($any($event.target).value)" [class.is-invalid]="stockForm.get('to_site_id')?.invalid && stockForm.get('to_site_id')?.touched">
-                    <option value="">Select Destination</option>
-                    <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
-                  </select>
-                </div>
-              </ng-container>
+            <div class="col-md-3">
+              <label class="form-label fw-bold small text-muted">Invoice / Ref No *</label>
+              <input type="text" class="form-control" formControlName="invoice_no" [class.is-invalid]="stockForm.get('invoice_no')?.invalid && stockForm.get('invoice_no')?.touched">
+            </div>
 
-              <div class="col-12">
-                <label class="form-label fw-bold small text-muted">Category Filter (Optional)</label>
-                <select class="form-select" formControlName="category_filter" (change)="onCategoryFilterChange($any($event.target).value)">
-                  <option value="">All Categories</option>
+            <div class="col-md-12">
+              <label class="form-label fw-bold small text-muted">Remarks</label>
+              <input type="text" class="form-control" formControlName="remarks" placeholder="General remarks for all items">
+            </div>
+          </div>
+
+          <div formArrayName="items">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+              <h6 class="fw-bold text-primary mb-0">Materials List</h6>
+              <button type="button" class="btn btn-sm btn-outline-primary" (click)="addItem()">
+                <i class="fas fa-plus me-1"></i> Add Another Material
+              </button>
+            </div>
+
+            <div *ngFor="let item of items.controls; let i=index" [formGroupName]="i" class="row g-2 mb-3 align-items-end border p-2 rounded position-relative">
+              
+              <button type="button" class="btn btn-sm btn-danger position-absolute" style="width:30px; height:30px; top:-10px; right:-10px; border-radius:50%; z-index:10;" (click)="removeItem(i)">
+                <i class="fas fa-times"></i>
+              </button>
+
+              <div class="col-md-2">
+                <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Category Filter</label>
+                <select class="form-select form-select-sm" formControlName="category_id">
+                  <option value="">All</option>
                   <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
                 </select>
               </div>
-              <div class="col-12">
-                <label class="form-label fw-bold small text-muted">Material *</label>
-                <select class="form-select" formControlName="material_id" (change)="onMaterialChange($any($event.target).value)" [class.is-invalid]="stockForm.get('material_id')?.invalid && stockForm.get('material_id')?.touched">
+
+              <div class="col-md-3">
+                <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Material *</label>
+                <select class="form-select form-select-sm" formControlName="material_id" [class.is-invalid]="item.get('material_id')?.invalid && item.get('material_id')?.touched">
                   <option value="">Select Material</option>
-                  <option *ngFor="let m of filteredMaterialsForStock" [value]="m.id">{{ m.name }}</option>
+                  <option *ngFor="let m of getFilteredMaterials(item.get('category_id')?.value)" [value]="m.id">{{ m.name }}</option>
                 </select>
               </div>
-              <div class="col-12">
-                <label class="form-label fw-bold small text-muted">Transaction Type *</label>
-                <select class="form-select border-primary bg-light" formControlName="entry_type">
-                  <option value="received">Received (Delivery IN)</option>
-                  <option value="used">Used (Consumed OUT)</option>
-                  <option value="returned_supplier">Returned to Supplier (OUT)</option>
-                  <option value="transfer">Site-to-Site Transfer</option>
-                </select>
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-bold small text-muted">Quantity *</label>
-                <input type="number" class="form-control" formControlName="quantity" min="0.01" step="0.01" [class.is-invalid]="stockForm.get('quantity')?.invalid && stockForm.get('quantity')?.touched">
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-bold small text-muted">Reference / Invoice # (Optional)</label>
-                <input type="text" class="form-control" formControlName="reference_no">
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-bold small text-muted">Remarks</label>
-                <textarea class="form-control" formControlName="remarks" rows="2"></textarea>
-              </div>
-              <div class="col-12 mt-4">
-                <button type="submit" class="btn btn-success fw-bold w-100 py-2" [disabled]="submittingStock || stockForm.invalid">
-                  <span *ngIf="!submittingStock"><i class="fas fa-save me-2"></i>Record Transaction</span>
-                  <span *ngIf="submittingStock"><i class="fas fa-spinner fa-spin me-2"></i>Saving...</span>
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
 
-    <div class="col-lg-8">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-header bg-white py-3 pt-4 border-bottom-0 d-flex justify-content-between align-items-center">
-          <h5 class="fw-bold mb-0"><i class="fas fa-history text-primary me-2"></i>Recent Transactions Ledger</h5>
-          <button class="btn btn-sm btn-outline-secondary" (click)="loadStockEntries()" *ngIf="selectedSiteId" [disabled]="loadingStockEntries">
-            <i class="fas fa-sync-alt" [class.fa-spin]="loadingStockEntries"></i> Refresh
-          </button>
-        </div>
-        <div class="card-body p-0">
-          <div class="text-center py-5 my-5" *ngIf="!selectedSiteId">
-            <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
-            <h4 class="fw-bold text-dark">No Site Selected</h4>
-            <p class="text-muted">Select a Project and Site to view transaction history.</p>
-          </div>
-          <div class="text-center py-5 my-5" *ngIf="loadingStockEntries">
-            <div class="spinner-border text-primary"></div>
-          </div>
-          <div class="table-responsive" [hidden]="!selectedSiteId || loadingStockEntries">
-            <table mat-table [dataSource]="stockDataSource" #stockSort="matSort" matSort class="table table-hover align-middle mb-0">
-              <ng-container matColumnDef="entry_date"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Date</th><td mat-cell *matCellDef="let element" class="px-3 text-muted"><small>{{ element.entry_date | date:'MMM d, y, h:mm a' }}</small></td></ng-container>
-              <ng-container matColumnDef="material_name"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Material</th><td mat-cell *matCellDef="let element" class="px-3 fw-bold">{{ element.material_name }}<small class="d-block text-muted" *ngIf="element.remarks">{{ element.remarks }}</small></td></ng-container>
-              <ng-container matColumnDef="entry_type">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Type</th>
-                <td mat-cell *matCellDef="let element" class="px-3">
-                  <span class="badge" [ngClass]="getEntryBadge(element.entry_type, element.remarks)">
-                    {{ formatEntryType(element.entry_type, element.remarks) }}
-                  </span>
-                </td>
-              </ng-container>
-              <ng-container matColumnDef="quantity"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Qty</th><td mat-cell *matCellDef="let element" class="px-3 fw-bold">{{ element.quantity }}</td></ng-container>
-              <ng-container matColumnDef="reference_no"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted px-3">Ref</th><td mat-cell *matCellDef="let element" class="px-3 text-muted">{{ element.reference_no || '-' }}</td></ng-container>
-              <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted text-end px-3">Act</th><td mat-cell *matCellDef="let element" class="text-end px-3"><button class="btn btn-sm text-danger" (click)="deleteStockEntry(element.id)"><i class="fas fa-trash-alt"></i></button></td></ng-container>
-              <tr mat-header-row *matHeaderRowDef="stockColumns"></tr><tr mat-row *matRowDef="let row; columns: stockColumns;" class="border-bottom"></tr>
-            </table>
-            <div class="text-center py-4" *ngIf="stockDataSource.data.length === 0 && selectedSiteId">No transactions yet.</div>
-          </div>
-          <mat-paginator #stockPaginator [pageSizeOptions]="[10, 25]" showFirstLastButtons class="border-top" [hidden]="!selectedSiteId || stockDataSource.data.length === 0"></mat-paginator>
-        </div>
-      </div>
-    </div>
-  </div>
+              <div class="col-md-1">
+                <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Qty *</label>
+                <input type="number" class="form-control form-control-sm" formControlName="quantity" min="0.01" step="0.01">
+              </div>
 
-  <div *ngIf="activeTab === 'category'" class="row g-4 animate__animated animate__fadeIn">
-    <div class="col-lg-4">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-header bg-light py-3 border-bottom-0"><h5 class="fw-bold mb-0 text-primary"><i class="fas" [class.fa-plus-circle]="!isEditingCategory" [class.fa-edit]="isEditingCategory"></i> {{ isEditingCategory ? 'Edit Category' : 'Create Category' }}</h5></div>
-        <div class="card-body p-4 pt-3">
-          <form [formGroup]="categoryForm" (ngSubmit)="submitCategory()">
-            <div class="mb-3">
-              <label class="form-label fw-bold small text-muted">Category Name *</label>
-              <input type="text" class="form-control" formControlName="name" [class.is-invalid]="categoryForm.get('name')?.invalid && categoryForm.get('name')?.touched">
-            </div>
-            <div class="mb-4">
-              <label class="form-label fw-bold small text-muted">Description</label>
-              <textarea class="form-control" formControlName="description" rows="3"></textarea>
-            </div>
-            <div class="d-flex gap-2">
-              <button type="button" class="btn btn-outline-secondary w-50 fw-bold" *ngIf="isEditingCategory" (click)="resetCategoryForm()">Cancel</button>
-              <button type="submit" class="btn btn-primary fw-bold" [ngClass]="isEditingCategory ? 'w-50' : 'w-100'" [disabled]="submittingCategory || categoryForm.invalid">
-                <i class="fas fa-save me-2"></i>{{ isEditingCategory ? 'Update' : 'Save' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-8">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table mat-table [dataSource]="categoryDataSource" #categorySort="matSort" matSort class="table table-hover align-middle mb-0">
-              <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-4 py-3">Category Name</th><td mat-cell *matCellDef="let element" class="px-4 fw-bold text-dark">{{ element.name }}</td></ng-container>
-              <ng-container matColumnDef="description"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted px-4 py-3">Description</th><td mat-cell *matCellDef="let element" class="px-4 text-muted">{{ element.description || '-' }}</td></ng-container>
-              <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted px-4 py-3 text-end">Actions</th><td mat-cell *matCellDef="let element" class="px-4 text-end">
-                <button class="btn btn-sm btn-light text-primary me-2" (click)="editCategory(element)"><i class="fas fa-edit"></i></button>
-                <button class="btn btn-sm btn-light text-danger" (click)="deleteCategory(element.id)"><i class="fas fa-trash-alt"></i></button>
-              </td></ng-container>
-              <tr mat-header-row *matHeaderRowDef="categoryColumns"></tr><tr mat-row *matRowDef="let row; columns: categoryColumns;" class="border-bottom"></tr>
-            </table>
-          </div>
-          <mat-paginator #categoryPaginator [pageSizeOptions]="[10, 25]" showFirstLastButtons class="border-top"></mat-paginator>
-        </div>
-      </div>
-    </div>
-  </div>
+              <div class="col-md-2">
+                <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Price/Unit</label>
+                <input type="number" class="form-control form-control-sm" formControlName="unit_price" min="0" step="0.01">
+              </div>
 
-  <div *ngIf="activeTab === 'material'" class="animate__animated animate__fadeIn">
-    <div class="card shadow-sm border-0 mb-4 bg-light">
-      <div class="card-header bg-white py-3 border-bottom-0"><h5 class="fw-bold mb-0 text-primary"><i class="fas" [class.fa-plus-circle]="!isEditingMaterial" [class.fa-edit]="isEditingMaterial"></i> {{ isEditingMaterial ? 'Edit Material' : 'Add New Material' }}</h5></div>
-      <div class="card-body p-4">
-        <form [formGroup]="materialForm" (ngSubmit)="submitMaterial()">
-          <div class="row g-3">
-            <div class="col-md-3">
-              <label class="form-label fw-bold small text-muted">Material Name *</label>
-              <input type="text" class="form-control" formControlName="name" [class.is-invalid]="materialForm.get('name')?.invalid && materialForm.get('name')?.touched">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-bold small text-muted">Category *</label>
-              <select class="form-select" formControlName="category_id" [class.is-invalid]="materialForm.get('category_id')?.invalid && materialForm.get('category_id')?.touched">
-                <option value="">Select Category</option>
-                <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
-              </select>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold small text-muted">Unit</label>
-              <select class="form-select" formControlName="unit">
-                <option value="Bags">Bags</option><option value="Kgs">Kgs</option><option value="Tons">Tons</option>
-                <option value="Liters">Liters</option><option value="Pieces">Pieces</option><option value="Meters">Meters</option>
-              </select>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-bold small text-muted">Standard Cost (₹)</label>
-              <input type="number" class="form-control" formControlName="standard_cost" step="0.01">
-            </div>
-            <div class="col-md-2 d-flex align-items-end gap-2">
-              <button type="button" class="btn btn-outline-secondary w-100 fw-bold" *ngIf="isEditingMaterial" (click)="resetMaterialForm()">Cancel</button>
-              <button type="submit" class="btn btn-primary w-100 fw-bold" [disabled]="submittingMaterial || materialForm.invalid">
-                {{ isEditingMaterial ? 'Update' : 'Save' }}
-              </button>
+              <div class="col-md-1">
+                <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Tax %</label>
+                <input type="number" class="form-control form-control-sm" formControlName="tax_percent" min="0" step="1">
+              </div>
+
+              <div class="col-md-1">
+                <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Tax Amt</label>
+                <input type="text" class="form-control form-control-sm bg-light" formControlName="tax_amount">
+              </div>
+
+              <div class="col-md-2">
+                <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Total Cost</label>
+                <input type="text" class="form-control form-control-sm bg-light fw-bold text-success" formControlName="total_cost">
+              </div>
+
             </div>
           </div>
+
+          <div class="col-12 mt-4 text-end">
+            <button type="submit" class="btn btn-success fw-bold px-5 py-2" [disabled]="submittingStock || stockForm.invalid">
+              <span *ngIf="!submittingStock"><i class="fas fa-save me-2"></i>Save All Materials</span>
+              <span *ngIf="submittingStock"><i class="fas fa-spinner fa-spin me-2"></i>Saving...</span>
+            </button>
+          </div>
+
         </form>
       </div>
     </div>
 
     <div class="card shadow-sm border-0">
+      <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+        <h5 class="fw-bold mb-0"><i class="fas fa-history text-primary me-2"></i>Recent Transactions Ledger</h5>
+        <button class="btn btn-sm btn-outline-secondary" (click)="loadStockEntries()" *ngIf="selectedSiteId" [disabled]="loadingStockEntries">
+          <i class="fas fa-sync-alt" [class.fa-spin]="loadingStockEntries"></i> Refresh
+        </button>
+      </div>
       <div class="card-body p-0">
-        <div class="p-3 bg-light border-bottom">
-          <div class="input-group w-50">
-            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
-            <input type="text" class="form-control border-start-0 ps-0" placeholder="Search materials..." [(ngModel)]="materialSearchTerm" (input)="applyMaterialSearch()">
-          </div>
+        <div class="text-center py-5 my-5" *ngIf="!selectedSiteId">
+          <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
+          <h4 class="fw-bold text-dark">No Site Selected</h4>
+          <p class="text-muted">Select a Project and Site above to view transaction history.</p>
         </div>
-        <div class="table-responsive">
-          <table mat-table [dataSource]="materialDataSource" #materialSort="matSort" matSort class="table table-hover align-middle mb-0">
-            <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-4 py-3">Material Name</th><td mat-cell *matCellDef="let element" class="px-4 fw-bold">{{ element.name }}</td></ng-container>
-            <ng-container matColumnDef="category"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-4 py-3">Category</th><td mat-cell *matCellDef="let element" class="px-4"><span class="badge bg-secondary">{{ getCategoryName(element.category_id) }}</span></td></ng-container>
-            <ng-container matColumnDef="unit"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted px-4 py-3">Unit</th><td mat-cell *matCellDef="let element" class="px-4">{{ element.unit }}</td></ng-container>
-            <ng-container matColumnDef="standard_cost"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-4 py-3">Std Cost</th><td mat-cell *matCellDef="let element" class="px-4 text-success fw-bold">₹{{ element.standard_cost }}</td></ng-container>
-            <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted px-4 py-3 text-end">Actions</th><td mat-cell *matCellDef="let element" class="px-4 text-end">
-              <button class="btn btn-sm btn-light text-primary me-2" (click)="editMaterial(element)"><i class="fas fa-edit"></i></button>
-              <button class="btn btn-sm btn-light text-danger" (click)="deleteMaterial(element.id)"><i class="fas fa-trash-alt"></i></button>
-            </td></ng-container>
-            <tr mat-header-row *matHeaderRowDef="materialColumns"></tr><tr mat-row *matRowDef="let row; columns: materialColumns;" class="border-bottom"></tr>
+        
+        <div class="table-responsive" [hidden]="!selectedSiteId || loadingStockEntries">
+          <table mat-table [dataSource]="stockDataSource" #stockSort="matSort" matSort class="table table-hover align-middle mb-0">
+            <ng-container matColumnDef="entry_date"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Date</th><td mat-cell *matCellDef="let element" class="px-3 text-muted"><small>{{ element.entry_date | date:'MMM d, y, h:mm a' }}</small></td></ng-container>
+            <ng-container matColumnDef="material_name"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Material</th><td mat-cell *matCellDef="let element" class="px-3 fw-bold">{{ element.material_name }}</td></ng-container>
+            <ng-container matColumnDef="entry_type">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Type</th>
+              <td mat-cell *matCellDef="let element" class="px-3">
+                <span class="badge bg-secondary">{{ element.entry_type }}</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="quantity"><th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-3">Qty</th><td mat-cell *matCellDef="let element" class="px-3 fw-bold">{{ element.quantity }}</td></ng-container>
+            <ng-container matColumnDef="reference_no"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted px-3">Ref</th><td mat-cell *matCellDef="let element" class="px-3 text-muted">{{ element.reference_no || '-' }}</td></ng-container>
+            <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted text-end px-3">Act</th><td mat-cell *matCellDef="let element" class="text-end px-3"><button class="btn btn-sm text-danger" (click)="deleteStockEntry(element.id)"><i class="fas fa-trash-alt"></i></button></td></ng-container>
+            <tr mat-header-row *matHeaderRowDef="stockColumns"></tr><tr mat-row *matRowDef="let row; columns: stockColumns;" class="border-bottom"></tr>
           </table>
         </div>
-        <mat-paginator #materialPaginator [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons class="border-top"></mat-paginator>
+        <mat-paginator #stockPaginator [pageSizeOptions]="[10, 25]" showFirstLastButtons class="border-top" [hidden]="!selectedSiteId || stockDataSource.data.length === 0"></mat-paginator>
       </div>
     </div>
   </div>
-</div>

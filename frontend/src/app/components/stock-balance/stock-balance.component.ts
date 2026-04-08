@@ -13,6 +13,10 @@ import { MaterialService } from '../../services/material.service';
 import { Project, Site } from '../../models/project.model';
 import { Material } from '../../models/material.model';
 
+// ENTERPRISE EXCEL IMPORTS
+import * as ExcelJS from 'exceljs';
+import * as saveAs from 'file-saver';
+
 @Component({
   selector: 'app-stock-balance',
   templateUrl: './stock-balance.component.html'
@@ -48,6 +52,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   private prevStart: string = '';
   private prevEnd: string = '';
+
+  // ==========================================
+  // EXPORT MODAL STATE
+  // ==========================================
+  showExportModal = false;
+  exportColumns: { key: string, label: string, selected: boolean }[] = [];
 
   constructor(
     private fb: FormBuilder,
@@ -284,29 +294,130 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }
   }
 
-  exportStockReport(): void {
-    if (this.dataSource.data.length === 0) { this.toastr.warning('No data to export', 'Warning'); return; }
+  // ==========================================
+  // NEW CUSTOM EXPORT & MODAL LOGIC
+  // ==========================================
+  openExportModal(): void {
+    if (this.dataSource.data.length === 0) {
+      this.toastr.warning('No data to export', 'Warning');
+      return;
+    }
+
+    // Build the column config matching your table headers exactly
+    this.exportColumns = [
+      { key: 'project', label: 'Project', selected: true },
+      { key: 'site_name', label: 'Site', selected: true },
+      { key: 'material_name', label: 'Material', selected: true },
+      { key: 'category', label: 'Category', selected: true },
+      { key: 'current_balance', label: 'Current Balance', selected: true },
+      { key: 'opening_balance', label: 'Opening Balance', selected: true },
+      { key: 'total_received', label: 'Received Qty', selected: true },
+      { key: 'received_value', label: 'Received Cost', selected: true },
+      { key: 'total_used', label: 'Consumed Qty', selected: true },
+      { key: 'used_value', label: 'Consumed Cost', selected: true },
+      { key: 'total_transfer_out', label: 'Sent to Site', selected: true },
+      { key: 'total_transfer_in', label: 'Received from Site', selected: true },
+      { key: 'total_returned_supplier', label: 'Ret. (Supplier)', selected: true },
+      { key: 'dateStr', label: 'Date', selected: true },
+      { key: 'status', label: 'Status', selected: true }
+    ];
+
+    this.showExportModal = true;
+  }
+
+  closeExportModal(): void {
+    this.showExportModal = false;
+  }
+
+  moveColumn(index: number, direction: number): void {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= this.exportColumns.length) return;
+    const temp = this.exportColumns[index];
+    this.exportColumns[index] = this.exportColumns[newIndex];
+    this.exportColumns[newIndex] = temp;
+  }
+
+  async confirmAndExport(): Promise<void> {
+    const selectedCols = this.exportColumns.filter(c => c.selected);
     
-    const headers = ['Project', 'Site', 'Material', 'Category', 'Current Balance', 'Opening Balance', 'Received Qty', 'Received Cost', 'Used Qty', 'Used Cost', 'Sent to Site', 'Received from Site', 'Returned (OUT to Supplier)', 'Date', 'Status'];
-    const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'Unknown';
-    
-    const rows = this.dataSource.data.map((item: any) => {
-      const dateStr = this.getFormattedDate(item);
-      return [ 
-        projectName, item.site_name || 'N/A', item.material_name, item.category, 
-        item.current_balance, item.opening_balance, 
-        item.total_received, item.received_value || 0, // Using Immutable DB value
-        item.total_used, item.used_value || 0,         // Using Immutable DB value
-        item.total_transfer_out || 0, item.total_transfer_in || 0, 
-        item.total_returned_supplier || 0, dateStr, this.getStockStatusText(item) 
-      ];
+    if (selectedCols.length === 0) {
+      this.toastr.warning('You must select at least one column to export.');
+      return;
+    }
+
+    // Pre-process the raw data to match the dynamic fields
+    const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'All Projects';
+    const data = this.dataSource.data.map(item => {
+      return {
+        ...item,
+        project: projectName,
+        site_name: item.site_name || 'N/A',
+        received_value: item.received_value || 0,
+        used_value: item.used_value || 0,
+        total_transfer_out: item.total_transfer_out || 0,
+        total_transfer_in: item.total_transfer_in || 0,
+        total_returned_supplier: item.total_returned_supplier || 0,
+        dateStr: this.getFormattedDate(item),
+        status: this.getStockStatusText(item)
+      };
     });
-    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const a = document.createElement('a');
-    a.href = window.URL.createObjectURL(new Blob([csvContent], { type: 'text/csv' }));
-    a.download = `stock-balance-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    this.toastr.success('Stock report exported', 'Success');
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Stock Balance');
+
+    // Title Row
+    worksheet.mergeCells(`A1:${String.fromCharCode(64 + selectedCols.length)}1`);
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = `Enterprise System: Stock Balance Report`;
+    titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }; 
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getRow(1).height = 30;
+
+    // Date Subtitle
+    const dateStr = new Date().toISOString().split('T')[0];
+    worksheet.mergeCells(`A2:${String.fromCharCode(64 + selectedCols.length)}2`);
+    const dateCell = worksheet.getCell('A2');
+    dateCell.value = `Generated on: ${new Date().toLocaleString()}`;
+    dateCell.font = { name: 'Arial', size: 10, italic: true };
+    dateCell.alignment = { horizontal: 'right' };
+
+    worksheet.addRow([]);
+
+    // Headers
+    const headerRow = worksheet.addRow(selectedCols.map(c => c.label));
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } }; 
+      cell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    });
+
+    // Data Mapping
+    data.forEach((item, index) => {
+      const rowData = selectedCols.map(c => item[c.key]);
+      const row = worksheet.addRow(rowData);
+      
+      // Alternating row styling
+      if (index % 2 === 0) {
+        row.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+        });
+      }
+    });
+
+    // Column Sizing
+    worksheet.columns.forEach(column => {
+      column.width = 22;
+    });
+
+    // Save File
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `stock-balance-${dateStr}.xlsx`);
+
+    this.toastr.success('Enterprise Report generated successfully!');
+    this.closeExportModal();
   }
 
   destroyChart(chartId: string): void {

@@ -1,0 +1,180 @@
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1 fw-bold text-dark"><i class="fas fa-cubes me-2 text-primary"></i>Bulk Stock Entry</h2>
+      <p class="text-muted mb-0">Record multiple materials against a single invoice and site.</p>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 rounded-3 mb-4">
+    <div class="card-header bg-white border-bottom py-3">
+      <h5 class="mb-0 fw-bold text-success"><i class="fas fa-plus-circle me-2"></i>Record Transaction</h5>
+    </div>
+    <div class="card-body p-4">
+      <form [formGroup]="stockForm">
+        
+        <div class="row g-4 mb-4 pb-4 border-bottom">
+          <div class="col-md-3">
+            <label class="form-label small fw-bold">Project *</label>
+            <select class="form-select bg-light" formControlName="project_id">
+              <option value="">Select Project</option>
+              <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
+            </select>
+          </div>
+          
+          <div class="col-md-3">
+            <label class="form-label small fw-bold">Site (From) *</label>
+            <select class="form-select bg-light" formControlName="site_id">
+              <option value="">Select Site</option>
+              <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label small fw-bold">Transaction Type *</label>
+            <select class="form-select bg-light border-primary border-2" formControlName="transaction_type">
+              <option *ngFor="let type of transactionTypes" [value]="type.value">{{ type.label }}</option>
+            </select>
+          </div>
+
+          <div class="col-md-3" *ngIf="stockForm.get('transaction_type')?.value === 'transfer'">
+            <label class="form-label small fw-bold text-info">To Site (Destination) *</label>
+            <select class="form-select bg-info bg-opacity-10 border-info" formControlName="to_site_id">
+              <option value="">Select Destination Site</option>
+              <option *ngFor="let s of toSites" [value]="s.id">{{ s.name }}</option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-danger">Invoice / Reference No. *</label>
+            <input type="text" class="form-control" formControlName="invoice_no" placeholder="Enter invoice number">
+          </div>
+
+          <div class="col-md-9">
+            <label class="form-label small fw-bold">Transaction Remarks</label>
+            <input type="text" class="form-control" formControlName="remarks" placeholder="Optional notes for this entire transaction...">
+          </div>
+        </div>
+
+        <h6 class="fw-bold mb-3"><i class="fas fa-boxes text-secondary me-2"></i>Material Items</h6>
+        
+        <div class="table-responsive mb-3" style="overflow-visible: visible;">
+          <table class="table table-borderless align-middle">
+            <thead class="bg-light">
+              <tr>
+                <th style="min-width: 180px;" class="small text-muted text-uppercase fw-bold">Category</th>
+                <th style="min-width: 250px;" class="small text-muted text-uppercase fw-bold">Material *</th>
+                <th style="width: 120px;" class="small text-muted text-uppercase fw-bold">Qty *</th>
+                <th style="width: 140px;" class="small text-muted text-uppercase fw-bold">Price/Unit *</th>
+                <th style="width: 100px;" class="small text-muted text-uppercase fw-bold">Tax %</th>
+                <th style="width: 120px;" class="small text-muted text-uppercase fw-bold text-end">Tax Amt</th>
+                <th style="width: 150px;" class="small text-muted text-uppercase fw-bold text-end">Total Cost</th>
+                <th style="width: 60px;"></th>
+              </tr>
+            </thead>
+            <tbody formArrayName="items">
+              <tr *ngFor="let item of items.controls; let i=index" [formGroupName]="i" class="border-bottom">
+                
+                <td>
+                  <select class="form-select form-select-sm" formControlName="category_id">
+                    <option value="">All Categories</option>
+                    <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
+                  </select>
+                </td>
+                
+                <td>
+                  <select class="form-select form-select-sm fw-bold" formControlName="material_id">
+                    <option value="">Select Material</option>
+                    <option *ngFor="let m of getFilteredMaterials(item.get('category_id')?.value)" [value]="m.id">{{ m.name }}</option>
+                  </select>
+                </td>
+
+                <td>
+                  <input type="number" class="form-control form-control-sm" formControlName="quantity" placeholder="0">
+                </td>
+
+                <td>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light text-muted">₹</span>
+                    <input type="number" class="form-control" formControlName="unit_price" placeholder="0.00">
+                  </div>
+                </td>
+
+                <td>
+                  <div class="input-group input-group-sm">
+                    <input type="number" class="form-control" formControlName="tax_percent" placeholder="0">
+                    <span class="input-group-text bg-light text-muted">%</span>
+                  </div>
+                </td>
+
+                <td class="text-end text-muted fw-bold">
+                  ₹{{ item.get('tax_amount')?.value | number:'1.2-2' }}
+                </td>
+
+                <td class="text-end text-success fw-bold fs-6">
+                  ₹{{ item.get('total_cost')?.value | number:'1.2-2' }}
+                </td>
+
+                <td class="text-end">
+                  <button type="button" class="btn btn-sm btn-outline-danger border-0" (click)="removeItem(i)" title="Remove Item">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </td>
+
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center border-top pt-4">
+          <button type="button" class="btn btn-outline-primary fw-bold" (click)="addItem()">
+            <i class="fas fa-plus me-2"></i>Add Another Material
+          </button>
+          
+          <button type="button" class="btn btn-success fw-bold px-5 py-2 fs-5 shadow-sm" (click)="submitTransaction()" [disabled]="submitting">
+            <i class="fas fa-save me-2" [class.fa-spin]="submitting"></i> 
+            {{ submitting ? 'Saving Ledger...' : 'Save All Transactions' }}
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 rounded-3">
+    <div class="card-header bg-white border-bottom py-3">
+      <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-history me-2 text-muted"></i>Recent Site Balances</h5>
+    </div>
+    <div class="card-body p-0">
+      
+      <div *ngIf="recentTransactions.length === 0" class="text-center py-5">
+        <i class="fas fa-map-marker-alt fa-3x text-muted opacity-25 mb-3"></i>
+        <h5 class="text-muted fw-bold">No Site Selected</h5>
+        <p class="text-muted small">Select a Site in the form above to view its current balances.</p>
+      </div>
+
+      <div class="table-responsive" *ngIf="recentTransactions.length > 0">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="bg-light">
+            <tr>
+              <th class="py-3 ps-4">Material</th>
+              <th class="py-3 text-end">Current Balance</th>
+              <th class="py-3 text-end text-success">Total Received</th>
+              <th class="py-3 text-end text-danger">Total Used</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of recentTransactions">
+              <td class="ps-4 fw-bold text-dark">{{ item.material_name }}</td>
+              <td class="text-end fw-bold fs-5" [ngClass]="item.has_negative_balance ? 'text-danger' : 'text-primary'">{{ item.current_balance }}</td>
+              <td class="text-end text-success fw-semibold"><i class="fas fa-arrow-down me-1"></i>{{ item.total_received }}</td>
+              <td class="text-end text-danger fw-semibold"><i class="fas fa-arrow-up me-1"></i>{{ item.total_used }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+</div>

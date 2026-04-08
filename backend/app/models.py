@@ -166,6 +166,8 @@ class StockEntry(Base):
     
     # --- SNAPSHOT DATA LOCKED IN AT TIME OF TRANSACTION ---
     unit_cost = Column(Numeric(10, 2), default=0.00) 
+    tax_percent = Column(Numeric(5, 2), default=0.00)
+    tax_amount = Column(Numeric(10, 2), default=0.00)
     total_cost = Column(Numeric(10, 2), default=0.00)
     # ------------------------------------------------------
     

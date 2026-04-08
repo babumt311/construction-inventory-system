@@ -5,7 +5,7 @@ import { UserService } from '../../services/user.service';
 import { ProjectService } from '../../services/project.service';
 import { StockService } from '../../services/stock.service';
 import { ReportService } from '../../services/report.service';
-import { ApiService } from '../../services/api.service'; // NEW: For fetching tasks
+import { ApiService } from '../../services/api.service';
 import { User, UserRole } from '../../models/user.model';
 import { Project } from '../../models/project.model';
 import { ToastrService } from 'ngx-toastr';
@@ -25,7 +25,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   recentProjects: Project[] = [];
   
-  // NEW: Arrays for our new scrollable widgets
   lowStockItems: any[] = [];
   actionableTasks: any[] = [];
 
@@ -93,6 +92,29 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
       complete: () => this.finishCall()
     });
+
+    // ==========================================
+    // NEW: FETCH LATEST REPORT / ACTIVITY DATE
+    // ==========================================
+    this.trackCall();
+    // We use the generic ApiService to grab the most recent global stock entry
+    const reportsSub = this.api.get<any[]>('stock/entries/', { limit: 1 }).subscribe({
+      next: (entries) => {
+        if (entries && entries.length > 0) {
+          // Extracts the most recent transaction date
+          this.latestReportDate = entries[0].entry_date || entries[0].created_at; 
+        } else {
+          this.latestReportDate = null;
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load latest activity date', err);
+        this.latestReportDate = null; // Failsafe triggers the HTML "No reports" message
+      },
+      complete: () => this.finishCall()
+    });
+    this.subscriptions.push(reportsSub);
+    // ==========================================
 
     this.loadStockSummary();
   }

@@ -1,16 +1,13 @@
-import { Component, OnInit, ViewChild, TemplateRef } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { MatTableDataSource } from '@angular/material/table';
-import { MatPaginator } from '@angular/material/paginator';
-import { MatSort } from '@angular/material/sort';
-import { MatDialog } from '@angular/material/dialog';
+import { Component, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
+import { forkJoin } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
+
 import { StockService } from '../../services/stock.service';
 import { ProjectService } from '../../services/project.service';
 import { MaterialService } from '../../services/material.service';
-import { StockEntry, StockEntryType, StockEntryCreateRequest } from '../../models/stock.model';
 import { Project, Site } from '../../models/project.model';
-import { Material } from '../../models/material.model';
-import { ToastrService } from 'ngx-toastr';
+import { Material, Category } from '../../models/material.model';
 
 @Component({
   selector: 'app-stock-entry',
@@ -18,37 +15,24 @@ import { ToastrService } from 'ngx-toastr';
   styleUrls: ['./stock-entry.component.scss']
 })
 export class StockEntryComponent implements OnInit {
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
-  @ViewChild(MatSort) sort!: MatSort;
-  @ViewChild('detailsDialog') detailsDialog!: TemplateRef<any>;
-
-  // Data
+  
+  stockForm!: FormGroup;
+  
   projects: Project[] = [];
   sites: Site[] = [];
+  toSites: Site[] = []; // For transfers
+  categories: Category[] = [];
   materials: Material[] = [];
-  stockEntries: StockEntry[] = [];
-  selectedEntry: StockEntry | null = null;
   
-  // Forms
-  entryForm: FormGroup;
-  filterForm: FormGroup;
-  
-  // Table
-  displayedColumns: string[] = ['date', 'site', 'material', 'type', 'quantity', 'supplier', 'actions'];
-  dataSource = new MatTableDataSource<StockEntry>();
-  
-  // UI State
+  recentTransactions: any[] = [];
   loading = false;
-  isEditing = false;
-  currentEntryId?: number;
-  selectedProjectId?: number;
-  selectedSiteId?: number;
-  StockEntryType = StockEntryType;
-  entryTypes = [
-    { value: StockEntryType.RECEIVED, label: 'Received', icon: 'fas fa-arrow-down', color: 'success' },
-    { value: StockEntryType.USED, label: 'Used', icon: 'fas fa-arrow-up', color: 'danger' },
-    { value: StockEntryType.RETURNED_RECEIVED, label: 'Return Received', icon: 'fas fa-undo', color: 'warning' },
-    { value: StockEntryType.RETURNED_SUPPLIER, label: 'Return to Supplier', icon: 'fas fa-truck-loading', color: 'secondary' }
+  submitting = false;
+
+  transactionTypes = [
+    { value: 'received', label: 'Received (Delivery IN)' },
+    { value: 'used', label: 'Consumed (Used OUT)' },
+    { value: 'transfer', label: 'Site-to-Site Transfer' },
+    { value: 'returned_supplier', label: 'Returned to Supplier' }
   ];
 
   constructor(
@@ -56,191 +40,222 @@ export class StockEntryComponent implements OnInit {
     private stockService: StockService,
     private projectService: ProjectService,
     private materialService: MaterialService,
-    private dialog: MatDialog,
     private toastr: ToastrService
   ) {
-    this.entryForm = this.fb.group({
-      site_id: ['', Validators.required],
-      material_id: ['', Validators.required],
-      entry_type: ['', Validators.required],
-      quantity: ['', [Validators.required, Validators.min(0.01)]],
-      supplier_name: [''],
-      invoice_no: [''],
-      reference: [''],
-      remarks: [''],
-      entry_date: [new Date()]
-    });
-
-    this.filterForm = this.fb.group({
-      site_id: [''],
-      material_id: [''],
-      entry_type: [''],
-      start_date: [''],
-      end_date: ['']
-    });
+    this.initForm();
   }
 
   ngOnInit(): void {
-    this.loadProjects();
-    this.loadMaterials();
-    this.loadStockEntries();
+    this.loadInitialData();
+    this.setupFormListeners();
   }
 
-  loadProjects(): void {
-    this.projectService.getProjects().subscribe({
-      next: (projects) => {
-        this.projects = projects;
-      },
-      error: (error) => {
-        this.toastr.error('Failed to load projects', 'Error');
-      }
+  initForm(): void {
+    this.stockForm = this.fb.group({
+      project_id: ['', Validators.required],
+      site_id: ['', Validators.required],
+      to_site_id: [''], // Only required for transfers
+      transaction_type: ['received', Validators.required],
+      invoice_no: ['', Validators.required],
+      remarks: [''],
+      items: this.fb.array([])
     });
-  }
-
-  loadMaterials(): void {
-    this.materialService.getMaterials().subscribe({
-      next: (materials) => {
-        this.materials = materials;
-      },
-      error: (error) => {
-        this.toastr.error('Failed to load materials', 'Error');
-      }
-    });
-  }
-
-  loadStockEntries(params?: any): void {
-    this.loading = true;
-    this.stockService.getStockEntries(params).subscribe({
-      next: (entries) => {
-        this.stockEntries = entries;
-        this.dataSource.data = entries;
-        this.dataSource.paginator = this.paginator;
-        this.dataSource.sort = this.sort;
-        this.loading = false;
-      },
-      error: (error) => {
-        this.toastr.error('Failed to load stock entries', 'Error');
-        this.loading = false;
-      }
-    });
-  }
-
-  onProjectChange(projectId: number): void {
-    this.selectedProjectId = projectId;
-    this.sites = [];
-    this.entryForm.patchValue({ site_id: '' });
     
-    if (projectId) {
-      this.projectService.getProjectSites(projectId).subscribe({
-        next: (sites) => {
-          this.sites = sites;
-        },
-        error: (error) => {
-          this.toastr.error('Failed to load sites', 'Error');
-        }
-      });
+    // Start with one empty row
+    this.addItem();
+  }
+
+  get items(): FormArray {
+    return this.stockForm.get('items') as FormArray;
+  }
+
+  addItem(): void {
+    const itemForm = this.fb.group({
+      category_id: [''],
+      material_id: ['', Validators.required],
+      quantity: [null, [Validators.required, Validators.min(0.01)]],
+      unit_price: [null, [Validators.required, Validators.min(0)]],
+      tax_percent: [0, [Validators.min(0)]],
+      tax_amount: [{ value: 0, disabled: true }],
+      total_cost: [{ value: 0, disabled: true }]
+    });
+
+    // Auto-calculate tax and totals when inputs change
+    itemForm.valueChanges.subscribe(val => {
+      const qty = Number(val.quantity || 0);
+      const price = Number(val.unit_price || 0);
+      const taxPct = Number(val.tax_percent || 0);
+
+      const taxAmt = price * (taxPct / 100);
+      const total = (price + taxAmt) * qty;
+
+      itemForm.patchValue({
+        tax_amount: taxAmt,
+        total_cost: total
+      }, { emitEvent: false });
+    });
+
+    this.items.push(itemForm);
+  }
+
+  removeItem(index: number): void {
+    if (this.items.length > 1) {
+      this.items.removeAt(index);
+    } else {
+      this.toastr.warning('You must have at least one material entry.');
     }
   }
 
-  createEntry(): void {
-    if (this.entryForm.invalid) {
-      this.markFormGroupTouched(this.entryForm);
+  loadInitialData(): void {
+    this.loading = true;
+    forkJoin({
+      projects: this.projectService.getProjects(),
+      categories: this.materialService.getCategories(),
+      materials: this.materialService.getMaterials()
+    }).subscribe({
+      next: (res) => {
+        this.projects = res.projects;
+        this.categories = res.categories;
+        this.materials = res.materials;
+        this.loading = false;
+      },
+      error: () => {
+        this.toastr.error('Failed to load master data');
+        this.loading = false;
+      }
+    });
+  }
+
+  setupFormListeners(): void {
+    // Load sites when project changes
+    this.stockForm.get('project_id')?.valueChanges.subscribe(projectId => {
+      this.stockForm.patchValue({ site_id: '', to_site_id: '' });
+      this.sites = [];
+      this.toSites = [];
+      
+      if (projectId) {
+        this.projectService.getProjectSites(projectId).subscribe(sites => {
+          this.sites = sites.filter(s => s.status === 'active' || s.status === 'IN_PROGRESS');
+          this.toSites = [...this.sites]; 
+        });
+      }
+    });
+
+    // Handle Site-to-Site transfer validation
+    this.stockForm.get('transaction_type')?.valueChanges.subscribe(type => {
+      const toSiteCtrl = this.stockForm.get('to_site_id');
+      if (type === 'transfer') {
+        toSiteCtrl?.setValidators([Validators.required]);
+      } else {
+        toSiteCtrl?.clearValidators();
+        toSiteCtrl?.setValue('');
+      }
+      toSiteCtrl?.updateValueAndValidity();
+    });
+
+    // Load ledger when site changes
+    this.stockForm.get('site_id')?.valueChanges.subscribe(siteId => {
+      if (siteId) {
+        this.loadRecentLedger(siteId);
+      } else {
+        this.recentTransactions = [];
+      }
+    });
+  }
+
+  getFilteredMaterials(categoryId: any): Material[] {
+    if (!categoryId) return this.materials;
+    return this.materials.filter(m => m.category_id === Number(categoryId));
+  }
+
+  loadRecentLedger(siteId: number): void {
+    this.stockService.getSiteStockSummary(siteId).subscribe(data => {
+      this.recentTransactions = data;
+    });
+  }
+
+  submitTransaction(): void {
+    if (this.stockForm.invalid) {
+      this.stockForm.markAllAsTouched();
+      this.toastr.error('Please fill all mandatory fields correctly.');
       return;
     }
 
-    const entryData: StockEntryCreateRequest = this.entryForm.value;
-    this.loading = true;
-
-    this.stockService.createStockEntry(entryData).subscribe({
-      next: () => {
-        this.toastr.success('Stock entry created successfully', 'Success');
-        this.loadStockEntries();
-        this.resetForm();
-      },
-      error: (error) => {
-        this.toastr.error(error.message || 'Failed to create stock entry', 'Error');
-        this.loading = false;
-      }
-    });
-  }
-
-  updateEntry(): void {
-    if (this.entryForm.invalid || !this.currentEntryId) {
-      return;
-    }
-
-    const entryData = this.entryForm.value;
-    this.loading = true;
-
-    this.stockService.updateStockEntry(this.currentEntryId, entryData).subscribe({
-      next: () => {
-        this.toastr.success('Stock entry updated successfully', 'Success');
-        this.loadStockEntries();
-        this.resetForm();
-      },
-      error: (error) => {
-        this.toastr.error(error.message || 'Failed to update stock entry', 'Error');
-        this.loading = false;
-      }
-    });
-  }
-
-  deleteEntry(id: number): void {
-    if (confirm('Are you sure you want to delete this stock entry?')) {
-      this.stockService.deleteStockEntry(id).subscribe({
-        next: () => {
-          this.toastr.success('Stock entry deleted successfully', 'Success');
-          this.loadStockEntries();
-        },
-        error: (error) => {
-          this.toastr.error(error.message || 'Failed to delete stock entry', 'Error');
-        }
-      });
-    }
-  }
-
-  editEntry(entry: StockEntry): void {
-    this.isEditing = true;
-    this.currentEntryId = entry.id;
+    this.submitting = true;
+    const formData = this.stockForm.getRawValue(); // gets disabled fields too (totals)
     
-    if (entry.site?.project_id) {
-      this.onProjectChange(entry.site.project_id);
-    }
-    
-    this.entryForm.patchValue({
-      site_id: entry.site_id,
-      material_id: entry.material_id,
-      entry_type: entry.entry_type,
-      quantity: entry.quantity,
-      supplier_name: entry.supplier_name,
-      invoice_no: entry.invoice_no,
-      reference: entry.reference,
-      remarks: entry.remarks,
-      entry_date: new Date(entry.entry_date)
+    const isTransfer = formData.transaction_type === 'transfer';
+    const apiRequests: any[] = [];
+
+    // Generate API payload for each material row
+    formData.items.forEach((item: any) => {
+      
+      const basePayload = {
+        material_id: item.material_id,
+        quantity: item.quantity,
+        unit_cost: Number(item.unit_price) + Number(item.tax_amount), // Final cost per unit
+        total_cost: item.total_cost,
+        invoice_no: formData.invoice_no,
+        remarks: formData.remarks
+      };
+
+      if (isTransfer) {
+        // Site-to-Site requires 2 entries: OUT from source, IN to destination
+        const transferOut = {
+          ...basePayload,
+          site_id: formData.site_id,
+          entry_type: 'used', // Taking it out of inventory
+          remarks: `Transfer OUT to Site ID ${formData.to_site_id} | ${formData.remarks}`
+        };
+        
+        const transferIn = {
+          ...basePayload,
+          site_id: formData.to_site_id,
+          entry_type: 'received', // Putting it into new inventory
+          remarks: `Transfer IN from Site ID ${formData.site_id} | ${formData.remarks}`
+        };
+
+        apiRequests.push(this.stockService.createStockEntry(transferOut));
+        apiRequests.push(this.stockService.createStockEntry(transferIn));
+        
+      } else {
+        // Standard single transaction
+        const entry = {
+          ...basePayload,
+          site_id: formData.site_id,
+          entry_type: formData.transaction_type
+        };
+        apiRequests.push(this.stockService.createStockEntry(entry));
+      }
     });
-  }
 
-  private markFormGroupTouched(formGroup: any): void {
-  Object.values(formGroup.controls).forEach((control: any) => {
-    control.markAsTouched();
+    // Execute all requests concurrently
+    forkJoin(apiRequests).subscribe({
+      next: () => {
+        this.toastr.success(`Successfully saved ${formData.items.length} material entries!`);
+        
+        // Reset the form but keep the project and site selected for easy continued entry
+        const currentProject = this.stockForm.get('project_id')?.value;
+        const currentSite = this.stockForm.get('site_id')?.value;
+        
+        this.stockForm.reset();
+        this.items.clear();
+        this.addItem(); // add one blank row back
+        
+        this.stockForm.patchValue({
+          project_id: currentProject,
+          site_id: currentSite,
+          transaction_type: 'received'
+        });
 
-    if (control.controls) {
-      this.markFormGroupTouched(control);
+        if (currentSite) this.loadRecentLedger(currentSite);
+        this.submitting = false;
+      },
+      error: (err) => {
+        this.toastr.error('Failed to save some entries. Check balances.');
+        console.error(err);
+        this.submitting = false;
       }
     });
   }
-
-  showEntryDetails(entry: StockEntry): void {
-    this.selectedEntry = entry;
-    this.dialog.open(this.detailsDialog, {
-      width: '600px',
-      data: { entry }
-    });
-  }
-
-  resetForm(): void {
-    this.entryForm.reset({
-      site_id: ''
-    });
-  }  
 }

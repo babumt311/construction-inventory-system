@@ -31,6 +31,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loading = false;
 
+  // Enterprise strict typing for the latest report date
+  latestReportDate: string | Date | null = null;
+
   private subscriptions: Subscription[] = [];
   private pendingCalls = 0;
 

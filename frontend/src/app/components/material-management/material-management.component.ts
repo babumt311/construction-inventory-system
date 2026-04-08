@@ -25,7 +25,7 @@ export class MaterialManagementComponent implements OnInit {
   categories: Category[] = [];
   
   // Table
-  displayedColumns: string[] = ['name', 'category', 'unit', 'standard_cost', 'actions'];
+  displayedColumns: string[] = ['name', 'category', 'unit', 'actions'];
   dataSource = new MatTableDataSource<Material>();
   
   // Forms

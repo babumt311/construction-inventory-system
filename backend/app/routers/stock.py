@@ -21,7 +21,7 @@ from app.utils.stock_calculator import StockCalculator
 router = APIRouter(prefix="/stock", tags=["stock"])
 logger = logging.getLogger(__name__)
 
-@router.post("/entries/", response_model=schemas.StockEntryInDB)
+@router.post("/entries", response_model=schemas.StockEntryInDB)
 async def create_stock_entry(
     stock_in: schemas.StockEntryCreate,
     db: Session = Depends(get_db),
@@ -31,6 +31,28 @@ async def create_stock_entry(
     """
     Create new stock entry, lock in historical costs, and update total balance
     """
+
+    # 1. Create stock entry history with IMMUTABLE COSTS
+    stock_data = stock_in.dict()
+    stock_data["created_by"] = current_user.id
+    
+    # --- ENTERPRISE LEDGER PROTOCOL: USE FRONTEND DYNAMIC COST ---
+    # Stop overwriting with standard_cost. Save the values exactly as entered in UI.
+    stock_data["unit_cost"] = stock_in.unit_cost or Decimal('0.00')
+    stock_data["tax_percent"] = stock_in.tax_percent or Decimal('0.00')
+    stock_data["tax_amount"] = stock_in.tax_amount or Decimal('0.00')
+    stock_data["total_cost"] = stock_in.total_cost or Decimal('0.00')
+    
+    # Map the frontend's 'reference_no' directly into the 'invoice_no' column
+    if hasattr(stock_in, 'reference_no') and stock_in.reference_no:
+        stock_data["invoice_no"] = stock_in.reference_no
+        
+    # Remove reference_no from dictionary so SQLAlchemy doesn't crash looking for it
+    stock_data.pop("reference_no", None)
+    # ---------------------------------------------------------
+    
+    stock_entry = models.StockEntry(**stock_data)
+    db.add(stock_entry)
     logger.info(f"Creating stock entry by user: {current_user.username}")
     
     # Check if user has access to the site's project

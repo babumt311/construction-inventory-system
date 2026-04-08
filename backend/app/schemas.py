@@ -228,9 +228,12 @@ class StockEntryBase(BaseModel):
     entry_type: StockEntryType
     quantity: Decimal
     unit_cost: Optional[Decimal] = Field(None, ge=0)    # Enterprise Immutable Cost
+    tax_percent: Optional[Decimal] = Field(None, ge=0)  # <-- NEW
+    tax_amount: Optional[Decimal] = Field(None, ge=0)
     total_cost: Optional[Decimal] = Field(None, ge=0)   # Enterprise Immutable Cost
     supplier_name: Optional[str] = None
     invoice_no: Optional[str] = None
+    reference_no: Optional[str] = None
     reference: Optional[str] = None
     remarks: Optional[str] = None
     entry_date: Optional[datetime] = None

@@ -201,14 +201,14 @@ export class StockEntryComponent implements OnInit {
 
       if (isTransfer) {
         // Site-to-Site requires 2 entries: OUT from source, IN to destination
-        const transferOut = {
+        const transferOut: any = { ... };
           ...basePayload,
           site_id: formData.site_id,
           entry_type: 'used', // Taking it out of inventory
           remarks: `Transfer OUT to Site ID ${formData.to_site_id} | ${formData.remarks}`
         };
         
-        const transferIn = {
+        const transferIn: any = { ... };
           ...basePayload,
           site_id: formData.to_site_id,
           entry_type: 'received', // Putting it into new inventory

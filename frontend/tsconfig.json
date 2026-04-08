@@ -9,6 +9,7 @@
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
     "sourceMap": true,
     "declaration": false,
     "downlevelIteration": true,
@@ -22,6 +23,7 @@
       "ES2022",
       "dom"
     ],
+    "types": ["node"],
     "paths": {
       "@app/*": ["src/app/*"],
       "@environments/*": ["src/environments/*"],

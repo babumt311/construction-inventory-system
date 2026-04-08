@@ -16,7 +16,7 @@
           </h1>
           <div class="user-meta">
             <span class="role-badge">{{ userRoleText }}</span>
-            <span class="last-login">Last login: {{ currentUser?.updated_at | date:'medium' }}</span>
+            <span class="ms-3 opacity-75">Last login: {{ currentUser?.last_login ? (currentUser?.last_login | date:'MMM d, y, h:mm a') : 'Current Session' }}</span>
           </div>
         </div>
         <button class="refresh-btn" (click)="loadDashboardData()" [disabled]="loading">
@@ -75,9 +75,6 @@
           <h2>{{ stockStats?.length || 0 }}</h2>
         </div>
         <div class="stat-icon materials"><i class="fas fa-boxes"></i></div>
-      </div>
-      <div class="stat-details">
-        <div class="detail-item"><i class="fas fa-rupee-sign"></i> Total Value: ₹{{ getTotalStockValue() | number:'1.2-2' }}</div>
       </div>
     </div>
 

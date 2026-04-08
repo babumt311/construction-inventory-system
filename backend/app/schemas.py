@@ -1,9 +1,9 @@
 """
-Pydantic schemas for request/response validation
+Pydantic schemas for request/response validation - Enterprise Ledger Edition
 """
 from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
 import logging
@@ -66,9 +66,11 @@ class CategoryCreate(CategoryBase):
 class CategoryUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=100)
     description: Optional[str] = None
+    is_active: Optional[bool] = None
 
 class CategoryInDB(CategoryBase):
     id: int
+    is_active: bool = True
     created_at: datetime
     
     class Config:
@@ -91,9 +93,11 @@ class MaterialUpdate(BaseModel):
     unit: Optional[str] = None
     description: Optional[str] = None
     standard_cost: Optional[Decimal] = Field(None, ge=0)
+    is_active: Optional[bool] = None
 
 class MaterialInDB(MaterialBase):
     id: int
+    is_active: bool = True
     created_at: datetime
     updated_at: Optional[datetime] = None
     category: Optional[CategoryInDB] = None
@@ -105,36 +109,30 @@ class MaterialInDB(MaterialBase):
 class ProjectBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=200)
     code: str = Field(..., min_length=2, max_length=50)
-    
-    # --- ADDED FIELDS ---
     client: Optional[str] = None
     budget: Optional[Decimal] = Field(0.00, ge=0)
-    # --------------------
-    
     description: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     status: str = "active"
 
 class ProjectCreate(ProjectBase):
-    user_ids: Optional[List[int]] = []  # Users with access to this project
+    user_ids: Optional[List[int]] = []
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=200)
     code: Optional[str] = Field(None, min_length=2, max_length=50)
-    
-    # --- ADDED FIELDS ---
     client: Optional[str] = None
     budget: Optional[Decimal] = Field(None, ge=0)
-    # --------------------
-    
     description: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     status: Optional[str] = None
+    is_active: Optional[bool] = None
 
 class ProjectInDB(ProjectBase):
     id: int
+    is_active: bool = True
     created_at: datetime
     updated_at: Optional[datetime] = None
     users: List[UserInDB] = []
@@ -160,9 +158,11 @@ class SiteUpdate(BaseModel):
     location: Optional[str] = None
     manager: Optional[str] = None
     status: Optional[str] = None
+    is_active: Optional[bool] = None
 
 class SiteInDB(SiteBase):
     id: int
+    is_active: bool = True
     created_at: datetime
     updated_at: Optional[datetime] = None
     project: Optional[ProjectInDB] = None
@@ -219,14 +219,16 @@ class POEntryInDB(POEntryBase):
 class StockEntryType(str, Enum):
     RECEIVED = "received"
     USED = "used"
-    RETURNED_RECEIVED = "returned_received"  # rr
-    RETURNED_SUPPLIER = "returned_supplier"  # rs
+    RETURNED_RECEIVED = "returned_received" 
+    RETURNED_SUPPLIER = "returned_supplier" 
 
 class StockEntryBase(BaseModel):
     site_id: int
     material_id: int
     entry_type: StockEntryType
     quantity: Decimal
+    unit_cost: Optional[Decimal] = Field(None, ge=0)    # Enterprise Immutable Cost
+    total_cost: Optional[Decimal] = Field(None, ge=0)   # Enterprise Immutable Cost
     supplier_name: Optional[str] = None
     invoice_no: Optional[str] = None
     reference: Optional[str] = None
@@ -267,6 +269,8 @@ class DailyStockReportBase(BaseModel):
     returned_supplier: Decimal = Field(0.00, ge=0)
     closing_stock: Decimal = Field(0.00)
     total_received: Decimal = Field(0.00, ge=0)
+    received_value: Decimal = Field(0.00, ge=0)   # Enterprise Cost Tracking
+    used_value: Decimal = Field(0.00, ge=0)       # Enterprise Cost Tracking
 
 class DailyStockReportCreate(DailyStockReportBase):
     pass
@@ -375,12 +379,9 @@ class ErrorResponse(BaseModel):
     detail: str
     error_code: Optional[str] = None
 
-# Update forward references
 UserWithProjects.update_forward_refs()
 ProjectInDB.update_forward_refs()
 
-# CLI Output helper
 def log_schema_validation(data: dict, schema_name: str):
-    """Log schema validation for debugging"""
     logger.debug(f"Validating data against {schema_name} schema")
     logger.debug(f"Data: {data}")

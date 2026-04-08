@@ -1,0 +1,278 @@
+<div class="container-fluid py-4">
+  
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1 fw-bold text-dark"><i class="fas fa-chart-line me-2 text-primary"></i>Stock Reports</h2>
+      <p class="text-muted mb-0">View and analyze current stock levels and transactions across sites</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary fw-bold" (click)="toggleChart()">
+        <i class="fas" [ngClass]="showChart ? 'fa-table' : 'fa-chart-pie'"></i> 
+        {{ showChart ? 'Hide Charts' : 'Show Charts' }}
+      </button>
+      <button class="btn btn-primary fw-bold px-4" (click)="openExportModal()" [disabled]="loading || (materialReportData.length === 0 && supplierReportData.length === 0 && periodReportData.length === 0 && customReportData.length === 0)">
+        <i class="fas fa-file-excel me-2"></i>Export
+      </button>
+      <button class="btn btn-success fw-bold px-4" (click)="generateReport()" [disabled]="loading">
+        <i class="fas fa-sync-alt me-2" [class.fa-spin]="loading"></i>Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4 rounded-3">
+    <div class="card-body p-4">
+      
+      <ul class="nav nav-pills mb-4 border-bottom pb-3">
+        <li class="nav-item">
+          <a class="nav-link fw-bold" style="cursor: pointer;" [class.active]="currentReportType === 'material'" (click)="onReportTypeChange('material')">Material Wise</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link fw-bold" style="cursor: pointer;" [class.active]="currentReportType === 'supplier'" (click)="onReportTypeChange('supplier')">Supplier Wise</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link fw-bold" style="cursor: pointer;" [class.active]="currentReportType === 'period'" (click)="onReportTypeChange('period')">Period Balance</a>
+        </li>
+      </ul>
+
+      <form [formGroup]="reportForm" (ngSubmit)="generateReport()">
+        <div class="row g-3">
+          
+          <div class="col-md-3">
+            <label class="form-label text-muted small fw-bold mb-1">Project</label>
+            <select class="form-select border-light-subtle" formControlName="project_id" (change)="onProjectChange($any($event.target).value)">
+              <option value="">All Projects</option>
+              <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label text-muted small fw-bold mb-1">Site</label>
+            <select class="form-select border-light-subtle" formControlName="site_id">
+              <option value="">All Sites in Project</option>
+              <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label text-muted small fw-bold mb-1">Category</label>
+            <select class="form-select border-light-subtle" formControlName="category_id">
+              <option value="">All Categories</option>
+              <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+
+          <div class="col-md-3" *ngIf="currentReportType === 'supplier'">
+            <label class="form-label text-muted small fw-bold mb-1">Supplier Name</label>
+            <input type="text" class="form-control border-light-subtle" formControlName="supplier_name" placeholder="Search supplier...">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label text-muted small fw-bold mb-1">Start Date</label>
+            <input type="date" class="form-control border-light-subtle" formControlName="start_date">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label text-muted small fw-bold mb-1">End Date</label>
+            <input type="date" class="form-control border-light-subtle" formControlName="end_date">
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3 text-muted fw-bold">Compiling Enterprise Data...</p>
+  </div>
+
+  <div *ngIf="!loading">
+    <div class="row g-3 mb-4" *ngIf="getReportSummary() as summary">
+      
+      <div class="col-md-3" *ngIf="summary.totalItems !== undefined">
+        <div class="card border-0 shadow-sm h-100 rounded-3 border-start border-4 border-primary">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+              <p class="text-muted small fw-bold mb-1 text-uppercase">Total Records</p>
+              <h3 class="mb-0 fw-bold text-dark">{{ summary.totalItems }}</h3>
+            </div>
+            <div class="bg-primary bg-opacity-10 p-3 rounded-circle text-primary">
+              <i class="fas fa-list fa-lg"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3" *ngIf="summary.totalCost !== undefined">
+        <div class="card border-0 shadow-sm h-100 rounded-3 border-start border-4 border-success">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+              <p class="text-muted small fw-bold mb-1 text-uppercase">Total Value</p>
+              <h3 class="mb-0 fw-bold text-dark">₹{{ summary.totalCost | number:'1.2-2' }}</h3>
+            </div>
+            <div class="bg-success bg-opacity-10 p-3 rounded-circle text-success">
+              <i class="fas fa-rupee-sign fa-lg"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3" *ngIf="summary.uniqueSuppliers !== undefined">
+        <div class="card border-0 shadow-sm h-100 rounded-3 border-start border-4 border-info">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+              <p class="text-muted small fw-bold mb-1 text-uppercase">Active Suppliers</p>
+              <h3 class="mb-0 fw-bold text-dark">{{ summary.uniqueSuppliers }}</h3>
+            </div>
+            <div class="bg-info bg-opacity-10 p-3 rounded-circle text-info">
+              <i class="fas fa-truck fa-lg"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="row mb-4" *ngIf="showChart && (materialReportData.length > 0 || supplierReportData.length > 0)">
+      <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-3">
+          <div class="card-body p-4">
+            <div style="height: 350px; width: 100%; display: flex; justify-content: center;">
+              <canvas id="materialChart" [class.d-none]="currentReportType !== 'material'"></canvas>
+              <canvas id="supplierChart" [class.d-none]="currentReportType !== 'supplier'"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          
+          <table class="table table-hover align-middle mb-0" *ngIf="currentReportType === 'material' && materialReportData.length > 0">
+            <thead class="bg-light">
+              <tr>
+                <th class="text-muted small fw-bold text-uppercase py-3 ps-4">Category</th>
+                <th class="text-muted small fw-bold text-uppercase py-3">Material</th>
+                <th class="text-muted small fw-bold text-uppercase py-3 text-end">Quantity</th>
+                <th class="text-muted small fw-bold text-uppercase py-3">Unit</th>
+                <th class="text-muted small fw-bold text-uppercase py-3 text-end">Unit Cost</th>
+                <th class="text-muted small fw-bold text-uppercase py-3 text-end pe-4">Total Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of materialDataSource.data">
+                <td class="ps-4"><span class="badge bg-secondary bg-opacity-10 text-secondary border">{{ row.category }}</span></td>
+                <td class="fw-semibold text-dark">{{ row.material }}</td>
+                <td class="text-end fw-bold">{{ row.quantity }}</td>
+                <td>{{ row.unit }}</td>
+                <td class="text-end">₹{{ row.unit_cost | number:'1.2-2' }}</td>
+                <td class="text-end pe-4 fw-bold text-success">₹{{ row.total_cost | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <table class="table table-hover align-middle mb-0" *ngIf="currentReportType === 'supplier' && supplierReportData.length > 0">
+            <thead class="bg-light">
+              <tr>
+                <th class="text-muted small fw-bold text-uppercase py-3 ps-4">Supplier</th>
+                <th class="text-muted small fw-bold text-uppercase py-3">Material</th>
+                <th class="text-muted small fw-bold text-uppercase py-3">Invoice</th>
+                <th class="text-muted small fw-bold text-uppercase py-3 text-end">Qty</th>
+                <th class="text-muted small fw-bold text-uppercase py-3 text-end pe-4">Total Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of supplierDataSource.data">
+                <td class="ps-4 fw-bold text-primary">{{ row.supplier_name }}</td>
+                <td class="fw-semibold text-dark">{{ row.material }}</td>
+                <td><span class="badge bg-light text-dark border">{{ row.invoice_no }}</span></td>
+                <td class="text-end fw-bold">{{ row.quantity }} <small class="text-muted fw-normal">{{ row.unit }}</small></td>
+                <td class="text-end pe-4 fw-bold text-success">₹{{ row.total_cost | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <table class="table table-hover align-middle mb-0" *ngIf="currentReportType === 'period' && periodReportData.length > 0">
+            <thead class="bg-light">
+              <tr>
+                <th class="text-muted small fw-bold text-uppercase py-3 ps-4">Material</th>
+                <th class="text-muted small fw-bold text-uppercase py-3 text-end">Opening</th>
+                <th class="text-muted small fw-bold text-uppercase py-3 text-end text-success">Received</th>
+                <th class="text-muted small fw-bold text-uppercase py-3 text-end text-danger">Issued</th>
+                <th class="text-muted small fw-bold text-uppercase py-3 text-end text-primary">Closing Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of periodDataSource.data">
+                <td class="ps-4 fw-semibold text-dark">{{ row.material }} <small class="text-muted ms-1">({{ row.unit }})</small></td>
+                <td class="text-end">{{ row.opening_stock }}</td>
+                <td class="text-end text-success fw-bold">+{{ row.received }}</td>
+                <td class="text-end text-danger fw-bold">-{{ row.total_issued }}</td>
+                <td class="text-end pe-4 fw-bold text-primary fs-6">{{ row.closing_stock }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="text-center py-5" *ngIf="materialReportData.length === 0 && supplierReportData.length === 0 && periodReportData.length === 0 && customReportData.length === 0">
+            <i class="fas fa-folder-open fa-3x text-muted opacity-25 mb-3"></i>
+            <h5 class="text-muted fw-bold">No Data Found</h5>
+            <p class="text-muted small mb-0">Adjust your filters and click Refresh to generate a report.</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div *ngIf="showExportModal" class="modal-backdrop" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1050; display: flex; align-items: center; justify-content: center;">
+  <div class="modal-dialog m-0 shadow-lg" style="width: 500px; max-width: 90vw;">
+    <div class="modal-content border-0 rounded-3">
+      
+      <div class="modal-header bg-primary text-white border-0 rounded-top">
+        <h5 class="modal-title fw-bold"><i class="fas fa-file-excel me-2"></i>Customize Export</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeExportModal()"></button>
+      </div>
+      
+      <div class="modal-body bg-light">
+        <p class="text-muted small mb-3">Select the columns to include and use the arrows to reorder them for your Excel report.</p>
+        
+        <div class="bg-white border rounded shadow-sm p-2" style="max-height: 400px; overflow-y: auto;">
+          <div *ngFor="let col of exportColumns; let i = index; let first = first; let last = last" 
+               class="d-flex align-items-center justify-content-between p-2 border-bottom">
+            
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" [(ngModel)]="col.selected" [id]="'chk_'+i" style="cursor: pointer;">
+              <label class="form-check-label fw-semibold text-dark" [for]="'chk_'+i" style="cursor: pointer;">
+                {{ col.label }}
+              </label>
+            </div>
+            
+            <div class="btn-group">
+              <button class="btn btn-sm btn-outline-secondary py-0 px-2" (click)="moveColumn(i, -1)" [disabled]="first" title="Move Up">
+                <i class="fas fa-chevron-up"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-secondary py-0 px-2" (click)="moveColumn(i, 1)" [disabled]="last" title="Move Down">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer bg-white border-top">
+        <button type="button" class="btn btn-light fw-bold" (click)="closeExportModal()">Cancel</button>
+        <button type="button" class="btn btn-success fw-bold px-4" (click)="confirmAndExport()">
+          <i class="fas fa-download me-2"></i>Download Excel
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>

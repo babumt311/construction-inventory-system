@@ -16,6 +16,7 @@ export interface User {
   created_at: Date;
   updated_at?: Date;
   projects?: Project[];
+  last_login?: string;
 }
 
 export interface LoginRequest {

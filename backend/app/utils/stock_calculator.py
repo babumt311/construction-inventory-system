@@ -12,6 +12,21 @@ from app import models, schemas
 logger = logging.getLogger(__name__)
 
 class StockCalculator:
+
+
+    @staticmethod
+    def validate_stock_entry(db: Session, site_id: int, material_id: int, entry_type: str, quantity: Decimal) -> bool:
+        """Validate if a stock entry is allowed (e.g., prevents negative stock)"""
+        if quantity <= 0:
+            return False
+            
+        # If removing stock, check if we have enough
+        if entry_type in ['used', 'returned_supplier']:
+            balance = StockCalculator.calculate_balance(db, site_id, material_id)
+            if balance['current_balance'] < quantity:
+                return False
+                
+        return True
     
     @staticmethod
     def calculate_balance(db: Session, site_id: int, material_id: int, as_of_date: Optional[datetime] = None) -> Dict[str, Any]:

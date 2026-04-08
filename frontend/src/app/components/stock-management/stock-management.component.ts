@@ -29,15 +29,33 @@ export class StockManagementComponent implements OnInit {
   categories: any[] = [];
   materials: any[] = [];
 
-  // Table variables
+  // Stock Table variables
   stockColumns: string[] = ['entry_date', 'material_name', 'entry_type', 'quantity', 'reference_no', 'actions'];
   stockDataSource = new MatTableDataSource<any>();
   @ViewChild('stockPaginator') stockPaginator!: MatPaginator;
   @ViewChild('stockSort') stockSort!: MatSort;
-  
   selectedSiteId: number | null = null;
   loadingStockEntries = false;
   submittingStock = false;
+
+  // Category Table variables
+  categoryColumns: string[] = ['name', 'description', 'actions'];
+  categoryDataSource = new MatTableDataSource<any>();
+  @ViewChild('categoryPaginator') categoryPaginator!: MatPaginator;
+  @ViewChild('categorySort') categorySort!: MatSort;
+  isEditingCategory = false;
+  editingCategoryId: number | null = null;
+  submittingCategory = false;
+
+  // Material Table variables
+  materialColumns: string[] = ['name', 'category', 'unit', 'actions']; // Removed standard_cost
+  materialDataSource = new MatTableDataSource<any>();
+  @ViewChild('materialPaginator') materialPaginator!: MatPaginator;
+  @ViewChild('materialSort') materialSort!: MatSort;
+  isEditingMaterial = false;
+  editingMaterialId: number | null = null;
+  submittingMaterial = false;
+  materialSearchTerm = '';
 
   constructor(
     private fb: FormBuilder,
@@ -52,13 +70,12 @@ export class StockManagementComponent implements OnInit {
       site_id: [''],
       from_site_id: [''],
       to_site_id: [''],
-      invoice_no: ['', Validators.required], // Made mandatory
+      invoice_no: ['', Validators.required], 
       entry_type: ['received', Validators.required],
       remarks: [''],
-      items: this.fb.array([]) // Array to hold multiple materials
+      items: this.fb.array([]) 
     });
 
-    // Site Validation Logic based on Transfer type
     this.stockForm.get('entry_type')?.valueChanges.subscribe(type => {
       const siteCtrl = this.stockForm.get('site_id');
       const fromCtrl = this.stockForm.get('from_site_id');
@@ -78,7 +95,7 @@ export class StockManagementComponent implements OnInit {
       toCtrl?.updateValueAndValidity();
     });
 
-    // Category and Material Forms
+    // Category and Material Forms (Standard cost removed)
     this.categoryForm = this.fb.group({ name: ['', Validators.required], description: [''] });
     this.materialForm = this.fb.group({ name: ['', Validators.required], category_id: ['', Validators.required], unit: ['Bags'], description: [''] });
   }
@@ -87,7 +104,7 @@ export class StockManagementComponent implements OnInit {
     this.loadProjects(); 
     this.loadCategories(); 
     this.loadMaterials();
-    this.addItem(); // Add one blank row by default
+    this.addItem(); 
     
     const savedTab = sessionStorage.getItem('activeInventoryTab');
     if (savedTab && ['stock', 'category', 'material'].includes(savedTab)) this.switchTab(savedTab as 'stock' | 'category' | 'material');
@@ -96,25 +113,32 @@ export class StockManagementComponent implements OnInit {
   switchTab(tab: 'stock' | 'category' | 'material'): void {
     this.activeTab = tab;
     sessionStorage.setItem('activeInventoryTab', tab);
+    setTimeout(() => {
+      if (tab === 'stock') { this.stockDataSource.paginator = this.stockPaginator; this.stockDataSource.sort = this.stockSort; }
+      else if (tab === 'category') { this.categoryDataSource.paginator = this.categoryPaginator; this.categoryDataSource.sort = this.categorySort; }
+      else if (tab === 'material') { this.materialDataSource.paginator = this.materialPaginator; this.materialDataSource.sort = this.materialSort; }
+    });
   }
 
-  // --- FORM ARRAY GETTER & METHODS ---
+  // ==========================================
+  // STOCK ENTRY LOGIC
+  // ==========================================
+
   get items(): FormArray {
     return this.stockForm.get('items') as FormArray;
   }
 
   addItem(): void {
     const itemGroup = this.fb.group({
-      category_id: [''], // Optional filter
+      category_id: [''],
       material_id: ['', Validators.required],
       quantity: [1, [Validators.required, Validators.min(0.01)]],
-      unit_price: [0, [Validators.required, Validators.min(0)]],
+      unit_price: [0, [Validators.min(0)]],
       tax_percent: [0, [Validators.min(0)]],
-      tax_amount: [{ value: 0, disabled: true }], // Calculated field
-      total_cost: [{ value: 0, disabled: true }]  // Calculated field
+      tax_amount: [{ value: 0, disabled: true }], 
+      total_cost: [{ value: 0, disabled: true }]  
     });
 
-    // Auto-calculate logic for this specific row
     itemGroup.valueChanges.subscribe(val => {
       const qty = val.quantity || 0;
       const price = val.unit_price || 0;
@@ -123,7 +147,6 @@ export class StockManagementComponent implements OnInit {
       const taxAmt = price * (taxPct / 100);
       const total = (price + taxAmt) * qty;
 
-      // Update without triggering infinite loop
       itemGroup.patchValue({
         tax_amount: parseFloat(taxAmt.toFixed(2)),
         total_cost: parseFloat(total.toFixed(2))
@@ -141,11 +164,8 @@ export class StockManagementComponent implements OnInit {
     }
   }
 
-  // --- DATA LOADING ---
   loadProjects(): void { this.projectService.getProjects().subscribe(res => this.projects = res); }
-  loadCategories(): void { this.materialService.getCategories().subscribe(res => this.categories = res); }
-  loadMaterials(): void { this.materialService.getMaterials().subscribe(res => this.materials = res); }
-
+  
   getFilteredMaterials(categoryId: any): any[] {
     if (!categoryId) return this.materials;
     return this.materials.filter(m => m.category_id === Number(categoryId));
@@ -169,7 +189,6 @@ export class StockManagementComponent implements OnInit {
     } 
   }
 
-  // --- SUBMIT LOGIC ---
   submitStock(): void {
     if (this.stockForm.invalid) { 
       this.stockForm.markAllAsTouched(); 
@@ -178,19 +197,16 @@ export class StockManagementComponent implements OnInit {
     }
 
     this.submittingStock = true;
-    const formValue = this.stockForm.getRawValue(); // gets raw value including disabled calculated fields
+    const formValue = this.stockForm.getRawValue(); 
     const apiRequests: any[] = [];
 
-    // Loop through each material row and create a separate transaction
     formValue.items.forEach((item: any) => {
       const basePayload = {
         project_id: formValue.project_id,
-        reference_no: formValue.invoice_no, // using reference_no for invoice
+        reference_no: formValue.invoice_no, 
         material_id: item.material_id,
         quantity: item.quantity,
-        unit_price: item.unit_price,
-        tax_percent: item.tax_percent,
-        tax_amount: item.tax_amount,
+        unit_cost: item.unit_price, // maps to your backend
         total_cost: item.total_cost
       };
 
@@ -212,17 +228,14 @@ export class StockManagementComponent implements OnInit {
       }
     });
 
-    // Execute all requests at once
     forkJoin(apiRequests).subscribe({
       next: () => {
         this.toastr.success(`Successfully saved ${formValue.items.length} material entries!`);
-        
-        // Reset form but keep project and site selected
         const currentProject = formValue.project_id;
         const currentSite = formValue.site_id;
         this.stockForm.reset({ project_id: currentProject, site_id: currentSite, entry_type: 'received' });
         this.items.clear();
-        this.addItem(); // add blank row back
+        this.addItem(); 
         this.loadStockEntries();
         this.submittingStock = false;
       },
@@ -248,5 +261,148 @@ export class StockManagementComponent implements OnInit {
       },
       error: () => { this.loadingStockEntries = false; }
     });
+  }
+
+  deleteStockEntry(id: number): void { 
+    if (confirm('Delete this transaction?')) { 
+      this.stockService.deleteStockEntry(id).subscribe({ 
+        next: () => { this.toastr.success('Transaction deleted'); this.loadStockEntries(); }, 
+        error: () => this.toastr.error('Failed to delete') 
+      }); 
+    } 
+  }
+
+  formatEntryType(type: string, remarks?: string): string {
+    if (type === 'used' && remarks?.includes('Transfer OUT')) return 'SENT TO SITE';
+    if (type === 'returned_received' && remarks?.includes('Transfer IN')) return 'RECEIVED FROM SITE';
+    if (type === 'returned_received') return 'RETURNED FROM SITE';
+    return type.replace('_', ' ').toUpperCase();
+  }
+
+  getEntryBadge(type: string, remarks?: string): string {
+    if (type === 'used' && remarks?.includes('Transfer OUT')) return 'bg-info text-dark border border-info';
+    if (type === 'returned_received' && remarks?.includes('Transfer IN')) return 'bg-primary text-white';
+    switch (type) {
+      case 'received': return 'bg-success';
+      case 'used': return 'bg-danger';
+      case 'returned_received': return 'bg-primary text-white';
+      case 'returned_supplier': return 'bg-warning text-dark';
+      default: return 'bg-secondary';
+    }
+  }
+
+  // ==========================================
+  // CATEGORY LOGIC
+  // ==========================================
+
+  loadCategories(): void { 
+    this.materialService.getCategories().subscribe(res => { 
+      this.categories = res; 
+      this.categoryDataSource.data = res; 
+      if (this.activeTab === 'category') this.categoryDataSource.paginator = this.categoryPaginator; 
+    }); 
+  }
+
+  getCategoryName(categoryId: number): string { 
+    const cat = this.categories.find(c => c.id === categoryId); 
+    return cat ? cat.name : 'Unknown'; 
+  }
+
+  submitCategory(): void {
+    if (this.categoryForm.invalid) { this.categoryForm.markAllAsTouched(); return; }
+    this.submittingCategory = true;
+    const payload = this.categoryForm.value;
+    const request = (this.isEditingCategory && this.editingCategoryId) ? this.materialService.createCategory(payload) : this.materialService.createCategory(payload);
+    request.subscribe({ 
+      next: () => { this.toastr.success(this.isEditingCategory ? 'Category updated' : 'Category created'); this.loadCategories(); this.resetCategoryForm(); this.submittingCategory = false; }, 
+      error: () => { this.toastr.error('Failed to save category'); this.submittingCategory = false; } 
+    });
+  }
+
+  editCategory(category: any): void { 
+    this.isEditingCategory = true; 
+    this.editingCategoryId = category.id; 
+    this.categoryForm.patchValue({ name: category.name, description: category.description }); 
+  }
+
+  resetCategoryForm(): void { 
+    this.isEditingCategory = false; 
+    this.editingCategoryId = null; 
+    this.categoryForm.reset(); 
+  }
+
+  deleteCategory(id: number): void { 
+    if (confirm('Are you sure you want to delete this category?')) { 
+      this.materialService.deleteCategory(id).subscribe({ 
+        next: () => { this.toastr.success('Category deleted successfully'); this.loadCategories(); }, 
+        error: (err) => { this.toastr.error(err.error?.detail || 'Failed to delete category'); } 
+      }); 
+    } 
+  }
+
+  // ==========================================
+  // MATERIAL LOGIC
+  // ==========================================
+
+  loadMaterials(): void { 
+    this.materialService.getMaterials().subscribe(res => { 
+      this.materials = res; 
+      this.materialDataSource.data = res; 
+      this.materialDataSource.filterPredicate = (data: any, filter: string): boolean => { 
+        return data.name.toLowerCase().includes(filter) || (data.description && data.description.toLowerCase().includes(filter)); 
+      }; 
+      if (this.activeTab === 'material') this.materialDataSource.paginator = this.materialPaginator; 
+    }); 
+  }
+
+  submitMaterial(): void {
+    if (this.materialForm.invalid) { this.materialForm.markAllAsTouched(); return; }
+    const payload = this.materialForm.value;
+    const isDuplicate = this.materials.some(existingMaterial => { 
+      if (this.isEditingMaterial && this.editingMaterialId === existingMaterial.id) return false; 
+      return existingMaterial.name.toLowerCase().trim() === payload.name.toLowerCase().trim(); 
+    });
+    
+    if (isDuplicate) { this.toastr.warning('A material with this name already exists!'); return; }
+    
+    this.submittingMaterial = true;
+    if (this.isEditingMaterial && this.editingMaterialId) { 
+      this.materialService.updateMaterial(this.editingMaterialId, payload).subscribe({ 
+        next: () => { this.toastr.success('Material updated'); this.loadMaterials(); this.resetMaterialForm(); this.submittingMaterial = false; }, 
+        error: () => { this.toastr.error('Failed to update material'); this.submittingMaterial = false; } 
+      }); 
+    } else { 
+      this.materialService.createMaterial(payload).subscribe({ 
+        next: () => { this.toastr.success('Material created'); this.loadMaterials(); this.resetMaterialForm(); this.submittingMaterial = false; }, 
+        error: () => { this.toastr.error('Failed to create material'); this.submittingMaterial = false; } 
+      }); 
+    }
+  }
+
+  editMaterial(material: any): void { 
+    this.isEditingMaterial = true; 
+    this.editingMaterialId = material.id; 
+    this.materialForm.patchValue({ name: material.name, category_id: material.category_id, unit: material.unit, description: material.description }); 
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+  }
+
+  deleteMaterial(id: number): void { 
+    if (confirm('Delete this material?')) { 
+      this.materialService.deleteMaterial(id).subscribe({ 
+        next: () => { this.toastr.success('Material deleted'); this.loadMaterials(); }, 
+        error: () => this.toastr.error('Failed to delete') 
+      }); 
+    } 
+  }
+
+  resetMaterialForm(): void { 
+    this.isEditingMaterial = false; 
+    this.editingMaterialId = null; 
+    this.materialForm.reset({ unit: 'Bags' }); 
+  }
+
+  applyMaterialSearch(): void { 
+    this.materialDataSource.filter = this.materialSearchTerm.trim().toLowerCase(); 
+    if (this.materialDataSource.paginator) { this.materialDataSource.paginator.firstPage(); } 
   }
 }

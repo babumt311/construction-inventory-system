@@ -31,6 +31,9 @@ async def login(
     logger.info(f"Login attempt for username: {form_data.username}")
     
     user = authenticate_user(db, form_data.username, form_data.password)
+
+    user.last_login = datetime.now()
+    db.commit()
     
     if not user:
         logger.warning(f"Failed login attempt for: {form_data.username}")

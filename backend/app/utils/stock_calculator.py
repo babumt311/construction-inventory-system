@@ -124,8 +124,6 @@ class StockCalculator:
             end_dt = datetime.combine(effective_end, datetime.max.time())
             
             for material in materials:
-                
-                # --- APPLY NEW FILTERS HERE ---
                 query = db.query(models.StockEntry).filter(
                     models.StockEntry.site_id == site_id,
                     models.StockEntry.material_id == material.id,
@@ -134,26 +132,22 @@ class StockCalculator:
                 )
                 
                 if supplier_name:
-                    # Uses ilike for case-insensitive search 
                     query = query.filter(models.StockEntry.supplier_name.ilike(f"%{supplier_name}%"))
-                    
                 if entry_type:
                     query = query.filter(models.StockEntry.entry_type == entry_type)
                     
                 entries_in_range = query.order_by(models.StockEntry.entry_date.asc()).all()
-                # ------------------------------
                 
                 if not entries_in_range:
-                    # If advanced filters are applied, but yield no results, skip adding this material to the summary
                     if supplier_name or entry_type:
                         continue 
 
                     calc = StockCalculator.calculate_balance(db, site_id, material.id, end_dt)
-                    actual_last_date = db.query(func.max(models.StockEntry.entry_date)).filter(
+                    latest_entry = db.query(models.StockEntry).filter(
                         models.StockEntry.site_id == site_id,
                         models.StockEntry.material_id == material.id,
                         models.StockEntry.entry_date <= end_dt
-                    ).scalar()
+                    ).order_by(models.StockEntry.entry_date.desc()).first()
                     
                     summary.append({
                         "material_id": material.id,
@@ -170,7 +164,10 @@ class StockCalculator:
                         "total_transfer_in": Decimal('0.00'),
                         "total_transfer_out": Decimal('0.00'),
                         "has_negative_balance": calc["current_balance"] < 0,
-                        "last_updated": actual_last_date
+                        "supplier_name": getattr(latest_entry, 'supplier_name', '-') if latest_entry else "-",
+                        "invoice_no": getattr(latest_entry, 'invoice_no', '-') if latest_entry else "-",
+                        "invoice_date": getattr(latest_entry, 'invoice_date', None) if latest_entry else None,
+                        "last_updated": latest_entry.entry_date if latest_entry else None
                     })
                     continue
                 
@@ -196,11 +193,19 @@ class StockCalculator:
                     day_returned_supplier = Decimal('0.00')
                     day_transfer_in = Decimal('0.00')
                     day_transfer_out = Decimal('0.00')
+                    
+                    # Track latest details for this period
                     latest_in_day = None
+                    latest_supplier = "-"
+                    latest_invoice = "-"
+                    latest_inv_date = None
                     
                     for e, safe_date in daily_data:
                         if latest_in_day is None or safe_date > latest_in_day:
                             latest_in_day = safe_date
+                            latest_supplier = getattr(e, 'supplier_name', None) or "-"
+                            latest_invoice = getattr(e, 'invoice_no', None) or "-"
+                            latest_inv_date = getattr(e, 'invoice_date', None)
                             
                         entry_cost = e.total_cost or Decimal('0.00')
                             
@@ -235,15 +240,18 @@ class StockCalculator:
                         "total_transfer_in": day_transfer_in,
                         "total_transfer_out": day_transfer_out,
                         "has_negative_balance": closing_bal < 0,
+                        "supplier_name": latest_supplier,
+                        "invoice_no": latest_invoice,
+                        "invoice_date": latest_inv_date,
                         "last_updated": latest_in_day
                     })
         else:
             for material in materials:
                 balance = StockCalculator.calculate_balance(db, site_id, material.id)
-                latest_entry_date = db.query(func.max(models.StockEntry.entry_date)).filter(
+                latest_entry = db.query(models.StockEntry).filter(
                     models.StockEntry.site_id == site_id,
                     models.StockEntry.material_id == material.id
-                ).scalar()
+                ).order_by(models.StockEntry.entry_date.desc()).first()
                 
                 summary.append({
                     "material_id": material.id,
@@ -260,7 +268,10 @@ class StockCalculator:
                     "total_transfer_in": balance["total_transfer_in"],
                     "total_transfer_out": balance["total_transfer_out"],
                     "has_negative_balance": balance["has_negative_balance"],
-                    "last_updated": latest_entry_date 
+                    "supplier_name": getattr(latest_entry, 'supplier_name', '-') if latest_entry else "-",
+                    "invoice_no": getattr(latest_entry, 'invoice_no', '-') if latest_entry else "-",
+                    "invoice_date": getattr(latest_entry, 'invoice_date', None) if latest_entry else None,
+                    "last_updated": latest_entry.entry_date if latest_entry else None 
                 })
         
         return summary

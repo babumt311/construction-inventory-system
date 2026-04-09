@@ -78,10 +78,22 @@
               </div>
             </ng-container>
 
-            <div class="col-md-3">
-              <label class="form-label fw-bold small text-muted">Invoice / Ref No *</label>
-              <input type="text" class="form-control" formControlName="invoice_no" [class.is-invalid]="stockForm.get('invoice_no')?.invalid && stockForm.get('invoice_no')?.touched">
-            </div>
+            <ng-container *ngIf="stockForm.get('entry_type')?.value === 'received'">
+              <div class="col-md-3">
+                <label class="form-label fw-bold small text-muted text-success">Supplier Name *</label>
+                <input type="text" class="form-control border-success" formControlName="supplier_name" [class.is-invalid]="stockForm.get('supplier_name')?.invalid && stockForm.get('supplier_name')?.touched" placeholder="Enter Supplier Name">
+              </div>
+
+              <div class="col-md-3">
+                <label class="form-label fw-bold small text-muted text-success">Invoice / Ref No *</label>
+                <input type="text" class="form-control border-success" formControlName="invoice_no" [class.is-invalid]="stockForm.get('invoice_no')?.invalid && stockForm.get('invoice_no')?.touched" placeholder="Enter invoice number">
+              </div>
+
+              <div class="col-md-3">
+                <label class="form-label fw-bold small text-muted text-success">Invoice Date *</label>
+                <input type="date" class="form-control border-success" formControlName="invoice_date" [class.is-invalid]="stockForm.get('invoice_date')?.invalid && stockForm.get('invoice_date')?.touched">
+              </div>
+            </ng-container>
 
             <div class="col-md-12">
               <label class="form-label fw-bold small text-muted">Remarks</label>

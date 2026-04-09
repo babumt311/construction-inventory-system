@@ -173,6 +173,7 @@ class StockCalculator:
                 
                 entries_by_date = {}
                 for e in entries_in_range:
+                    from datetime import timedelta
                     safe_date = e.entry_date.replace(tzinfo=None) if getattr(e.entry_date, 'tzinfo', None) else e.entry_date
                     d_key = safe_date.date()
                     if d_key not in entries_by_date:
@@ -180,6 +181,7 @@ class StockCalculator:
                     entries_by_date[d_key].append((e, safe_date))
                     
                 for d_key, daily_data in entries_by_date.items():
+                    from datetime import timedelta
                     day_start = datetime.combine(d_key, datetime.min.time())
                     opening_dt = day_start - timedelta(microseconds=1)
                     
@@ -189,12 +191,10 @@ class StockCalculator:
                     day_received = Decimal('0.00')
                     day_received_value = Decimal('0.00')
                     day_used = Decimal('0.00')
-                    day_used_value = Decimal('0.00')
                     day_returned_supplier = Decimal('0.00')
                     day_transfer_in = Decimal('0.00')
                     day_transfer_out = Decimal('0.00')
                     
-                    # Track latest details for this period
                     latest_in_day = None
                     latest_supplier = "-"
                     latest_invoice = "-"
@@ -217,13 +217,19 @@ class StockCalculator:
                                 day_transfer_out += e.quantity
                             else:
                                 day_used += e.quantity
-                                day_used_value += entry_cost
                         elif e.entry_type == 'returned_received':
                             day_transfer_in += e.quantity
                         elif e.entry_type == 'returned_supplier':
                             day_returned_supplier += e.quantity
                             
                     closing_bal = opening_bal + day_received + day_transfer_in - day_used - day_transfer_out - day_returned_supplier
+                    
+                    # --- NEW LOGIC: Dynamic Average Costing for Used Items ---
+                    tot_rec_qty = opening_calc.get("total_received", Decimal('0')) + day_received
+                    tot_rec_val = opening_calc.get("received_value", Decimal('0')) + day_received_value
+                    avg_cost = tot_rec_val / tot_rec_qty if tot_rec_qty > 0 else Decimal('0')
+                    dynamic_used_value = day_used * avg_cost
+                    # ---------------------------------------------------------
                     
                     summary.append({
                         "material_id": material.id,
@@ -235,7 +241,7 @@ class StockCalculator:
                         "total_received": day_received,
                         "received_value": day_received_value,
                         "total_used": day_used,
-                        "used_value": day_used_value,
+                        "used_value": dynamic_used_value, # <-- Patched here
                         "total_returned_supplier": day_returned_supplier,
                         "total_transfer_in": day_transfer_in,
                         "total_transfer_out": day_transfer_out,
@@ -253,6 +259,13 @@ class StockCalculator:
                     models.StockEntry.material_id == material.id
                 ).order_by(models.StockEntry.entry_date.desc()).first()
                 
+                # --- NEW LOGIC: Dynamic Average Costing for Used Items ---
+                rec_qty = balance.get("total_received", Decimal('0'))
+                rec_val = balance.get("received_value", Decimal('0'))
+                avg_cost = rec_val / rec_qty if rec_qty > 0 else Decimal('0')
+                dynamic_used_value = balance.get("total_used", Decimal('0')) * avg_cost
+                # ---------------------------------------------------------
+                
                 summary.append({
                     "material_id": material.id,
                     "material_name": material.name,
@@ -261,9 +274,9 @@ class StockCalculator:
                     "current_balance": balance["current_balance"],
                     "opening_balance": balance["opening_balance"],
                     "total_received": balance["total_received"],
-                    "received_value": balance["received_value"],
+                    "received_value": balance.get("received_value", Decimal('0')),
                     "total_used": balance["total_used"],
-                    "used_value": balance["used_value"],
+                    "used_value": dynamic_used_value, # <-- Patched here
                     "total_returned_supplier": balance["total_returned_supplier"],
                     "total_transfer_in": balance["total_transfer_in"],
                     "total_transfer_out": balance["total_transfer_out"],

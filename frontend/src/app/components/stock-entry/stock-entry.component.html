@@ -23,17 +23,17 @@
           </div>
           
           <div class="col-md-3">
+            <label class="form-label small fw-bold">Transaction Type *</label>
+            <select class="form-select bg-light border-primary border-2" formControlName="transaction_type">
+              <option *ngFor="let type of transactionTypes" [value]="type.value">{{ type.label }}</option>
+            </select>
+          </div>
+          
+          <div class="col-md-3">
             <label class="form-label small fw-bold">Site (From) *</label>
             <select class="form-select bg-light" formControlName="site_id">
               <option value="">Select Site</option>
               <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
-            </select>
-          </div>
-
-          <div class="col-md-3">
-            <label class="form-label small fw-bold">Transaction Type *</label>
-            <select class="form-select bg-light border-primary border-2" formControlName="transaction_type">
-              <option *ngFor="let type of transactionTypes" [value]="type.value">{{ type.label }}</option>
             </select>
           </div>
 
@@ -45,12 +45,24 @@
             </select>
           </div>
 
-          <div class="col-md-3">
-            <label class="form-label small fw-bold text-danger">Invoice / Reference No. *</label>
-            <input type="text" class="form-control" formControlName="invoice_no" placeholder="Enter invoice number">
-          </div>
+          <ng-container *ngIf="stockForm.get('transaction_type')?.value === 'received'">
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-success">Supplier Name *</label>
+              <input type="text" class="form-control" formControlName="supplier_name" placeholder="Enter Supplier Name">
+            </div>
 
-          <div class="col-md-9">
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-success">Invoice / Ref No. *</label>
+              <input type="text" class="form-control" formControlName="invoice_no" placeholder="Enter invoice number">
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-success">Invoice Date *</label>
+              <input type="date" class="form-control" formControlName="invoice_date">
+            </div>
+          </ng-container>
+
+          <div class="col-md-12">
             <label class="form-label small fw-bold">Transaction Remarks</label>
             <input type="text" class="form-control" formControlName="remarks" placeholder="Optional notes for this entire transaction...">
           </div>

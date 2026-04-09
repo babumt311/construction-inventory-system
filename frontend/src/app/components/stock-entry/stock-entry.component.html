@@ -77,10 +77,10 @@
                 <th style="min-width: 180px;" class="small text-muted text-uppercase fw-bold">Category</th>
                 <th style="min-width: 250px;" class="small text-muted text-uppercase fw-bold">Material *</th>
                 <th style="width: 120px;" class="small text-muted text-uppercase fw-bold">Qty *</th>
-                <th style="width: 140px;" class="small text-muted text-uppercase fw-bold">Price/Unit *</th>
-                <th style="width: 100px;" class="small text-muted text-uppercase fw-bold">Tax %</th>
-                <th style="width: 120px;" class="small text-muted text-uppercase fw-bold text-end">Tax Amt</th>
-                <th style="width: 150px;" class="small text-muted text-uppercase fw-bold text-end">Total Cost</th>
+                <th *ngIf="isReceivedType" style="width: 140px;" class="small text-muted text-uppercase fw-bold">Price/Unit *</th>
+                <th *ngIf="isReceivedType" style="width: 100px;" class="small text-muted text-uppercase fw-bold">Tax %</th>
+                <th *ngIf="isReceivedType" style="width: 120px;" class="small text-muted text-uppercase fw-bold text-end">Tax Amt</th>
+                <th *ngIf="isReceivedType" style="width: 150px;" class="small text-muted text-uppercase fw-bold text-end">Total Cost</th>
                 <th style="width: 60px;"></th>
               </tr>
             </thead>
@@ -105,25 +105,25 @@
                   <input type="number" class="form-control form-control-sm" formControlName="quantity" placeholder="0">
                 </td>
 
-                <td>
+                <td *ngIf="isReceivedType">
                   <div class="input-group input-group-sm">
                     <span class="input-group-text bg-light text-muted">₹</span>
                     <input type="number" class="form-control" formControlName="unit_price" placeholder="0.00">
                   </div>
                 </td>
 
-                <td>
+                <td *ngIf="isReceivedType">
                   <div class="input-group input-group-sm">
                     <input type="number" class="form-control" formControlName="tax_percent" placeholder="0">
                     <span class="input-group-text bg-light text-muted">%</span>
                   </div>
                 </td>
 
-                <td class="text-end text-muted fw-bold">
+                <td *ngIf="isReceivedType" class="text-end text-muted fw-bold">
                   ₹{{ item.get('tax_amount')?.value | number:'1.2-2' }}
                 </td>
 
-                <td class="text-end text-success fw-bold fs-6">
+                <td *ngIf="isReceivedType" class="text-end text-success fw-bold fs-6">
                   ₹{{ item.get('total_cost')?.value | number:'1.2-2' }}
                 </td>
 

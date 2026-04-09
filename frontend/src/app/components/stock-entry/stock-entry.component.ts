@@ -56,7 +56,9 @@ export class StockEntryComponent implements OnInit {
       site_id: ['', Validators.required],
       to_site_id: [''], // Only required for transfers
       transaction_type: ['received', Validators.required],
-      invoice_no: ['', Validators.required],
+      supplier_name: ['', Validators.required], // Required for received
+      invoice_no: ['', Validators.required],    // Required for received
+      invoice_date: ['', Validators.required],  // Required for received
       remarks: [''],
       items: this.fb.array([])
     });
@@ -141,9 +143,14 @@ export class StockEntryComponent implements OnInit {
       }
     });
 
-    // Handle Site-to-Site transfer validation
+    // Handle dynamic validation based on Transaction Type
     this.stockForm.get('transaction_type')?.valueChanges.subscribe(type => {
       const toSiteCtrl = this.stockForm.get('to_site_id');
+      const supplierCtrl = this.stockForm.get('supplier_name');
+      const invoiceNoCtrl = this.stockForm.get('invoice_no');
+      const invoiceDateCtrl = this.stockForm.get('invoice_date');
+
+      // 1. Transfer Logic
       if (type === 'transfer') {
         toSiteCtrl?.setValidators([Validators.required]);
       } else {
@@ -151,6 +158,24 @@ export class StockEntryComponent implements OnInit {
         toSiteCtrl?.setValue('');
       }
       toSiteCtrl?.updateValueAndValidity();
+
+      // 2. Received (Supplier & Invoice) Logic
+      if (type === 'received') {
+        supplierCtrl?.setValidators([Validators.required]);
+        invoiceNoCtrl?.setValidators([Validators.required]);
+        invoiceDateCtrl?.setValidators([Validators.required]);
+      } else {
+        supplierCtrl?.clearValidators();
+        invoiceNoCtrl?.clearValidators();
+        invoiceDateCtrl?.clearValidators();
+        // Clear values so they don't accidentally submit
+        supplierCtrl?.setValue('');
+        invoiceNoCtrl?.setValue('');
+        invoiceDateCtrl?.setValue('');
+      }
+      supplierCtrl?.updateValueAndValidity();
+      invoiceNoCtrl?.updateValueAndValidity();
+      invoiceDateCtrl?.updateValueAndValidity();
     });
 
     // Load ledger when site changes
@@ -195,7 +220,9 @@ export class StockEntryComponent implements OnInit {
         quantity: item.quantity,
         unit_cost: Number(item.unit_price) + Number(item.tax_amount), // Final cost per unit
         total_cost: item.total_cost,
-        invoice_no: formData.invoice_no,
+        supplier_name: formData.supplier_name || null,
+        invoice_no: formData.invoice_no || null,
+        invoice_date: formData.invoice_date || null,
         remarks: formData.remarks
       };
 

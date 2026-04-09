@@ -46,12 +46,13 @@ export class StockService {
   }
 
   // FIX: Updated to natively accept and pass Date Ranges to your backend!
-  getSiteStockSummary(siteId: number, startDate?: string, endDate?: string): Observable<any[]> {
-    const params: any = {};
-    if (startDate) params.start_date = startDate;
-    if (endDate) params.end_date = endDate;
-    
-    return this.api.get<any[]>(`stock/site-summary/${siteId}`, params);
+  getSiteStockSummary(siteId: number, startDate?: string, endDate?: string, supplierName?: string, entryType?: string) {
+    let params = new HttpParams();
+    if (startDate) params = params.set('start_date', startDate);
+    if (endDate) params = params.set('end_date', endDate);
+    if (supplierName) params = params.set('supplier_name', supplierName);
+    if (entryType) params = params.set('entry_type', entryType);
+    return this.http.get<any>(`${this.apiUrl}/stock/site-summary/${siteId}`, { params });
   }
 
   // Daily Reports

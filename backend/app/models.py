@@ -3,7 +3,7 @@ SQLAlchemy models for the application - ENTERPRISE IMMUTABLE LEDGER
 """
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, 
-    ForeignKey, Text, Numeric, Enum, Table, UniqueConstraint
+    ForeignKey, Text, Numeric, Enum, Table, UniqueConstraint, Date
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -173,7 +173,7 @@ class StockEntry(Base):
     
     supplier_name = Column(String(200))
     invoice_no = Column(String(100))
-    invoice_date = Column(DateTime(timezone=True), nullable=True)
+    invoice_date = Column(Date, nullable=True)
     reference = Column(String(200))
     remarks = Column(Text)
     entry_date = Column(DateTime(timezone=True), server_default=func.now(), index=True)

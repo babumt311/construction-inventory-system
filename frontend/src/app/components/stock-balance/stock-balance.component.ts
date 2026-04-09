@@ -194,6 +194,14 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     let loaded = 0;
     const filters = this.filterForm.value;
 
+    // --- NEW: Strict URL Parameter Mapping ---
+    // This forces the dates into the HTTP Request so the backend can't ignore them
+    const apiParams: any = {};
+    if (filters.start_date) apiParams.start_date = filters.start_date;
+    if (filters.end_date) apiParams.end_date = filters.end_date;
+    if (filters.supplier_name) apiParams.supplier_name = filters.supplier_name;
+    if (filters.entry_type) apiParams.entry_type = filters.entry_type;
+
     this.sites.forEach(site => {
       this.stockService.getSiteStockSummary(site.id, filters.start_date, filters.end_date, filters.supplier_name, filters.entry_type).subscribe({
         next: (balances: any) => {

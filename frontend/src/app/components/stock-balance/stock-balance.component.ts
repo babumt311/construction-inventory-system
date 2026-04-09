@@ -6,6 +6,8 @@ import { ToastrService } from 'ngx-toastr';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
+import { forkJoin } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 
 import { StockService } from '../../services/stock.service';
 import { ProjectService } from '../../services/project.service';
@@ -13,7 +15,6 @@ import { MaterialService } from '../../services/material.service';
 import { Project, Site } from '../../models/project.model';
 import { Material } from '../../models/material.model';
 
-// ENTERPRISE EXCEL IMPORTS
 import * as ExcelJS from 'exceljs';
 import * as saveAs from 'file-saver';
 
@@ -33,7 +34,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   filteredMaterials: Material[] = []; 
   
   allTimeBalances: any[] = []; 
-  dateRangedBalances: any[] | null = null; 
   
   selectedMaterial: Material | null = null;
   selectedMaterialHistory: any[] = [];
@@ -50,12 +50,10 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   selectedProjectId?: number;
   viewMode: 'table' | 'cards' = 'table';
 
-  private prevStart: string = '';
-  private prevEnd: string = '';
+  // State trackers to prevent unnecessary API calls
+  private prevBackendState = { start: '', end: '', supplier: '', entryType: '', project: '' };
+  private prevProjectId: any = '';
 
-  // ==========================================
-  // EXPORT MODAL STATE
-  // ==========================================
   showExportModal = false;
   exportColumns: { key: string, label: string, selected: boolean }[] = [];
 
@@ -69,7 +67,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   ) {
     Chart.register(...registerables);
     
-    // Configured to sort by the immutable values sent from the backend
     this.dataSource.sortingDataAccessor = (item, property) => {
       switch(property) {
         case 'material': return (item.material_name || '').toLowerCase();
@@ -98,72 +95,94 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       material_id: [''],
       start_date: [''],
       end_date: [''],
+      supplier_name: [''], // NEW
+      entry_type: [''],    // NEW
       show_negative_only: [false]
     });
   }
 
   ngOnInit(): void {
-    this.loadProjects(); this.loadCategories(); this.loadMaterials();
-    this.filterForm.valueChanges.subscribe(vals => {
-      if (vals.start_date !== this.prevStart || vals.end_date !== this.prevEnd) {
-        this.prevStart = vals.start_date; this.prevEnd = vals.end_date;
-        this.fetchDateRangedData();
+    this.loadCategories(); 
+    this.loadMaterials();
+    this.loadProjectsAndInitialData();
+
+    // Debounce limits API calls while the user is actively typing a supplier name
+    this.filterForm.valueChanges.pipe(debounceTime(400)).subscribe(vals => {
+      const needsBackendFetch = 
+        vals.start_date !== this.prevBackendState.start || 
+        vals.end_date !== this.prevBackendState.end ||
+        vals.supplier_name !== this.prevBackendState.supplier ||
+        vals.entry_type !== this.prevBackendState.entryType ||
+        vals.project_id !== this.prevBackendState.project;
+
+      if (needsBackendFetch) {
+        this.prevBackendState = { start: vals.start_date, end: vals.end_date, supplier: vals.supplier_name, entryType: vals.entry_type, project: vals.project_id };
+        
+        // If project changed, reload the site dropdown list
+        if (vals.project_id !== this.prevProjectId) {
+          this.prevProjectId = vals.project_id;
+          this.filterForm.patchValue({ site_id: '' }, { emitEvent: false });
+          this.loadSitesAndFetchData(vals.project_id);
+        } else {
+          this.fetchDataFromBackend();
+        }
       } else {
-        this.updateTable();
+        this.updateTable(); // Fast client-side filtering
       }
     });
   }
 
-  loadProjects(): void { this.projectService.getProjects().subscribe(p => this.projects = p); }
+  loadProjectsAndInitialData(): void { 
+    this.projectService.getProjects().subscribe(p => {
+      this.projects = p;
+      // Triggers initial load for "All Projects"
+      this.loadSitesAndFetchData(''); 
+    }); 
+  }
+
   loadCategories(): void { this.materialService.getCategories().subscribe(c => this.categories = c); }
   loadMaterials(): void { this.materialService.getMaterials().subscribe(m => { this.materials = m; this.filteredMaterials = m; }); }
 
-  onProjectChange(projectId: any): void {
-    const id = projectId ? Number(projectId) : 0;
-    this.selectedProjectId = id; this.sites = []; this.allTimeBalances = []; this.dateRangedBalances = null;
-    this.filterForm.patchValue({ site_id: '', start_date: '', end_date: '' }, { emitEvent: false });
-    this.prevStart = ''; this.prevEnd = '';
-
-    if (id) {
+  loadSitesAndFetchData(projectId: any): void {
+    this.sites = [];
+    if (!projectId) {
+      // ALL PROJECTS SELECTED: Fetch sites for every single project
+      if (this.projects.length === 0) { this.updateTable(); return; }
       this.loading = true;
-      this.projectService.getProjectSites(id).subscribe(sites => {
-        this.sites = sites.filter(s => s.status.toUpperCase() === 'ACTIVE' || s.status.toUpperCase() === 'IN_PROGRESS');
-        if (this.sites.length === 0) { this.loading = false; return; }
-
-        let loaded = 0;
-        this.sites.forEach(site => {
-          this.stockService.getSiteStockSummary(site.id).subscribe({
-            next: (balances) => {
-              const tagged = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
-              this.allTimeBalances = [...this.allTimeBalances, ...tagged];
-              loaded++;
-              if (loaded === this.sites.length) { this.loading = false; this.updateTable(); }
-            }
-          });
-        });
+      const requests = this.projects.map(p => this.projectService.getProjectSites(p.id));
+      forkJoin(requests).subscribe(results => {
+        this.sites = results.flat().filter(s => s.status.toUpperCase() === 'ACTIVE' || s.status.toUpperCase() === 'IN_PROGRESS');
+        this.fetchDataFromBackend();
       });
-    } else { this.updateTable(); }
+    } else {
+      // SINGLE PROJECT SELECTED
+      this.loading = true;
+      this.projectService.getProjectSites(Number(projectId)).subscribe(sites => {
+        this.sites = sites.filter(s => s.status.toUpperCase() === 'ACTIVE' || s.status.toUpperCase() === 'IN_PROGRESS');
+        this.fetchDataFromBackend();
+      });
+    }
   }
 
-  onSiteChange(siteId: any): void {}
-  onCategoryChange(categoryId: any): void {
-    this.filterForm.patchValue({ material_id: '' }, { emitEvent: false }); 
-    if (categoryId) { this.filteredMaterials = this.materials.filter(m => m.category_id === Number(categoryId)); } 
-    else { this.filteredMaterials = this.materials; }
-    this.updateTable(); 
-  }
+  fetchDataFromBackend(): void {
+    if (this.sites.length === 0) {
+      this.allTimeBalances = [];
+      this.updateTable();
+      this.loading = false;
+      return;
+    }
 
-  fetchDateRangedData(): void {
-    const start = this.filterForm.value.start_date; const end = this.filterForm.value.end_date;
-    if (!start && !end) { this.dateRangedBalances = null; this.updateTable(); return; }
-
-    this.loading = true; this.dateRangedBalances = [];
+    this.loading = true;
+    this.allTimeBalances = [];
     let loaded = 0;
+    const filters = this.filterForm.value;
+
     this.sites.forEach(site => {
-      this.stockService.getSiteStockSummary(site.id, start, end).subscribe({
+      // NOTE: Ensure your stockService is updated to accept the two new parameters
+      this.stockService.getSiteStockSummary(site.id, filters.start_date, filters.end_date, filters.supplier_name, filters.entry_type).subscribe({
         next: (balances) => {
           const tagged = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
-          this.dateRangedBalances = [...(this.dateRangedBalances || []), ...tagged];
+          this.allTimeBalances = [...this.allTimeBalances, ...tagged];
           loaded++;
           if (loaded === this.sites.length) { this.loading = false; this.updateTable(); }
         },
@@ -172,10 +191,18 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  onCategoryChange(categoryId: any): void {
+    this.filterForm.patchValue({ material_id: '' }, { emitEvent: false }); 
+    if (categoryId) { this.filteredMaterials = this.materials.filter(m => m.category_id === Number(categoryId)); } 
+    else { this.filteredMaterials = this.materials; }
+    this.updateTable(); 
+  }
+
   updateTable(): void {
     const filters = this.filterForm.value;
-    let baseData = (this.viewMode === 'table' && this.dateRangedBalances !== null) ? this.dateRangedBalances : this.allTimeBalances;
+    let baseData = this.allTimeBalances;
 
+    // Apply Client-Side Filters
     baseData = baseData.filter(b => {
       if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
       if (filters.material_id && b.material_id !== Number(filters.material_id)) return false;
@@ -191,6 +218,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     if (this.viewMode === 'table') { this.dataSource.paginator = this.paginator; this.dataSource.sort = this.sort; }
   }
 
+  // --- Utility & Display Methods remain exactly the same as your code ---
   get cardData() { return this.dataSource.data; }
   getHealthyStockCount(data: any[]): number { return data.filter(b => !b.has_negative_balance && b.current_balance > 0).length; }
   getLowStockCount(data: any[]): number { return data.filter(b => b.current_balance < 10 && !b.has_negative_balance).length; }
@@ -239,9 +267,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       next: (entries) => {
         this.selectedMaterialHistory = entries;
         this.isLoadingHistory = false;
-        if (entries.length > 0) {
-          setTimeout(() => this.drawChart(entries), 100);
-        }
+        if (entries.length > 0) { setTimeout(() => this.drawChart(entries), 100); }
       },
       error: () => { this.isLoadingHistory = false; }
     });
@@ -294,16 +320,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ==========================================
-  // NEW CUSTOM EXPORT & MODAL LOGIC
-  // ==========================================
   openExportModal(): void {
     if (this.dataSource.data.length === 0) {
       this.toastr.warning('No data to export', 'Warning');
       return;
     }
 
-    // Build the column config matching your table headers exactly
     this.exportColumns = [
       { key: 'project', label: 'Project', selected: true },
       { key: 'site_name', label: 'Site', selected: true },
@@ -325,9 +347,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.showExportModal = true;
   }
 
-  closeExportModal(): void {
-    this.showExportModal = false;
-  }
+  closeExportModal(): void { this.showExportModal = false; }
 
   moveColumn(index: number, direction: number): void {
     const newIndex = index + direction;
@@ -345,7 +365,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Pre-process the raw data to match the dynamic fields
     const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'All Projects';
     const data = this.dataSource.data.map(item => {
       return {
@@ -365,7 +384,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Stock Balance');
 
-    // Title Row
     worksheet.mergeCells(`A1:${String.fromCharCode(64 + selectedCols.length)}1`);
     const titleCell = worksheet.getCell('A1');
     titleCell.value = `Enterprise System: Stock Balance Report`;
@@ -374,7 +392,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
     worksheet.getRow(1).height = 30;
 
-    // Date Subtitle
     const dateStr = new Date().toISOString().split('T')[0];
     worksheet.mergeCells(`A2:${String.fromCharCode(64 + selectedCols.length)}2`);
     const dateCell = worksheet.getCell('A2');
@@ -384,7 +401,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
     worksheet.addRow([]);
 
-    // Headers
     const headerRow = worksheet.addRow(selectedCols.map(c => c.label));
     headerRow.eachCell((cell) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } }; 
@@ -393,25 +409,16 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
     });
 
-    // Data Mapping
     data.forEach((item, index) => {
       const rowData = selectedCols.map(c => item[c.key]);
       const row = worksheet.addRow(rowData);
-      
-      // Alternating row styling
       if (index % 2 === 0) {
-        row.eachCell((cell) => {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-        });
+        row.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; });
       }
     });
 
-    // Column Sizing
-    worksheet.columns.forEach(column => {
-      column.width = 22;
-    });
+    worksheet.columns.forEach(column => { column.width = 22; });
 
-    // Save File
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, `stock-balance-${dateStr}.xlsx`);
@@ -431,5 +438,5 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.updateTable(); 
     if (this.viewMode === 'table') { setTimeout(() => { this.dataSource.paginator = this.paginator; this.dataSource.sort = this.sort; }); }
   }
-  refreshData(): void { if (this.selectedProjectId) this.onProjectChange(this.selectedProjectId); }
+  refreshData(): void { this.loadSitesAndFetchData(this.filterForm.value.project_id); }
 }

@@ -169,6 +169,11 @@ class StockEntry(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     site_id = Column(Integer, ForeignKey("sites.id"), nullable=False)
+    supplier_name = Column(String(200))
+    invoice_no = Column(String(100))
+    invoice_date = Column(DateTime(timezone=True), nullable=True)  # <-- NEW
+    reference = Column(String(200))
+    remarks = Column(Text)
     material_id = Column(Integer, ForeignKey("materials.id"), nullable=False)
     entry_type = Column(String(50), nullable=False)  # received, used, returned_received, returned_supplier
     quantity = Column(Numeric(10, 2), nullable=False)

@@ -27,7 +27,7 @@ pydantic==2.5.0
 pydantic-settings==2.1.0
 
 # Background Tasks
-celery==5.3.4
+celery==5.4.0
 redis==5.0.1
 
 # Email

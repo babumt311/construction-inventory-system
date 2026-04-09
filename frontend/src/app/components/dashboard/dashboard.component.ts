@@ -145,7 +145,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.projectService.getProjectSites(p.id).subscribe(sites => {
         if(!sites) return;
         sites.forEach((s: any) => {
-          this.stockService.getSiteStockSummary(s.id).subscribe(balances => {
+          this.stockService.getSiteStockSummary(s.id).subscribe((balances: any) => {
             if(!balances) return;
             const lowStocks = balances.filter((b: any) => b.current_balance < 10)
                                       .map((b: any) => ({...b, projectName: p.name, siteName: s.name}));

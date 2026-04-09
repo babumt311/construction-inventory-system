@@ -48,7 +48,7 @@ export class StockManagementComponent implements OnInit {
   submittingCategory = false;
 
   // Material Table variables
-  materialColumns: string[] = ['name', 'category', 'unit', 'actions']; // Removed standard_cost
+  materialColumns: string[] = ['name', 'category', 'unit', 'actions'];
   materialDataSource = new MatTableDataSource<any>();
   @ViewChild('materialPaginator') materialPaginator!: MatPaginator;
   @ViewChild('materialSort') materialSort!: MatSort;
@@ -70,7 +70,9 @@ export class StockManagementComponent implements OnInit {
       site_id: [''],
       from_site_id: [''],
       to_site_id: [''],
-      invoice_no: ['', Validators.required], 
+      supplier_name: ['', Validators.required], // NEW
+      invoice_no: ['', Validators.required],    // NEW (Required for received)
+      invoice_date: ['', Validators.required],  // NEW
       entry_type: ['received', Validators.required],
       remarks: [''],
       items: this.fb.array([]) 
@@ -80,7 +82,11 @@ export class StockManagementComponent implements OnInit {
       const siteCtrl = this.stockForm.get('site_id');
       const fromCtrl = this.stockForm.get('from_site_id');
       const toCtrl = this.stockForm.get('to_site_id');
+      const supplierCtrl = this.stockForm.get('supplier_name');
+      const invoiceNoCtrl = this.stockForm.get('invoice_no');
+      const invoiceDateCtrl = this.stockForm.get('invoice_date');
 
+      // Transfer Logic
       if (type === 'transfer') {
         siteCtrl?.clearValidators();
         fromCtrl?.setValidators(Validators.required);
@@ -90,12 +96,31 @@ export class StockManagementComponent implements OnInit {
         fromCtrl?.clearValidators();
         toCtrl?.clearValidators();
       }
+
+      // Received Logic (Supplier and Invoice)
+      if (type === 'received') {
+        supplierCtrl?.setValidators(Validators.required);
+        invoiceNoCtrl?.setValidators(Validators.required);
+        invoiceDateCtrl?.setValidators(Validators.required);
+      } else {
+        supplierCtrl?.clearValidators();
+        invoiceNoCtrl?.clearValidators();
+        invoiceDateCtrl?.clearValidators();
+        // Clear the values so they don't accidentally submit
+        supplierCtrl?.setValue('');
+        invoiceNoCtrl?.setValue('');
+        invoiceDateCtrl?.setValue('');
+      }
+
       siteCtrl?.updateValueAndValidity();
       fromCtrl?.updateValueAndValidity();
       toCtrl?.updateValueAndValidity();
+      supplierCtrl?.updateValueAndValidity();
+      invoiceNoCtrl?.updateValueAndValidity();
+      invoiceDateCtrl?.updateValueAndValidity();
     });
 
-    // Category and Material Forms (Standard cost removed)
+    // Category and Material Forms
     this.categoryForm = this.fb.group({ name: ['', Validators.required], description: [''] });
     this.materialForm = this.fb.group({ name: ['', Validators.required], category_id: ['', Validators.required], unit: ['Bags'], description: [''] });
   }
@@ -119,10 +144,6 @@ export class StockManagementComponent implements OnInit {
       else if (tab === 'material') { this.materialDataSource.paginator = this.materialPaginator; this.materialDataSource.sort = this.materialSort; }
     });
   }
-
-  // ==========================================
-  // STOCK ENTRY LOGIC
-  // ==========================================
 
   get items(): FormArray {
     return this.stockForm.get('items') as FormArray;
@@ -203,10 +224,13 @@ export class StockManagementComponent implements OnInit {
     formValue.items.forEach((item: any) => {
       const basePayload = {
         project_id: formValue.project_id,
-        reference_no: formValue.invoice_no, 
+        supplier_name: formValue.supplier_name || null, // NEW
+        invoice_no: formValue.invoice_no || null,       // NEW
+        invoice_date: formValue.invoice_date || null,   // NEW
+        reference_no: formValue.invoice_no || null,     // Keep backward compatibility
         material_id: item.material_id,
         quantity: item.quantity,
-        unit_cost: item.unit_price, // maps to your backend
+        unit_cost: item.unit_price,
         total_cost: item.total_cost
       };
 
@@ -291,10 +315,6 @@ export class StockManagementComponent implements OnInit {
     }
   }
 
-  // ==========================================
-  // CATEGORY LOGIC
-  // ==========================================
-
   loadCategories(): void { 
     this.materialService.getCategories().subscribe(res => { 
       this.categories = res; 
@@ -339,10 +359,6 @@ export class StockManagementComponent implements OnInit {
       }); 
     } 
   }
-
-  // ==========================================
-  // MATERIAL LOGIC
-  // ==========================================
 
   loadMaterials(): void { 
     this.materialService.getMaterials().subscribe(res => { 

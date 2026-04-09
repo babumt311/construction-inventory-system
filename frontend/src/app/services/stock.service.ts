@@ -53,7 +53,7 @@ export class StockService {
     if (endDate) params = params.set('end_date', endDate);
     if (supplierName) params = params.set('supplier_name', supplierName);
     if (entryType) params = params.set('entry_type', entryType);
-    return this.http.get<any>(`${this.apiUrl}/stock/site-summary/${siteId}`, { params });
+    return this.httpClient.get<any>(`${this.apiUrl}/stock/site-summary/${siteId}`, { params });
   }
 
   // Daily Reports

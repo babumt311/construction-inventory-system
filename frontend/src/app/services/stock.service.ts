@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 import {
   StockEntry,
   StockEntryCreateRequest,
@@ -53,7 +54,7 @@ export class StockService {
     if (endDate) params = params.set('end_date', endDate);
     if (supplierName) params = params.set('supplier_name', supplierName);
     if (entryType) params = params.set('entry_type', entryType);
-    return this.httpClient.get<any>(`${environment.apiUrl}/stock/site-summary/${siteId}`, { params });
+    return this.http.get<any>(`${environment.apiUrl}/stock/site-summary/${siteId}`, { params });
   }
 
   // Daily Reports

@@ -76,6 +76,15 @@ async def create_stock_entry(
         # Remove reference_no from dictionary so SQLAlchemy doesn't crash
         stock_data.pop("reference_no")
 
+    # --- ORIGIN TRACKING: Auto-inherit supplier data for non-received items ---
+    if stock_data["entry_type"] != "received":
+        sup_info = StockCalculator.get_latest_supplier_info(db, stock_data["site_id"], stock_data["material_id"])
+        if sup_info:
+            stock_data["supplier_name"] = sup_info.supplier_name
+            stock_data["invoice_no"] = sup_info.invoice_no
+            stock_data["invoice_date"] = sup_info.invoice_date
+    # --------------------------------------------------------------------------
+
     # --- ENTERPRISE LEDGER PROTOCOL: USE FRONTEND DYNAMIC COST ---
     # Apply cost data from frontend, fallback to standard material cost if missing
     stock_data["unit_cost"] = stock_in.unit_cost or material.standard_cost or Decimal('0.00')
@@ -179,6 +188,16 @@ async def read_stock_entries(
     
     # Apply pagination
     entries = query.offset(pagination.skip).limit(pagination.size).all()
+    
+    # --- HISTORICAL HEALING: Attach supplier info to old blank rows ---
+    for entry in entries:
+        if not entry.supplier_name or entry.supplier_name == '':
+            sup_info = StockCalculator.get_latest_supplier_info(db, entry.site_id, entry.material_id, entry.entry_date)
+            if sup_info:
+                entry.supplier_name = sup_info.supplier_name
+                entry.invoice_no = sup_info.invoice_no
+                entry.invoice_date = sup_info.invoice_date
+    # ------------------------------------------------------------------
     
     logger.debug(f"Returning {len(entries)} stock entries")
     return entries

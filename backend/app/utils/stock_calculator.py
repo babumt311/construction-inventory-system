@@ -163,11 +163,8 @@ class StockCalculator:
             ).order_by(models.StockEntry.entry_date.asc()).all()
 
             # 2. STRICT ISOLATION: If a date range is active, skip materials with 0 transactions in this window
-            if has_date_filter and len(entries) == 0:
-                continue
-            
-            # If no date filter, skip only if absolutely no history (fallback)
-            if not has_date_filter and len(entries) == 0 and opening_bal == 0:
+           # 2. STRICT VISIBILITY: Skip only if there are NO transactions AND NO opening balance
+            if len(entries) == 0 and opening_bal == 0:
                 continue
 
             period_received = Decimal('0.0')

@@ -42,7 +42,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   
   filterForm: FormGroup;
   
-  displayedColumns: string[] = ['material', 'category', 'site', 'current_balance', 'opening_balance', 'total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier', 'updated_at', 'status'];
+  displayedColumns: string[] = ['material', 'category', 'site', 'supplier_name', 'invoice_no', 'invoice_date', 'current_balance', 'opening_balance', 'total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier', 'updated_at', 'status'];
   dataSource = new MatTableDataSource<any>();
   
   materialChart: Chart | null = null;
@@ -81,6 +81,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         case 'total_transfer_out': return Number(item.total_transfer_out || 0);
         case 'total_transfer_in': return Number(item.total_transfer_in || 0);
         case 'total_returned_supplier': return Number(item.total_returned_supplier || 0);
+        case 'supplier_name': return (item.supplier_name || '').toLowerCase();
+        case 'invoice_no': return (item.invoice_no || '').toLowerCase();
+        case 'invoice_date': return item.invoice_date ? new Date(item.invoice_date).getTime() : 0;
         case 'updated_at': 
           const dateStr = item.updated_at || item.created_at || item.last_updated || item.entry_date || item.report_date;
           return dateStr ? new Date(dateStr).getTime() : 0;
@@ -331,6 +334,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       { key: 'site_name', label: 'Site', selected: true },
       { key: 'material_name', label: 'Material', selected: true },
       { key: 'category', label: 'Category', selected: true },
+      { key: 'supplier_name', label: 'Supplier Name', selected: true },
+      { key: 'invoice_no', label: 'Invoice No', selected: true },
+      { key: 'invoice_date', label: 'Invoice Date', selected: true },
       { key: 'current_balance', label: 'Current Balance', selected: true },
       { key: 'opening_balance', label: 'Opening Balance', selected: true },
       { key: 'total_received', label: 'Received Qty', selected: true },

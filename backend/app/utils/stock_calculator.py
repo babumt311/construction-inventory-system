@@ -111,6 +111,25 @@ class StockCalculator:
         }
     
     @staticmethod
+    def get_latest_supplier_info(db: Session, site_id: int, material_id: int, as_of: datetime = None):
+        """Detective function: Looks back in time to find the original supplier/invoice"""
+        query = db.query(models.StockEntry).filter(
+            models.StockEntry.material_id == material_id,
+            models.StockEntry.supplier_name.isnot(None),
+            models.StockEntry.supplier_name != ''
+        )
+        if as_of:
+            query = query.filter(models.StockEntry.entry_date <= as_of)
+            
+        # Try finding it for this specific site first
+        site_query = query.filter(models.StockEntry.site_id == site_id).order_by(models.StockEntry.entry_date.desc()).first()
+        if site_query:
+            return site_query
+            
+        # Fallback to any site (if it was transferred in from somewhere else)
+        return query.order_by(models.StockEntry.entry_date.desc()).first()
+
+    @staticmethod
     def get_site_stock_summary(db: Session, site_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None, supplier_name: Optional[str] = None, entry_type: Optional[str] = None) -> List[Dict[str, Any]]:
         summary = []
         materials = db.query(models.Material).join(models.StockEntry).filter(
@@ -131,23 +150,17 @@ class StockCalculator:
                     models.StockEntry.entry_date <= end_dt
                 )
                 
-                if supplier_name:
-                    query = query.filter(models.StockEntry.supplier_name.ilike(f"%{supplier_name}%"))
-                if entry_type:
-                    query = query.filter(models.StockEntry.entry_type == entry_type)
-                    
                 entries_in_range = query.order_by(models.StockEntry.entry_date.asc()).all()
                 
                 if not entries_in_range:
-                    if supplier_name or entry_type:
-                        continue 
-
                     calc = StockCalculator.calculate_balance(db, site_id, material.id, end_dt)
                     latest_entry = db.query(models.StockEntry).filter(
                         models.StockEntry.site_id == site_id,
                         models.StockEntry.material_id == material.id,
                         models.StockEntry.entry_date <= end_dt
                     ).order_by(models.StockEntry.entry_date.desc()).first()
+                    
+                    sup_info = StockCalculator.get_latest_supplier_info(db, site_id, material.id, end_dt)
                     
                     summary.append({
                         "material_id": material.id,
@@ -164,10 +177,10 @@ class StockCalculator:
                         "total_transfer_in": Decimal('0.00'),
                         "total_transfer_out": Decimal('0.00'),
                         "has_negative_balance": calc["current_balance"] < 0,
-                        "supplier_name": getattr(latest_entry, 'supplier_name', '-') if latest_entry else "-",
-                        "invoice_no": getattr(latest_entry, 'invoice_no', '-') if latest_entry else "-",
-                        "invoice_date": getattr(latest_entry, 'invoice_date', None) if latest_entry else None,
-                        "last_updated": latest_entry.entry_date if latest_entry else None
+                        "supplier_name": getattr(sup_info, 'supplier_name', '-') if sup_info else "-",
+                        "invoice_no": getattr(sup_info, 'invoice_no', '-') if sup_info else "-",
+                        "invoice_date": getattr(sup_info, 'invoice_date', None) if sup_info else None,
+                        "last_updated": getattr(latest_entry, 'entry_date', None)
                     })
                     continue
                 
@@ -196,16 +209,10 @@ class StockCalculator:
                     day_transfer_out = Decimal('0.00')
                     
                     latest_in_day = None
-                    latest_supplier = "-"
-                    latest_invoice = "-"
-                    latest_inv_date = None
                     
                     for e, safe_date in daily_data:
                         if latest_in_day is None or safe_date > latest_in_day:
                             latest_in_day = safe_date
-                            latest_supplier = getattr(e, 'supplier_name', None) or "-"
-                            latest_invoice = getattr(e, 'invoice_no', None) or "-"
-                            latest_inv_date = getattr(e, 'invoice_date', None)
                             
                         entry_cost = e.total_cost or Decimal('0.00')
                             
@@ -224,12 +231,15 @@ class StockCalculator:
                             
                     closing_bal = opening_bal + day_received + day_transfer_in - day_used - day_transfer_out - day_returned_supplier
                     
-                    # --- NEW LOGIC: Dynamic Average Costing for Used Items ---
+                    # --- AVERAGE COSTING ENGINE ---
                     tot_rec_qty = opening_calc.get("total_received", Decimal('0')) + day_received
                     tot_rec_val = opening_calc.get("received_value", Decimal('0')) + day_received_value
                     avg_cost = tot_rec_val / tot_rec_qty if tot_rec_qty > 0 else Decimal('0')
                     dynamic_used_value = day_used * avg_cost
-                    # ---------------------------------------------------------
+
+                    # Fetch persistent supplier info
+                    day_end_dt = datetime.combine(d_key, datetime.max.time())
+                    sup_info = StockCalculator.get_latest_supplier_info(db, site_id, material.id, day_end_dt)
                     
                     summary.append({
                         "material_id": material.id,
@@ -241,14 +251,14 @@ class StockCalculator:
                         "total_received": day_received,
                         "received_value": day_received_value,
                         "total_used": day_used,
-                        "used_value": dynamic_used_value, # <-- Patched here
+                        "used_value": dynamic_used_value,
                         "total_returned_supplier": day_returned_supplier,
                         "total_transfer_in": day_transfer_in,
                         "total_transfer_out": day_transfer_out,
                         "has_negative_balance": closing_bal < 0,
-                        "supplier_name": latest_supplier,
-                        "invoice_no": latest_invoice,
-                        "invoice_date": latest_inv_date,
+                        "supplier_name": getattr(sup_info, 'supplier_name', '-') if sup_info else "-",
+                        "invoice_no": getattr(sup_info, 'invoice_no', '-') if sup_info else "-",
+                        "invoice_date": getattr(sup_info, 'invoice_date', None) if sup_info else None,
                         "last_updated": latest_in_day
                     })
         else:
@@ -259,12 +269,13 @@ class StockCalculator:
                     models.StockEntry.material_id == material.id
                 ).order_by(models.StockEntry.entry_date.desc()).first()
                 
-                # --- NEW LOGIC: Dynamic Average Costing for Used Items ---
+                sup_info = StockCalculator.get_latest_supplier_info(db, site_id, material.id)
+                
+                # --- AVERAGE COSTING ENGINE ---
                 rec_qty = balance.get("total_received", Decimal('0'))
                 rec_val = balance.get("received_value", Decimal('0'))
                 avg_cost = rec_val / rec_qty if rec_qty > 0 else Decimal('0')
                 dynamic_used_value = balance.get("total_used", Decimal('0')) * avg_cost
-                # ---------------------------------------------------------
                 
                 summary.append({
                     "material_id": material.id,
@@ -276,17 +287,32 @@ class StockCalculator:
                     "total_received": balance["total_received"],
                     "received_value": balance.get("received_value", Decimal('0')),
                     "total_used": balance["total_used"],
-                    "used_value": dynamic_used_value, # <-- Patched here
+                    "used_value": dynamic_used_value,
                     "total_returned_supplier": balance["total_returned_supplier"],
                     "total_transfer_in": balance["total_transfer_in"],
                     "total_transfer_out": balance["total_transfer_out"],
                     "has_negative_balance": balance["has_negative_balance"],
-                    "supplier_name": getattr(latest_entry, 'supplier_name', '-') if latest_entry else "-",
-                    "invoice_no": getattr(latest_entry, 'invoice_no', '-') if latest_entry else "-",
-                    "invoice_date": getattr(latest_entry, 'invoice_date', None) if latest_entry else None,
-                    "last_updated": latest_entry.entry_date if latest_entry else None 
+                    "supplier_name": getattr(sup_info, 'supplier_name', '-') if sup_info else "-",
+                    "invoice_no": getattr(sup_info, 'invoice_no', '-') if sup_info else "-",
+                    "invoice_date": getattr(sup_info, 'invoice_date', None) if sup_info else None,
+                    "last_updated": getattr(latest_entry, 'entry_date', None)
                 })
-        
+
+        # Apply Backend Filters to the Calculated Data
+        if supplier_name:
+            search_str = supplier_name.lower()
+            summary = [s for s in summary if search_str in s['supplier_name'].lower()]
+            
+        if entry_type:
+            if entry_type == 'received':
+                summary = [s for s in summary if s['total_received'] > 0]
+            elif entry_type == 'used':
+                summary = [s for s in summary if s['total_used'] > 0]
+            elif entry_type == 'transfer':
+                summary = [s for s in summary if s['total_transfer_out'] > 0 or s['total_transfer_in'] > 0]
+            elif entry_type == 'returned_supplier':
+                summary = [s for s in summary if s['total_returned_supplier'] > 0]
+
         return summary
 
     @staticmethod

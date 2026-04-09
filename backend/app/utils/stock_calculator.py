@@ -131,32 +131,30 @@ class StockCalculator:
 
     @staticmethod
     def get_site_stock_summary(db: Session, site_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None, supplier_name: Optional[str] = None, entry_type: Optional[str] = None) -> List[Dict[str, Any]]:
-        from datetime import timedelta # Ensure timedelta is imported
-        
         summary = []
         materials = db.query(models.Material).join(models.StockEntry).filter(
             models.StockEntry.site_id == site_id
         ).distinct().all()
 
-        # Establish strict date boundaries
+        has_date_filter = bool(start_date or end_date)
         effective_start = start_date if start_date else date.min
         effective_end = end_date if end_date else date.today()
+        
         start_dt = datetime.combine(effective_start, datetime.min.time())
         end_dt = datetime.combine(effective_end, datetime.max.time())
 
         for material in materials:
-            # 1. Calculate opening balance strictly BEFORE start_dt
-            if start_date:
+            # 1. STRICT START DATE: Find exact balance the millisecond before start date
+            if has_date_filter and start_date:
                 opening_calc = StockCalculator.calculate_balance(db, site_id, material.id, start_dt - timedelta(microseconds=1))
                 opening_bal = opening_calc["current_balance"]
-                prev_tot_rec_qty = opening_calc.get("total_received", Decimal('0'))
-                prev_tot_rec_val = opening_calc.get("received_value", Decimal('0'))
+                prev_tot_rec_qty = opening_calc.get("total_received", Decimal('0.0'))
+                prev_tot_rec_val = opening_calc.get("received_value", Decimal('0.0'))
             else:
-                opening_bal = Decimal('0')
-                prev_tot_rec_qty = Decimal('0')
-                prev_tot_rec_val = Decimal('0')
+                opening_bal = Decimal('0.0')
+                prev_tot_rec_qty = Decimal('0.0')
+                prev_tot_rec_val = Decimal('0.0')
 
-            # 2. Get entries strictly IN the range
             entries = db.query(models.StockEntry).filter(
                 models.StockEntry.site_id == site_id,
                 models.StockEntry.material_id == material.id,
@@ -164,24 +162,36 @@ class StockCalculator:
                 models.StockEntry.entry_date <= end_dt
             ).order_by(models.StockEntry.entry_date.asc()).all()
 
-            # Skip if material has absolutely no history and 0 opening balance
-            if len(entries) == 0 and opening_bal == 0:
+            # 2. STRICT ISOLATION: If a date range is active, skip materials with 0 transactions in this window
+            if has_date_filter and len(entries) == 0:
+                continue
+            
+            # If no date filter, skip only if absolutely no history (fallback)
+            if not has_date_filter and len(entries) == 0 and opening_bal == 0:
                 continue
 
-            period_received = Decimal('0')
-            period_received_value = Decimal('0')
-            period_used = Decimal('0')
-            period_returned_supplier = Decimal('0')
-            period_transfer_in = Decimal('0')
-            period_transfer_out = Decimal('0')
+            period_received = Decimal('0.0')
+            period_received_value = Decimal('0.0')
+            period_used = Decimal('0.0')
+            period_returned_supplier = Decimal('0.0')
+            period_transfer_in = Decimal('0.0')
+            period_transfer_out = Decimal('0.0')
 
             latest_in_range = None
+            latest_sup_in_range = "-"
+            latest_inv_in_range = "-"
+            latest_inv_date_in_range = None
             
-            # 3. Sum up activity ONLY within the period
+            # 3. ONLY process math for transactions that occurred strictly within the dates
             for e in entries:
                 latest_in_range = e.entry_date
-                entry_cost = e.total_cost or Decimal('0.00')
+                entry_cost = e.total_cost or Decimal('0.0')
                 
+                if e.supplier_name and str(e.supplier_name).strip() != "" and str(e.supplier_name).strip() != "-":
+                    latest_sup_in_range = e.supplier_name
+                    latest_inv_in_range = e.invoice_no
+                    latest_inv_date_in_range = e.invoice_date
+
                 if e.entry_type == 'received':
                     period_received += e.quantity
                     period_received_value += entry_cost
@@ -195,17 +205,20 @@ class StockCalculator:
                 elif e.entry_type == 'returned_supplier':
                     period_returned_supplier += e.quantity
 
-            # Closing balance is Opening + (In - Out) during period
             closing_bal = opening_bal + period_received + period_transfer_in - period_used - period_transfer_out - period_returned_supplier
 
-            # Calculate dynamic used value based on average cost
             tot_rec_qty = prev_tot_rec_qty + period_received
             tot_rec_val = prev_tot_rec_val + period_received_value
-            avg_cost = tot_rec_val / tot_rec_qty if tot_rec_qty > 0 else Decimal('0')
+            avg_cost = tot_rec_val / tot_rec_qty if tot_rec_qty > 0 else Decimal('0.0')
             dynamic_used_value = period_used * avg_cost
 
-            # Fetch persistent supplier info
-            sup_info = StockCalculator.get_latest_supplier_info(db, site_id, material.id, end_dt)
+            # Origin inheritance: If no supplier found IN the range, look backward historically
+            if latest_sup_in_range == "-":
+                sup_info = StockCalculator.get_latest_supplier_info(db, site_id, material.id, end_dt)
+                if sup_info:
+                    latest_sup_in_range = sup_info.supplier_name
+                    latest_inv_in_range = sup_info.invoice_no
+                    latest_inv_date_in_range = sup_info.invoice_date
 
             summary.append({
                 "material_id": material.id,
@@ -222,16 +235,16 @@ class StockCalculator:
                 "total_transfer_in": period_transfer_in,
                 "total_transfer_out": period_transfer_out,
                 "has_negative_balance": closing_bal < 0,
-                "supplier_name": getattr(sup_info, 'supplier_name', '-') if sup_info else "-",
-                "invoice_no": getattr(sup_info, 'invoice_no', '-') if sup_info else "-",
-                "invoice_date": getattr(sup_info, 'invoice_date', None) if sup_info else None,
+                "supplier_name": latest_sup_in_range,
+                "invoice_no": latest_inv_in_range,
+                "invoice_date": latest_inv_date_in_range,
                 "last_updated": latest_in_range if latest_in_range else (end_dt if start_date else None)
             })
 
-        # 4. Post-process Backend Filters
+        # 4. Post-Process Backend Filters
         if supplier_name:
             search_str = supplier_name.lower()
-            summary = [s for s in summary if search_str in s['supplier_name'].lower()]
+            summary = [s for s in summary if s['supplier_name'] and search_str in s['supplier_name'].lower()]
             
         if entry_type:
             if entry_type == 'received':

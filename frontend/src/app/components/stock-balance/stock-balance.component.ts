@@ -180,7 +180,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.sites.forEach(site => {
       // NOTE: Ensure your stockService is updated to accept the two new parameters
       this.stockService.getSiteStockSummary(site.id, filters.start_date, filters.end_date, filters.supplier_name, filters.entry_type).subscribe({
-        next: (balances) => {
+        next: (balances: any) => {
           const tagged = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
           this.allTimeBalances = [...this.allTimeBalances, ...tagged];
           loaded++;

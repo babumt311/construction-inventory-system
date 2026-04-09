@@ -86,6 +86,19 @@ export class StockManagementComponent implements OnInit {
       const invoiceNoCtrl = this.stockForm.get('invoice_no');
       const invoiceDateCtrl = this.stockForm.get('invoice_date');
 
+      // --- NEW LOGIC: Zero out prices if transaction is NOT received ---
+      if (type !== 'received') {
+        const itemsArray = this.stockForm.get('items') as FormArray;
+        itemsArray.controls.forEach(control => {
+          control.patchValue({
+            unit_price: 0,
+            tax_percent: 0,
+            tax_amount: 0,
+            total_cost: 0
+          });
+        });
+      }
+
       // Transfer Logic
       if (type === 'transfer') {
         siteCtrl?.clearValidators();
@@ -133,6 +146,11 @@ export class StockManagementComponent implements OnInit {
     
     const savedTab = sessionStorage.getItem('activeInventoryTab');
     if (savedTab && ['stock', 'category', 'material'].includes(savedTab)) this.switchTab(savedTab as 'stock' | 'category' | 'material');
+  }
+
+  // --- NEW GETTER to conditionally hide columns in HTML ---
+  get isReceivedType(): boolean {
+    return this.stockForm.get('entry_type')?.value === 'received';
   }
 
   switchTab(tab: 'stock' | 'category' | 'material'): void {

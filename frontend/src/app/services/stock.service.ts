@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import {
   StockEntry,
   StockEntryCreateRequest,

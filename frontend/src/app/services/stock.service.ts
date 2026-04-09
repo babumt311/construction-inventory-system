@@ -47,13 +47,8 @@ export class StockService {
     return this.api.get<StockBalance>('stock/balance', params);
   }
 
-  // FIX: Updated to natively accept and pass Date Ranges to your backend!
-  getSiteStockSummary(siteId: number, startDate?: string, endDate?: string, supplierName?: string, entryType?: string) {
-    let params = new HttpParams();
-    if (startDate) params = params.set('start_date', startDate);
-    if (endDate) params = params.set('end_date', endDate);
-    if (supplierName) params = params.set('supplier_name', supplierName);
-    if (entryType) params = params.set('entry_type', entryType);
+  // Pass the pre-built params object directly to your API wrapper
+  getSiteStockSummary(siteId: number, params?: any) {
     return this.api.get(`stock/site-summary/${siteId}`, params);
   }
 

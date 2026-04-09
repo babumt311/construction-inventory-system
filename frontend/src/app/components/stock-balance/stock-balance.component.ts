@@ -207,6 +207,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
     // Apply Client-Side Filters
     baseData = baseData.filter(b => {
+      // Standard filters
       if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
       if (filters.material_id && b.material_id !== Number(filters.material_id)) return false;
       if (filters.show_negative_only && !b.has_negative_balance) return false;
@@ -214,11 +215,31 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         const mat = this.materials.find(m => m.id === b.material_id);
         if (!mat || mat.category_id !== Number(filters.category_id)) return false;
       }
+      
+      // NEW: Instant Supplier Name Filter
+      if (filters.supplier_name) {
+        const searchStr = filters.supplier_name.toLowerCase().trim();
+        const recordSupplier = (b.supplier_name || '').toLowerCase();
+        if (!recordSupplier.includes(searchStr)) return false;
+      }
+
+      // NEW: Instant Transaction Type Filter
+      // (Since this is a summary balance sheet, if you pick "Used", it hides materials that haven't been used)
+      if (filters.entry_type) {
+        if (filters.entry_type === 'received' && (!b.total_received || b.total_received <= 0)) return false;
+        if (filters.entry_type === 'used' && (!b.total_used || b.total_used <= 0)) return false;
+        if (filters.entry_type === 'transfer' && (!b.total_transfer_out || b.total_transfer_out <= 0) && (!b.total_transfer_in || b.total_transfer_in <= 0)) return false;
+        if (filters.entry_type === 'returned_supplier' && (!b.total_returned_supplier || b.total_returned_supplier <= 0)) return false;
+      }
+
       return true;
     });
 
     this.dataSource.data = baseData;
-    if (this.viewMode === 'table') { this.dataSource.paginator = this.paginator; this.dataSource.sort = this.sort; }
+    if (this.viewMode === 'table') { 
+      this.dataSource.paginator = this.paginator; 
+      this.dataSource.sort = this.sort; 
+    }
   }
 
   // --- Utility & Display Methods remain exactly the same as your code ---

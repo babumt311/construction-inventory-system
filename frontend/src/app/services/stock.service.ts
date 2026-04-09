@@ -19,23 +19,23 @@ export class StockService {
 
   // Stock Entry Management
   getStockEntries(params?: any): Observable<StockEntry[]> {
-    return this.api.get<StockEntry[]>('stock/entries', params);
+    return this.api.get<StockEntry[]>('/stock/entries', params);
   }
 
   getStockEntry(id: number): Observable<StockEntry> {
-    return this.api.get<StockEntry>(`stock/entries/${id}`);
+    return this.api.get<StockEntry>(`/stock/entries/${id}`);
   }
 
   createStockEntry(entry: StockEntryCreateRequest): Observable<StockEntry> {
-    return this.api.post<StockEntry>('stock/entries', entry);
+    return this.api.post<StockEntry>('/stock/entries', entry);
   }
 
   updateStockEntry(id: number, entry: Partial<StockEntry>): Observable<StockEntry> {
-    return this.api.put<StockEntry>(`stock/entries/${id}`, entry);
+    return this.api.put<StockEntry>(`/stock/entries/${id}`, entry);
   }
 
   deleteStockEntry(id: number): Observable<any> {
-    return this.api.delete<any>(`stock/entries/${id}`);
+    return this.api.delete<any>(`/stock/entries/${id}`);
   }
 
   // Stock Calculations
@@ -44,7 +44,7 @@ export class StockService {
     if (asOfDate) {
       params.as_of_date = asOfDate.toISOString();
     }
-    return this.api.get<StockBalance>('stock/balance', params);
+    return this.api.get<StockBalance>('/stock/balance', params);
   }
 
   // FIX: Updated to natively accept and pass Date Ranges to your backend!
@@ -59,7 +59,7 @@ export class StockService {
 
   // Daily Reports
   getDailyReports(siteId: number, params?: any): Observable<DailyStockReport[]> {
-    return this.api.get<DailyStockReport[]>(`stock/daily-reports/${siteId}`, params);
+    return this.api.get<DailyStockReport[]>(`/stock/daily-reports/${siteId}`, params);
   }
 
   generateDailyReport(siteId: number, reportDate?: Date): Observable<any> {
@@ -77,7 +77,7 @@ export class StockService {
 
   // Excel Upload for Stock Entries
   uploadStockEntries(file: File, siteId: number): Observable<any> {
-    return this.api.uploadFile('uploads/stock', file, { site_id: siteId });
+    return this.api.uploadFile('/uploads/stock', file, { site_id: siteId });
   }
 
   // CLI Methods

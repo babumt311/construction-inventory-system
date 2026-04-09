@@ -100,38 +100,43 @@
   </div>
 
   <div class="row mb-4 g-4">
-    <div class="col-md-3">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-body p-4 d-flex justify-content-between align-items-center">
-          <div><h6 class="text-muted fw-bold mb-2">TOTAL MATERIALS</h6><h2 class="mb-0 fw-bold">{{ cardData.length }}</h2></div>
-          <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;"><i class="fas fa-boxes fa-lg"></i></div>
+    
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0 h-100 border-start border-success border-4">
+        <div class="card-body p-4">
+          <h6 class="text-success fw-bold mb-3 text-uppercase"><i class="fas fa-arrow-down me-2"></i>Total Material Received</h6>
+          <div class="row text-center align-items-center">
+            <div class="col-6 border-end">
+              <p class="text-muted mb-1 small fw-bold text-uppercase">Total Qty</p>
+              <h2 class="fw-bold mb-0 text-dark">{{ totalReceivedQty | number:'1.2-2' }}</h2>
+            </div>
+            <div class="col-6">
+              <p class="text-muted mb-1 small fw-bold text-uppercase">Total Cost Value</p>
+              <h2 class="fw-bold mb-0 text-success">₹{{ totalReceivedCost | number:'1.2-2' }}</h2>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    <div class="col-md-3">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-body p-4 d-flex justify-content-between align-items-center">
-          <div><h6 class="text-muted fw-bold mb-2">IN STOCK</h6><h2 class="mb-0 fw-bold">{{ getHealthyStockCount(cardData) }}</h2></div>
-          <div class="bg-success text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;"><i class="fas fa-check-circle fa-lg"></i></div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0 h-100 border-start border-danger border-4">
+        <div class="card-body p-4">
+          <h6 class="text-danger fw-bold mb-3 text-uppercase"><i class="fas fa-arrow-up me-2"></i>Total Material Used</h6>
+          <div class="row text-center align-items-center">
+            <div class="col-6 border-end">
+              <p class="text-muted mb-1 small fw-bold text-uppercase">Total Qty</p>
+              <h2 class="fw-bold mb-0 text-dark">{{ totalUsedQty | number:'1.2-2' }}</h2>
+            </div>
+            <div class="col-6">
+              <p class="text-muted mb-1 small fw-bold text-uppercase">Total Cost Value</p>
+              <h2 class="fw-bold mb-0 text-danger">₹{{ totalUsedCost | number:'1.2-2' }}</h2>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    <div class="col-md-3">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-body p-4 d-flex justify-content-between align-items-center">
-          <div><h6 class="text-muted fw-bold mb-2">LOW STOCK</h6><h2 class="mb-0 fw-bold">{{ getLowStockCount(cardData) }}</h2></div>
-          <div class="bg-warning text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;"><i class="fas fa-exclamation-triangle fa-lg"></i></div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-body p-4 d-flex justify-content-between align-items-center">
-          <div><h6 class="text-muted fw-bold mb-2">STOCK VALUE</h6><h2 class="mb-0 fw-bold">₹{{ calculateStockValue(cardData) | number:'1.2-2' }}</h2></div>
-          <div class="bg-info text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 60px; height: 60px;"><i class="fas fa-rupee-sign fa-lg"></i></div>
-        </div>
-      </div>
-    </div>
+
   </div>
 
   <div class="card shadow-sm border-0" *ngIf="viewMode === 'table'">

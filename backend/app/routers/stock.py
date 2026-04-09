@@ -136,7 +136,7 @@ async def create_stock_entry(
     
     return stock_entry
 
-@router.get("/entries/", response_model=List[schemas.StockEntryInDB])
+@router.get("/entries", response_model=List[schemas.StockEntryInDB])
 async def read_stock_entries(
     site_id: Optional[int] = Query(None),
     material_id: Optional[int] = Query(None),

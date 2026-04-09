@@ -42,7 +42,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   
   filterForm: FormGroup;
   
-  displayedColumns: string[] = ['material', 'category', 'site', 'supplier_name', 'invoice_no', 'invoice_date', 'current_balance', 'opening_balance', 'total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier', 'updated_at', 'status'];
+  // --- DYNAMIC COLUMNS (Starts empty) ---
+  displayedColumns: string[] = [];
   dataSource = new MatTableDataSource<any>();
   
   materialChart: Chart | null = null;
@@ -71,6 +72,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       switch(property) {
         case 'material': return (item.material_name || '').toLowerCase();
         case 'category': return (item.category || '').toLowerCase();
+        case 'project': return this.getProjectNameForSite(item.site_id).toLowerCase(); // Add sorting for project
         case 'site': return (item.site_name || '').toLowerCase();
         case 'current_balance': return Number(item.current_balance || 0);
         case 'opening_balance': return Number(item.opening_balance || 0);
@@ -98,8 +100,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       material_id: [''],
       start_date: [''],
       end_date: [''],
-      supplier_name: [''], // NEW
-      entry_type: [''],    // NEW
+      supplier_name: [''],
+      entry_type: [''],    
       show_negative_only: [false]
     });
   }
@@ -133,6 +135,16 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         this.updateTable(); // Fast client-side filtering
       }
     });
+  }
+
+  // --- NEW: Helper function to get Project name based on Site ID ---
+  getProjectNameForSite(siteId: any): string {
+    if (!siteId) return '-';
+    const site = this.sites?.find(s => s.id === Number(siteId));
+    if (!site || !site.project_id) return '-';
+    
+    const proj = this.projects?.find(p => p.id === site.project_id);
+    return proj ? proj.name : '-';
   }
 
   loadProjectsAndInitialData(): void { 
@@ -181,7 +193,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const filters = this.filterForm.value;
 
     this.sites.forEach(site => {
-      // NOTE: Ensure your stockService is updated to accept the two new parameters
       this.stockService.getSiteStockSummary(site.id, filters.start_date, filters.end_date, filters.supplier_name, filters.entry_type).subscribe({
         next: (balances: any) => {
           const tagged = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
@@ -216,15 +227,14 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         if (!mat || mat.category_id !== Number(filters.category_id)) return false;
       }
       
-      // NEW: Instant Supplier Name Filter
+      // Instant Supplier Name Filter
       if (filters.supplier_name) {
         const searchStr = filters.supplier_name.toLowerCase().trim();
         const recordSupplier = (b.supplier_name || '').toLowerCase();
         if (!recordSupplier.includes(searchStr)) return false;
       }
 
-      // NEW: Instant Transaction Type Filter
-      // (Since this is a summary balance sheet, if you pick "Used", it hides materials that haven't been used)
+      // Instant Transaction Type Filter
       if (filters.entry_type) {
         if (filters.entry_type === 'received' && (!b.total_received || b.total_received <= 0)) return false;
         if (filters.entry_type === 'used' && (!b.total_used || b.total_used <= 0)) return false;
@@ -236,13 +246,41 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
 
     this.dataSource.data = baseData;
-    if (this.viewMode === 'table') { 
-      this.dataSource.paginator = this.paginator; 
-      this.dataSource.sort = this.sort; 
+
+    // --- DYNAMIC COLUMNS LOGIC ---
+    const type = filters.entry_type;
+    
+    // Base columns that ALWAYS show
+    let cols = ['material', 'category', 'project', 'site', 'supplier_name', 'invoice_no', 'invoice_date', 'current_balance', 'opening_balance'];
+
+    // Conditionally add columns based on the selected transaction type
+    if (!type || type === '') {
+      cols.push('total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier');
+    } else if (type === 'received') {
+      cols.push('total_received', 'received_cost');
+    } else if (type === 'used') {
+      cols.push('total_used', 'used_cost');
+    } else if (type === 'transfer') {
+      cols.push('total_transfer_out', 'total_transfer_in');
+    } else if (type === 'returned_supplier') {
+      cols.push('total_returned_supplier');
+    }
+    
+    // Add the ending columns
+    cols.push('updated_at', 'status');
+
+    this.displayedColumns = cols;
+    // --------------------------------
+
+    // --- PAGINATION FIX ---
+    if (this.viewMode === 'table') {
+      setTimeout(() => {
+        this.dataSource.paginator = this.paginator;
+        this.dataSource.sort = this.sort;
+      });
     }
   }
 
-  // --- Utility & Display Methods remain exactly the same as your code ---
   // Dynamic summary calculations based on currently filtered table data
   get totalReceivedQty(): number {
     return this.dataSource.data.reduce((sum, item) => sum + (Number(item.total_received) || 0), 0);
@@ -403,7 +441,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const data = this.dataSource.data.map(item => {
       return {
         ...item,
-        project: projectName,
+        project: this.getProjectNameForSite(item.site_id), // Use the new project name logic
         site_name: item.site_name || 'N/A',
         received_value: item.received_value || 0,
         used_value: item.used_value || 0,
@@ -444,7 +482,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
 
     data.forEach((item, index) => {
-      const rowData = selectedCols.map(c => item[c.key]);
+      const rowData = selectedCols.map(c => item[c.key as keyof typeof item]); // Added quick type cast to clear any TS errors during build
       const row = worksheet.addRow(rowData);
       if (index % 2 === 0) {
         row.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; });

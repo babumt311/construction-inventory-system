@@ -178,6 +178,16 @@ export class StockManagementComponent implements OnInit {
       total_cost: [{ value: 0, disabled: true }]  
     });
 
+    // --- NEW: Auto-select category when material is chosen ---
+    itemGroup.get('material_id')?.valueChanges.subscribe(matId => {
+      if (matId) {
+        const selectedMat = this.materials.find(m => m.id === Number(matId));
+        if (selectedMat && selectedMat.category_id) {
+          itemGroup.patchValue({ category_id: selectedMat.category_id }, { emitEvent: false });
+        }
+      }
+    });
+    
     itemGroup.valueChanges.subscribe(val => {
       const qty = val.quantity || 0;
       const price = val.unit_price || 0;

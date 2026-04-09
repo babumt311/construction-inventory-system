@@ -277,9 +277,11 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       setTimeout(() => {
         this.dataSource.paginator = this.paginator;
         this.dataSource.sort = this.sort;
+        
+        // Add this line to force the paginator to recalculate total numbers
+        if (this.paginator) { this.paginator.firstPage(); }
       });
     }
-  }
 
   // Dynamic summary calculations based on currently filtered table data
   get totalReceivedQty(): number {

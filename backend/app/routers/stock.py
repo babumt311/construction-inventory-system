@@ -31,31 +31,9 @@ async def create_stock_entry(
     """
     Create new stock entry, lock in historical costs, and update total balance
     """
-
-    # 1. Create stock entry history with IMMUTABLE COSTS
-    stock_data = stock_in.dict()
-    stock_data["created_by"] = current_user.id
-    
-    # --- ENTERPRISE LEDGER PROTOCOL: USE FRONTEND DYNAMIC COST ---
-    # Stop overwriting with standard_cost. Save the values exactly as entered in UI.
-    stock_data["unit_cost"] = stock_in.unit_cost or Decimal('0.00')
-    stock_data["tax_percent"] = stock_in.tax_percent or Decimal('0.00')
-    stock_data["tax_amount"] = stock_in.tax_amount or Decimal('0.00')
-    stock_data["total_cost"] = stock_in.total_cost or Decimal('0.00')
-    
-    # Map the frontend's 'reference_no' directly into the 'invoice_no' column
-    if hasattr(stock_in, 'reference_no') and stock_in.reference_no:
-        stock_data["invoice_no"] = stock_in.reference_no
-        
-    # Remove reference_no from dictionary so SQLAlchemy doesn't crash looking for it
-    stock_data.pop("reference_no", None)
-    # ---------------------------------------------------------
-    
-    stock_entry = models.StockEntry(**stock_data)
-    db.add(stock_entry)
     logger.info(f"Creating stock entry by user: {current_user.username}")
-    
-    # Check if user has access to the site's project
+
+    # 1. Validate Access and Existence
     site = crud.crud_site.get(db, id=stock_in.site_id)
     if not site:
         logger.warning(f"Site not found: {stock_in.site_id}")
@@ -63,10 +41,10 @@ async def create_stock_entry(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Site not found"
         )
-    
+
     # Validate project access
     check_project_access(current_user, site.project_id, db)
-    
+
     # Validate material exists
     material = crud.crud_material.get(db, id=stock_in.material_id)
     if not material:
@@ -75,8 +53,8 @@ async def create_stock_entry(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Material not found"
         )
-    
-    # Validate stock entry
+
+    # Validate stock entry (e.g., negative stock check)
     calculator = StockCalculator()
     if not calculator.validate_stock_entry(
         db, stock_in.site_id, stock_in.material_id, stock_in.entry_type, stock_in.quantity
@@ -86,21 +64,31 @@ async def create_stock_entry(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Stock entry validation failed"
         )
-    
-    # 1. Create stock entry history with IMMUTABLE COSTS
+
+    # 2. Prepare Data for Database (ONLY ONCE)
     stock_data = stock_in.dict()
     stock_data["created_by"] = current_user.id
-    
-    # --- ENTERPRISE LEDGER PROTOCOL: LOCK IN CURRENT PRICE ---
-    current_unit_price = material.standard_cost or Decimal('0.00')
-    stock_data["unit_cost"] = current_unit_price
-    stock_data["total_cost"] = current_unit_price * Decimal(str(stock_in.quantity))
+
+    # Map the frontend's 'reference_no' directly into the 'invoice_no' column
+    if "reference_no" in stock_data:
+        if stock_data["reference_no"]:
+            stock_data["invoice_no"] = stock_data["reference_no"]
+        # Remove reference_no from dictionary so SQLAlchemy doesn't crash
+        stock_data.pop("reference_no")
+
+    # --- ENTERPRISE LEDGER PROTOCOL: USE FRONTEND DYNAMIC COST ---
+    # Apply cost data from frontend, fallback to standard material cost if missing
+    stock_data["unit_cost"] = stock_in.unit_cost or material.standard_cost or Decimal('0.00')
+    stock_data["tax_percent"] = stock_in.tax_percent or Decimal('0.00')
+    stock_data["tax_amount"] = stock_in.tax_amount or Decimal('0.00')
+    stock_data["total_cost"] = stock_in.total_cost or (stock_data["unit_cost"] * Decimal(str(stock_in.quantity)))
     # ---------------------------------------------------------
-    
+
+    # Save the entry to the ledger
     stock_entry = models.StockEntry(**stock_data)
     db.add(stock_entry)
 
-    # 2. Update the Stock Balance Summary Table
+    # 3. Update the Stock Balance Summary Table
     try:
         balance = db.query(models.StockBalance).filter(
             models.StockBalance.site_id == stock_in.site_id,
@@ -128,7 +116,7 @@ async def create_stock_entry(
     except Exception as e:
         logger.warning(f"StockBalance update skipped (Handled by calculator): {e}")
 
-    # 3. Permanently Commit to PostgreSQL
+    # 4. Permanently Commit to PostgreSQL
     db.commit()
     db.refresh(stock_entry)
     
@@ -356,8 +344,8 @@ async def get_site_stock_summary(
     site_id: int,
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
-    supplier_name: Optional[str] = Query(None), # <--- NEW PARAMETER
-    entry_type: Optional[str] = Query(None),    # <--- NEW PARAMETER
+    supplier_name: Optional[str] = Query(None), 
+    entry_type: Optional[str] = Query(None),    
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_dependency)
 ) -> Any:

@@ -356,6 +356,8 @@ async def get_site_stock_summary(
     site_id: int,
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
+    supplier_name: Optional[str] = Query(None), # <--- NEW PARAMETER
+    entry_type: Optional[str] = Query(None),    # <--- NEW PARAMETER
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_dependency)
 ) -> Any:
@@ -375,9 +377,11 @@ async def get_site_stock_summary(
     
     check_project_access(current_user, site.project_id, db)
     
-    # Get summary
+    # Get summary and pass the new filters to the calculator
     calculator = StockCalculator()
-    summary = calculator.get_site_stock_summary(db, site_id, start_date, end_date)
+    summary = calculator.get_site_stock_summary(
+        db, site_id, start_date, end_date, supplier_name, entry_type
+    )
     
     logger.debug(f"Returning stock summary with {len(summary)} materials")
     

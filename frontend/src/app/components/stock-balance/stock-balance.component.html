@@ -80,10 +80,10 @@
             <label class="form-label small fw-bold">Start Date</label>
             <input type="date" class="form-control" formControlName="start_date">
           </div>
-          <div class="col-md-2">
+         <div class="col-md-2">
             <label class="form-label small fw-bold">End Date</label>
-            <input type="date" class="form-control" formControlName="end_date">
-          </div>
+            <input type="date" class="form-control" formControlName="end_date" [min]="filterForm.get('start_date')?.value">
+         </div>
           
           <div class="col-md-2 pt-3">
             <div class="form-check form-switch mt-2">

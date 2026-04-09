@@ -217,7 +217,7 @@ class StockEntryBase(BaseModel):
     quantity: Decimal
     supplier_name: Optional[str] = None
     invoice_no: Optional[str] = None
-    invoice_date = Column(DateTime(timezone=True), nullable=True)
+    invoice_date: Optional[datetime] = None
     reference: Optional[str] = None
     remarks: Optional[str] = None
     entry_date: Optional[datetime] = None

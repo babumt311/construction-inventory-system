@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 class StockCalculator:
 
-
     @staticmethod
     def validate_stock_entry(db: Session, site_id: int, material_id: int, entry_type: str, quantity: Decimal) -> bool:
         """Validate if a stock entry is allowed (e.g., prevents negative stock)"""
@@ -112,27 +111,43 @@ class StockCalculator:
         }
     
     @staticmethod
-    def get_site_stock_summary(db: Session, site_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None) -> List[Dict[str, Any]]:
+    def get_site_stock_summary(db: Session, site_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None, supplier_name: Optional[str] = None, entry_type: Optional[str] = None) -> List[Dict[str, Any]]:
         summary = []
         materials = db.query(models.Material).join(models.StockEntry).filter(
             models.StockEntry.site_id == site_id
         ).distinct().all()
         
-        if start_date or end_date:
+        if start_date or end_date or supplier_name or entry_type:
             effective_start = start_date if start_date else date.min
             effective_end = end_date if end_date else date.today()
             start_dt = datetime.combine(effective_start, datetime.min.time())
             end_dt = datetime.combine(effective_end, datetime.max.time())
             
             for material in materials:
-                entries_in_range = db.query(models.StockEntry).filter(
+                
+                # --- APPLY NEW FILTERS HERE ---
+                query = db.query(models.StockEntry).filter(
                     models.StockEntry.site_id == site_id,
                     models.StockEntry.material_id == material.id,
                     models.StockEntry.entry_date >= start_dt,
                     models.StockEntry.entry_date <= end_dt
-                ).order_by(models.StockEntry.entry_date.asc()).all()
+                )
+                
+                if supplier_name:
+                    # Uses ilike for case-insensitive search 
+                    query = query.filter(models.StockEntry.supplier_name.ilike(f"%{supplier_name}%"))
+                    
+                if entry_type:
+                    query = query.filter(models.StockEntry.entry_type == entry_type)
+                    
+                entries_in_range = query.order_by(models.StockEntry.entry_date.asc()).all()
+                # ------------------------------
                 
                 if not entries_in_range:
+                    # If advanced filters are applied, but yield no results, skip adding this material to the summary
+                    if supplier_name or entry_type:
+                        continue 
+
                     calc = StockCalculator.calculate_balance(db, site_id, material.id, end_dt)
                     actual_last_date = db.query(func.max(models.StockEntry.entry_date)).filter(
                         models.StockEntry.site_id == site_id,

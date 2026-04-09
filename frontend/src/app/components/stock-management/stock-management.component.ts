@@ -30,7 +30,7 @@ export class StockManagementComponent implements OnInit {
   materials: any[] = [];
 
   // Stock Table variables
-  stockColumns: string[] = ['entry_date', 'material_name', 'entry_type', 'quantity', 'reference_no', 'actions'];
+  stockColumns: string[] = ['entry_date', 'material_name', 'entry_type', 'quantity', 'supplier_name', 'invoice_no', 'actions'];
   stockDataSource = new MatTableDataSource<any>();
   @ViewChild('stockPaginator') stockPaginator!: MatPaginator;
   @ViewChild('stockSort') stockSort!: MatSort;

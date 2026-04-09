@@ -243,14 +243,21 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
 
   // --- Utility & Display Methods remain exactly the same as your code ---
-  get cardData() { return this.dataSource.data; }
-  getHealthyStockCount(data: any[]): number { return data.filter(b => !b.has_negative_balance && b.current_balance > 0).length; }
-  getLowStockCount(data: any[]): number { return data.filter(b => b.current_balance < 10 && !b.has_negative_balance).length; }
-  calculateStockValue(data: any[]): number {
-    return data.reduce((total, balance) => {
-      const material = this.materials.find(m => m.id === balance.material_id);
-      return total + (balance.current_balance * (material?.standard_cost || 0));
-    }, 0);
+  // Dynamic summary calculations based on currently filtered table data
+  get totalReceivedQty(): number {
+    return this.dataSource.data.reduce((sum, item) => sum + (Number(item.total_received) || 0), 0);
+  }
+
+  get totalReceivedCost(): number {
+    return this.dataSource.data.reduce((sum, item) => sum + (Number(item.received_value) || 0), 0);
+  }
+
+  get totalUsedQty(): number {
+    return this.dataSource.data.reduce((sum, item) => sum + (Number(item.total_used) || 0), 0);
+  }
+
+  get totalUsedCost(): number {
+    return this.dataSource.data.reduce((sum, item) => sum + (Number(item.used_value) || 0), 0);
   }
 
   getFormattedDate(balance: any): string {

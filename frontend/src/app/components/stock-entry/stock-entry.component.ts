@@ -50,6 +50,11 @@ export class StockEntryComponent implements OnInit {
     this.setupFormListeners();
   }
 
+  // --- NEW GETTER: Check if we should show cost columns ---
+  get isReceivedType(): boolean {
+    return this.stockForm.get('transaction_type')?.value === 'received';
+  }
+
   initForm(): void {
     this.stockForm = this.fb.group({
       project_id: ['', Validators.required],
@@ -149,6 +154,18 @@ export class StockEntryComponent implements OnInit {
       const supplierCtrl = this.stockForm.get('supplier_name');
       const invoiceNoCtrl = this.stockForm.get('invoice_no');
       const invoiceDateCtrl = this.stockForm.get('invoice_date');
+
+      // --- NEW OPTIONAL/RECOMMENDED: Reset costs to 0 if not "Received" ---
+      if (type !== 'received') {
+        this.items.controls.forEach(control => {
+          control.patchValue({
+            unit_price: 0,
+            tax_percent: 0,
+            tax_amount: 0,
+            total_cost: 0
+          });
+        });
+      }
 
       // 1. Transfer Logic
       if (type === 'transfer') {

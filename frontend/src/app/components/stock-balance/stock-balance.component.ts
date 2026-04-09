@@ -42,7 +42,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   
   filterForm: FormGroup;
   
-  // --- DYNAMIC COLUMNS (Starts empty) ---
+  // --- DYNAMIC COLUMNS ---
   displayedColumns: string[] = [];
   dataSource = new MatTableDataSource<any>();
   
@@ -51,7 +51,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   selectedProjectId?: number;
   viewMode: 'table' | 'cards' = 'table';
 
-  // State trackers to prevent unnecessary API calls
+  // State trackers
   private prevBackendState = { start: '', end: '', supplier: '', entryType: '', project: '' };
   private prevProjectId: any = '';
 
@@ -72,7 +72,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       switch(property) {
         case 'material': return (item.material_name || '').toLowerCase();
         case 'category': return (item.category || '').toLowerCase();
-        case 'project': return this.getProjectNameForSite(item.site_id).toLowerCase(); // Add sorting for project
+        case 'project': return this.getProjectNameForSite(item.site_id).toLowerCase();
         case 'site': return (item.site_name || '').toLowerCase();
         case 'current_balance': return Number(item.current_balance || 0);
         case 'opening_balance': return Number(item.opening_balance || 0);
@@ -111,7 +111,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.loadMaterials();
     this.loadProjectsAndInitialData();
 
-    // Debounce limits API calls while the user is actively typing a supplier name
     this.filterForm.valueChanges.pipe(debounceTime(400)).subscribe(vals => {
       const needsBackendFetch = 
         vals.start_date !== this.prevBackendState.start || 
@@ -123,7 +122,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       if (needsBackendFetch) {
         this.prevBackendState = { start: vals.start_date, end: vals.end_date, supplier: vals.supplier_name, entryType: vals.entry_type, project: vals.project_id };
         
-        // If project changed, reload the site dropdown list
         if (vals.project_id !== this.prevProjectId) {
           this.prevProjectId = vals.project_id;
           this.filterForm.patchValue({ site_id: '' }, { emitEvent: false });
@@ -132,12 +130,11 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
           this.fetchDataFromBackend();
         }
       } else {
-        this.updateTable(); // Fast client-side filtering
+        this.updateTable();
       }
     });
   }
 
-  // --- NEW: Helper function to get Project name based on Site ID ---
   getProjectNameForSite(siteId: any): string {
     if (!siteId) return '-';
     const site = this.sites?.find(s => s.id === Number(siteId));
@@ -150,7 +147,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   loadProjectsAndInitialData(): void { 
     this.projectService.getProjects().subscribe(p => {
       this.projects = p;
-      // Triggers initial load for "All Projects"
       this.loadSitesAndFetchData(''); 
     }); 
   }
@@ -161,7 +157,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   loadSitesAndFetchData(projectId: any): void {
     this.sites = [];
     if (!projectId) {
-      // ALL PROJECTS SELECTED: Fetch sites for every single project
       if (this.projects.length === 0) { this.updateTable(); return; }
       this.loading = true;
       const requests = this.projects.map(p => this.projectService.getProjectSites(p.id));
@@ -170,7 +165,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         this.fetchDataFromBackend();
       });
     } else {
-      // SINGLE PROJECT SELECTED
       this.loading = true;
       this.projectService.getProjectSites(Number(projectId)).subscribe(sites => {
         this.sites = sites.filter(s => s.status.toUpperCase() === 'ACTIVE' || s.status.toUpperCase() === 'IN_PROGRESS');
@@ -216,9 +210,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const filters = this.filterForm.value;
     let baseData = this.allTimeBalances;
 
-    // Apply Client-Side Filters
     baseData = baseData.filter(b => {
-      // Standard filters
       if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
       if (filters.material_id && b.material_id !== Number(filters.material_id)) return false;
       if (filters.show_negative_only && !b.has_negative_balance) return false;
@@ -227,14 +219,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         if (!mat || mat.category_id !== Number(filters.category_id)) return false;
       }
       
-      // Instant Supplier Name Filter
       if (filters.supplier_name) {
         const searchStr = filters.supplier_name.toLowerCase().trim();
         const recordSupplier = (b.supplier_name || '').toLowerCase();
         if (!recordSupplier.includes(searchStr)) return false;
       }
 
-      // Instant Transaction Type Filter
       if (filters.entry_type) {
         if (filters.entry_type === 'received' && (!b.total_received || b.total_received <= 0)) return false;
         if (filters.entry_type === 'used' && (!b.total_used || b.total_used <= 0)) return false;
@@ -249,11 +239,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
     // --- DYNAMIC COLUMNS LOGIC ---
     const type = filters.entry_type;
-    
-    // Base columns that ALWAYS show
     let cols = ['material', 'category', 'project', 'site', 'supplier_name', 'invoice_no', 'invoice_date', 'current_balance', 'opening_balance'];
 
-    // Conditionally add columns based on the selected transaction type
     if (!type || type === '') {
       cols.push('total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier');
     } else if (type === 'received') {
@@ -266,39 +253,23 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       cols.push('total_returned_supplier');
     }
     
-    // Add the ending columns
     cols.push('updated_at', 'status');
-
     this.displayedColumns = cols;
-    // --------------------------------
 
     // --- PAGINATION FIX ---
     if (this.viewMode === 'table') {
       setTimeout(() => {
         this.dataSource.paginator = this.paginator;
         this.dataSource.sort = this.sort;
-        
-        // Add this line to force the paginator to recalculate total numbers
         if (this.paginator) { this.paginator.firstPage(); }
       });
     }
-
-  // Dynamic summary calculations based on currently filtered table data
-  get totalReceivedQty(): number {
-    return this.dataSource.data.reduce((sum, item) => sum + (Number(item.total_received) || 0), 0);
   }
 
-  get totalReceivedCost(): number {
-    return this.dataSource.data.reduce((sum, item) => sum + (Number(item.received_value) || 0), 0);
-  }
-
-  get totalUsedQty(): number {
-    return this.dataSource.data.reduce((sum, item) => sum + (Number(item.total_used) || 0), 0);
-  }
-
-  get totalUsedCost(): number {
-    return this.dataSource.data.reduce((sum, item) => sum + (Number(item.used_value) || 0), 0);
-  }
+  get totalReceivedQty(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.total_received) || 0), 0); }
+  get totalReceivedCost(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.received_value) || 0), 0); }
+  get totalUsedQty(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.total_used) || 0), 0); }
+  get totalUsedCost(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.used_value) || 0), 0); }
 
   getFormattedDate(balance: any): string {
     const rawDate = balance.updated_at || balance.created_at || balance.last_updated || balance.entry_date || balance.report_date;
@@ -443,7 +414,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const data = this.dataSource.data.map(item => {
       return {
         ...item,
-        project: this.getProjectNameForSite(item.site_id), // Use the new project name logic
+        project: this.getProjectNameForSite(item.site_id),
         site_name: item.site_name || 'N/A',
         received_value: item.received_value || 0,
         used_value: item.used_value || 0,
@@ -484,7 +455,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
 
     data.forEach((item, index) => {
-      const rowData = selectedCols.map(c => item[c.key as keyof typeof item]); // Added quick type cast to clear any TS errors during build
+      const rowData = selectedCols.map(c => item[c.key as keyof typeof item]);
       const row = worksheet.addRow(rowData);
       if (index % 2 === 0) {
         row.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; });

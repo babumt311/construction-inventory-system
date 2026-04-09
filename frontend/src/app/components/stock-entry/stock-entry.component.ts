@@ -194,7 +194,7 @@ export class StockEntryComponent implements OnInit {
   }
 
   loadRecentLedger(siteId: number): void {
-    this.stockService.getSiteStockSummary(siteId).subscribe(data => {
+    this.stockService.getSiteStockSummary(siteId).subscribe((data: any) => {
       this.recentTransactions = data;
     });
   }

@@ -233,7 +233,7 @@ class StockEntryBase(BaseModel):
     total_cost: Optional[Decimal] = Field(None, ge=0)   # Enterprise Immutable Cost
     supplier_name: Optional[str] = None
     invoice_no: Optional[str] = None
-    invoice_date: Optional[datetime] = None
+    invoice_date: Optional[date] = None
     reference_no: Optional[str] = None
     reference: Optional[str] = None
     remarks: Optional[str] = None

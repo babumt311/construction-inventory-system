@@ -110,6 +110,14 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.loadCategories(); 
     this.loadMaterials();
     this.loadProjectsAndInitialData();
+    // --- NEW: Force End Date to be >= Start Date ---
+    this.filterForm.get('start_date')?.valueChanges.subscribe(startDate => {
+      const endDate = this.filterForm.get('end_date')?.value;
+      if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+        this.filterForm.patchValue({ end_date: startDate }, { emitEvent: false });
+      }
+    });
+    // -----------------------------------------------
 
     this.filterForm.valueChanges.pipe(debounceTime(400)).subscribe(vals => {
       const needsBackendFetch = 

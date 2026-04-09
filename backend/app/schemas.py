@@ -227,10 +227,10 @@ class StockEntryBase(BaseModel):
     material_id: int
     entry_type: StockEntryType
     quantity: Decimal
-    unit_cost: Optional[Decimal] = Field(None, ge=0)    # Enterprise Immutable Cost
-    tax_percent: Optional[Decimal] = Field(None, ge=0)  # <-- NEW
+    unit_cost: Optional[Decimal] = Field(None, ge=0)
+    tax_percent: Optional[Decimal] = Field(None, ge=0)
     tax_amount: Optional[Decimal] = Field(None, ge=0)
-    total_cost: Optional[Decimal] = Field(None, ge=0)   # Enterprise Immutable Cost
+    total_cost: Optional[Decimal] = Field(None, ge=0)
     supplier_name: Optional[str] = None
     invoice_no: Optional[str] = None
     invoice_date: Optional[date] = None
@@ -240,7 +240,11 @@ class StockEntryBase(BaseModel):
     entry_date: Optional[datetime] = None
 
 class StockEntryCreate(StockEntryBase):
-    pass
+    # Overriding costs to ensure they default to 0 if frontend sends missing data for non-received items
+    unit_cost: Optional[Decimal] = 0
+    tax_percent: Optional[Decimal] = 0
+    tax_amount: Optional[Decimal] = 0
+    total_cost: Optional[Decimal] = 0
 
 class StockEntryUpdate(BaseModel):
     quantity: Optional[Decimal] = None

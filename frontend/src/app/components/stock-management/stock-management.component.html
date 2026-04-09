@@ -136,22 +136,22 @@
                 <input type="number" class="form-control form-control-sm" formControlName="quantity" min="0.01" step="0.01">
               </div>
 
-              <div class="col-md-2">
+              <div class="col-md-2" *ngIf="isReceivedType">
                 <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Price/Unit</label>
                 <input type="number" class="form-control form-control-sm" formControlName="unit_price" min="0" step="0.01">
               </div>
 
-              <div class="col-md-1">
+              <div class="col-md-1" *ngIf="isReceivedType">
                 <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Tax %</label>
                 <input type="number" class="form-control form-control-sm" formControlName="tax_percent" min="0" step="1">
               </div>
 
-              <div class="col-md-1">
+              <div class="col-md-1" *ngIf="isReceivedType">
                 <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Tax Amt</label>
                 <input type="text" class="form-control form-control-sm bg-light" formControlName="tax_amount">
               </div>
 
-              <div class="col-md-2">
+              <div class="col-md-2" *ngIf="isReceivedType">
                 <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Total Cost</label>
                 <input type="text" class="form-control form-control-sm bg-light fw-bold text-success" formControlName="total_cost">
               </div>

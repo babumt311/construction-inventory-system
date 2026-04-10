@@ -1,60 +1,61 @@
-import { Component, OnInit, ViewChild, TemplateRef } from '@angular/core';
+import { Component, OnInit, ViewChild, TemplateRef, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { Chart, registerables } from 'chart.js';
 import { ToastrService } from 'ngx-toastr';
-
-// Angular Material Imports (Consolidated)
 import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
+import { forkJoin } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 
-// Services
 import { StockService } from '../../services/stock.service';
 import { ProjectService } from '../../services/project.service';
 import { MaterialService } from '../../services/material.service';
-
-// Models
-import { StockBalance } from '../../models/stock.model';
 import { Project, Site } from '../../models/project.model';
 import { Material } from '../../models/material.model';
 
+import * as ExcelJS from 'exceljs';
+import * as saveAs from 'file-saver';
+
 @Component({
   selector: 'app-stock-balance',
-  templateUrl: './stock-balance.component.html',
-  styleUrls: ['./stock-balance.component.scss']
+  templateUrl: './stock-balance.component.html'
 })
-export class StockBalanceComponent implements OnInit {
+export class StockBalanceComponent implements OnInit, OnDestroy {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
   @ViewChild('materialDetails') materialDetailsDialog!: TemplateRef<any>;
 
-  // Data
   projects: Project[] = [];
   sites: Site[] = [];
-  materials: Material[] = [];
   categories: any[] = [];
-  stockBalances: StockBalance[] = [];
-  selectedMaterial: Material | null = null;
-  materialStockHistory: any[] = [];
+  materials: Material[] = [];
+  filteredMaterials: Material[] = []; 
   
-  // Forms
+  allTimeBalances: any[] = []; 
+  
+  selectedMaterial: Material | null = null;
+  selectedMaterialHistory: any[] = [];
+  selectedSiteName: string = '';
+  isLoadingHistory: boolean = false;
+  
   filterForm: FormGroup;
   
-  // Table
-  displayedColumns: string[] = ['material', 'category', 'current_balance', 'opening_balance', 'total_received', 'total_used', 'status'];
-  dataSource = new MatTableDataSource<StockBalance>();
+  // --- DYNAMIC COLUMNS ---
+  displayedColumns: string[] = [];
+  dataSource = new MatTableDataSource<any>();
   
-  // Charts
-  stockChart: Chart | null = null;
   materialChart: Chart | null = null;
-  
-  // UI State
   loading = false;
   selectedProjectId?: number;
-  selectedSiteId?: number;
   viewMode: 'table' | 'cards' = 'table';
-  showNegativeOnly = false;
+
+  private prevBackendState = { start: '', end: '', supplier: '', entryType: '', project: '' };
+  private prevProjectId: any = '';
+
+  showExportModal = false;
+  exportColumns: { key: string, label: string, selected: boolean }[] = [];
 
   constructor(
     private fb: FormBuilder,
@@ -66,145 +67,253 @@ export class StockBalanceComponent implements OnInit {
   ) {
     Chart.register(...registerables);
     
+    this.dataSource.sortingDataAccessor = (item, property) => {
+      switch(property) {
+        case 'material': return (item.material_name || '').toLowerCase();
+        case 'category': return (item.category || '').toLowerCase();
+        case 'project': return this.getProjectNameForSite(item.site_id).toLowerCase();
+        case 'site': return (item.site_name || '').toLowerCase();
+        case 'current_balance': return Number(item.current_balance || 0);
+        case 'opening_balance': return Number(item.opening_balance || 0);
+        case 'total_received': return Number(item.total_received || 0);
+        case 'received_cost': return Number(item.received_value || 0); 
+        case 'total_used': return Number(item.total_used || 0);
+        case 'used_cost': return Number(item.used_value || 0); 
+        case 'total_transfer_out': return Number(item.total_transfer_out || 0);
+        case 'total_transfer_in': return Number(item.total_transfer_in || 0);
+        case 'total_returned_supplier': return Number(item.total_returned_supplier || 0);
+        case 'supplier_name': return (item.supplier_name || '').toLowerCase();
+        case 'invoice_no': return (item.invoice_no || '').toLowerCase();
+        case 'invoice_date': return item.invoice_date ? new Date(item.invoice_date).getTime() : 0;
+        case 'updated_at': 
+          const dateStr = item.updated_at || item.created_at || item.last_updated || item.entry_date || item.report_date;
+          return dateStr ? new Date(dateStr).getTime() : 0;
+        default: return item[property];
+      }
+    };
+
     this.filterForm = this.fb.group({
       project_id: [''],
       site_id: [''],
+      category_id: [''], 
       material_id: [''],
+      start_date: [''],
+      end_date: [''],
+      supplier_name: [''],
+      entry_type: [''],    
       show_negative_only: [false]
     });
   }
 
   ngOnInit(): void {
-    this.loadProjects();
+    this.loadCategories(); 
     this.loadMaterials();
-    this.loadCategories();
-    this.loadStockBalances();
-    
-    // Subscribe to filter changes
-    this.filterForm.valueChanges.subscribe(() => {
-      this.applyFilters();
-    });
-  }
+    this.loadProjectsAndInitialData();
 
-  loadProjects(): void {
-    this.projectService.getProjects().subscribe({
-      next: (projects) => {
-        this.projects = projects;
-      },
-      error: (error) => {
-        this.toastr.error('Failed to load projects', 'Error');
+    // Lock end date if user tries to pick an invalid range
+    this.filterForm.get('start_date')?.valueChanges.subscribe(startDate => {
+      const endDate = this.filterForm.get('end_date')?.value;
+      if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+        this.filterForm.patchValue({ end_date: startDate }, { emitEvent: false });
       }
     });
-  }
 
-  loadMaterials(): void {
-    this.materialService.getMaterials().subscribe({
-      next: (materials) => {
-        this.materials = materials;
-      },
-      error: (error) => {
-        this.toastr.error('Failed to load materials', 'Error');
-      }
-    });
-  }
+    this.filterForm.valueChanges.pipe(debounceTime(400)).subscribe(vals => {
+      const needsBackendFetch = 
+        vals.start_date !== this.prevBackendState.start || 
+        vals.end_date !== this.prevBackendState.end ||
+        vals.supplier_name !== this.prevBackendState.supplier ||
+        vals.entry_type !== this.prevBackendState.entryType ||
+        vals.project_id !== this.prevBackendState.project;
 
-  loadCategories(): void {
-    this.materialService.getCategories().subscribe({
-      next: (categories) => {
-        this.categories = categories;
-      },
-      error: (error) => {
-        console.warn('Could not load categories', error);
-      }
-    });
-  }
-
-  loadStockBalances(): void {
-    this.loading = true;
-    
-    if (this.selectedSiteId) {
-      this.loadSiteStockSummary(this.selectedSiteId);
-    } else {
-      this.loadAllStockBalances();
-    }
-  }
-
-  loadSiteStockSummary(siteId: number): void {
-    this.stockService.getSiteStockSummary(siteId).subscribe({
-      next: (balances) => {
-        this.stockBalances = balances;
-        this.dataSource.data = balances;
-        this.dataSource.paginator = this.paginator;
-        this.dataSource.sort = this.sort;
-        this.createStockChart(balances);
-        this.loading = false;
-      },
-      error: (error) => {
-        this.toastr.error('Failed to load stock balances', 'Error');
-        this.loading = false;
-      }
-    });
-  }
-
-  loadAllStockBalances(): void {
-    this.loading = false;
-    this.toastr.info('Please select a site to view stock balances', 'Info');
-  }
-
-  onProjectChange(projectId: any): void {
-    const id = projectId ? Number(projectId) : 0;
-    this.selectedProjectId = id;
-    this.sites = [];
-    this.selectedSiteId = undefined;
-    this.filterForm.patchValue({ site_id: '' });
-    
-    if (id) {
-      this.projectService.getProjectSites(id).subscribe({
-        next: (sites) => {
-          this.sites = sites.filter(site => site.status === 'active');
-        },
-        error: (error) => {
-          this.toastr.error('Failed to load sites', 'Error');
+      if (needsBackendFetch) {
+        this.prevBackendState = { start: vals.start_date, end: vals.end_date, supplier: vals.supplier_name, entryType: vals.entry_type, project: vals.project_id };
+        
+        if (vals.project_id !== this.prevProjectId) {
+          this.prevProjectId = vals.project_id;
+          this.filterForm.patchValue({ site_id: '' }, { emitEvent: false });
+          this.loadSitesAndFetchData(vals.project_id);
+        } else {
+          this.fetchDataFromBackend();
         }
+      } else {
+        this.updateTable();
+      }
+    });
+  }
+
+  // --- ENTERPRISE BATCH MERGING FOR CARDS ---
+  get mergedCardsData(): any[] {
+    const merged = new Map<number, any>();
+    for (const item of this.dataSource.data) {
+      if (merged.has(item.material_id)) {
+        const existing = merged.get(item.material_id);
+        // Safely aggregate all numeric values
+        existing.current_balance = Number(existing.current_balance || 0) + Number(item.current_balance || 0);
+        existing.opening_balance = Number(existing.opening_balance || 0) + Number(item.opening_balance || 0);
+        existing.total_received = Number(existing.total_received || 0) + Number(item.total_received || 0);
+        existing.received_value = Number(existing.received_value || 0) + Number(item.received_value || 0);
+        existing.total_used = Number(existing.total_used || 0) + Number(item.total_used || 0);
+        existing.used_value = Number(existing.used_value || 0) + Number(item.used_value || 0);
+        existing.total_transfer_out = Number(existing.total_transfer_out || 0) + Number(item.total_transfer_out || 0);
+        existing.total_transfer_in = Number(existing.total_transfer_in || 0) + Number(item.total_transfer_in || 0);
+        existing.total_returned_supplier = Number(existing.total_returned_supplier || 0) + Number(item.total_returned_supplier || 0);
+        
+        // Nullify specific batch details since this card represents multiple batches
+        existing.supplier_name = '-';
+        existing.invoice_no = '-';
+      } else {
+        // Deep clone so we don't accidentally mutate the table data
+        merged.set(item.material_id, JSON.parse(JSON.stringify(item)));
+      }
+    }
+    return Array.from(merged.values());
+  }
+
+  getProjectNameForSite(siteId: any): string {
+    if (!siteId) return '-';
+    const site = this.sites?.find(s => s.id === Number(siteId));
+    if (!site || !site.project_id) return '-';
+    
+    const proj = this.projects?.find(p => p.id === site.project_id);
+    return proj ? proj.name : '-';
+  }
+
+  loadProjectsAndInitialData(): void { 
+    this.projectService.getProjects().subscribe(p => {
+      this.projects = p;
+      this.loadSitesAndFetchData(''); 
+    }); 
+  }
+
+  loadCategories(): void { this.materialService.getCategories().subscribe(c => this.categories = c); }
+  loadMaterials(): void { this.materialService.getMaterials().subscribe(m => { this.materials = m; this.filteredMaterials = m; }); }
+
+  loadSitesAndFetchData(projectId: any): void {
+    this.sites = [];
+    if (!projectId) {
+      if (this.projects.length === 0) { this.updateTable(); return; }
+      this.loading = true;
+      const requests = this.projects.map(p => this.projectService.getProjectSites(p.id));
+      forkJoin(requests).subscribe(results => {
+        this.sites = results.flat().filter(s => s.status.toUpperCase() === 'ACTIVE' || s.status.toUpperCase() === 'IN_PROGRESS');
+        this.fetchDataFromBackend();
+      });
+    } else {
+      this.loading = true;
+      this.projectService.getProjectSites(Number(projectId)).subscribe(sites => {
+        this.sites = sites.filter(s => s.status.toUpperCase() === 'ACTIVE' || s.status.toUpperCase() === 'IN_PROGRESS');
+        this.fetchDataFromBackend();
       });
     }
   }
 
-  onSiteChange(siteId: any): void {
-    const id = siteId ? Number(siteId) : 0;
-    this.selectedSiteId = id;
-    if (id) {
-      this.loadStockBalances();
+  fetchDataFromBackend(): void {
+    if (this.sites.length === 0) {
+      this.allTimeBalances = [];
+      this.updateTable();
+      this.loading = false;
+      return;
     }
-  }
 
-  applyFilters(): void {
+    this.loading = true;
+    this.allTimeBalances = [];
+    let loaded = 0;
     const filters = this.filterForm.value;
-    let filteredData = this.stockBalances;
-    
-    if (filters.material_id) {
-      filteredData = filteredData.filter(balance => 
-        balance.material_id === filters.material_id
-      );
-    }
-    
-    if (filters.show_negative_only) {
-      filteredData = filteredData.filter(balance => 
-        balance.has_negative_balance
-      );
-    }
-    
-    this.dataSource.data = filteredData;
+
+    const apiParams: any = {};
+    if (filters.start_date) apiParams.start_date = filters.start_date;
+    if (filters.end_date) apiParams.end_date = filters.end_date;
+    if (filters.supplier_name) apiParams.supplier_name = filters.supplier_name;
+    if (filters.entry_type) apiParams.entry_type = filters.entry_type;
+
+    this.sites.forEach(site => {
+      this.stockService.getSiteStockSummary(site.id, apiParams).subscribe({
+        next: (balances: any) => {
+          const tagged = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
+          this.allTimeBalances = [...this.allTimeBalances, ...tagged];
+          loaded++;
+          if (loaded === this.sites.length) { this.loading = false; this.updateTable(); }
+        },
+        error: () => { loaded++; if (loaded === this.sites.length) { this.loading = false; this.updateTable(); } }
+      });
+    });
   }
 
-  // --- HTML Helper Methods ---
-
-  getHealthyStockCount(): number {
-    return this.stockBalances.filter(b => !b.has_negative_balance && b.current_balance > 0).length;
+  onCategoryChange(categoryId: any): void {
+    this.filterForm.patchValue({ material_id: '' }, { emitEvent: false }); 
+    if (categoryId) { this.filteredMaterials = this.materials.filter(m => m.category_id === Number(categoryId)); } 
+    else { this.filteredMaterials = this.materials; }
+    this.updateTable(); 
   }
 
-  getLowStockCount(): number {
-    return this.stockBalances.filter(b => b.current_balance < 10 && !b.has_negative_balance).length;
+  updateTable(): void {
+    const filters = this.filterForm.value;
+    let baseData = this.allTimeBalances;
+
+    baseData = baseData.filter(b => {
+      if (filters.site_id && b.site_id !== Number(filters.site_id)) return false;
+      if (filters.material_id && b.material_id !== Number(filters.material_id)) return false;
+      if (filters.show_negative_only && !b.has_negative_balance) return false;
+      if (filters.category_id) {
+        const mat = this.materials.find(m => m.id === b.material_id);
+        if (!mat || mat.category_id !== Number(filters.category_id)) return false;
+      }
+      
+      if (filters.supplier_name) {
+        const searchStr = filters.supplier_name.toLowerCase().trim();
+        const recordSupplier = (b.supplier_name || '').toLowerCase();
+        if (!recordSupplier.includes(searchStr)) return false;
+      }
+
+      if (filters.entry_type) {
+        if (filters.entry_type === 'received' && (!b.total_received || b.total_received <= 0)) return false;
+        if (filters.entry_type === 'used' && (!b.total_used || b.total_used <= 0)) return false;
+        if (filters.entry_type === 'transfer' && (!b.total_transfer_out || b.total_transfer_out <= 0) && (!b.total_transfer_in || b.total_transfer_in <= 0)) return false;
+        if (filters.entry_type === 'returned_supplier' && (!b.total_returned_supplier || b.total_returned_supplier <= 0)) return false;
+      }
+
+      return true;
+    });
+
+    this.dataSource.data = baseData;
+
+    const type = filters.entry_type;
+    let cols = ['material', 'category', 'project', 'site', 'supplier_name', 'invoice_no', 'invoice_date', 'current_balance', 'opening_balance'];
+
+    if (!type || type === '') {
+      cols.push('total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier');
+    } else if (type === 'received') {
+      cols.push('total_received', 'received_cost');
+    } else if (type === 'used') {
+      cols.push('total_used', 'used_cost');
+    } else if (type === 'transfer') {
+      cols.push('total_transfer_out', 'total_transfer_in');
+    } else if (type === 'returned_supplier') {
+      cols.push('total_returned_supplier');
+    }
+    
+    cols.push('updated_at', 'status');
+    this.displayedColumns = cols;
+
+    if (this.viewMode === 'table') {
+      setTimeout(() => {
+        this.dataSource.paginator = this.paginator;
+        this.dataSource.sort = this.sort;
+        if (this.paginator) { this.paginator.firstPage(); }
+      });
+    }
+  }
+
+  get totalReceivedQty(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.total_received) || 0), 0); }
+  get totalReceivedCost(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.received_value) || 0), 0); }
+  get totalUsedQty(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.total_used) || 0), 0); }
+  get totalUsedCost(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.used_value) || 0), 0); }
+
+  getFormattedDate(balance: any): string {
+    const rawDate = balance.updated_at || balance.created_at || balance.last_updated || balance.entry_date || balance.report_date;
+    if (!rawDate) return 'N/A';
+    return new Date(rawDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   getCategoryName(categoryId: number | undefined): string {
@@ -212,225 +321,206 @@ export class StockBalanceComponent implements OnInit {
     const category = this.categories?.find((c: any) => c.id === categoryId);
     return category ? category.name : 'Unknown';
   }
-
-  getMaterial(materialId: number | undefined): any {
-    if (!materialId) return null;
-    return this.materials?.find(m => m.id === materialId);
-  }
-
-  getCurrentStock(materialId: number | undefined): number {
-    if (!materialId) return 0;
-    const balance = this.stockBalances?.find(b => b.material_id === materialId);
-    return balance ? balance.current_balance : 0;
-  }
-
-  getBalance(materialId: number | undefined): any {
-    if (!materialId) return null;
-    return this.stockBalances?.find(b => b.material_id === materialId);
-  }
   
-  getMaterialName(materialId: number): string {
-    const material = this.materials.find(m => m.id === materialId);
-    return material ? material.name : 'Unknown';
-  }
+  getMaterial(materialId: number | undefined): any { return this.materials?.find(m => m.id === materialId); }
+  getStockStatus(balance: any): string { return balance?.has_negative_balance ? 'danger' : (balance?.current_balance < 10 ? 'warning' : 'success'); }
+  getStockStatusText(balance: any): string { return balance?.has_negative_balance ? 'Negative Stock' : (balance?.current_balance < 10 ? 'Low Stock' : 'In Stock'); }
+  getCurrentStock(materialId: number | undefined): number { const balance = this.allTimeBalances.find(b => b.material_id === materialId); return balance ? balance.current_balance : 0; }
 
-  calculateStockValue(): number {
-    return this.stockBalances.reduce((total, balance) => {
-      const material = this.materials.find(m => m.id === balance.material_id);
-      const unitCost = material?.standard_cost || 0;
-      return total + (balance.current_balance * unitCost);
-    }, 0);
-  }
-
-  getStockStatus(balance: any): string {
-    if (!balance) return 'secondary';
-    if (balance.has_negative_balance) {
-      return 'danger';
-    } else if (balance.current_balance < 10) {
-      return 'warning';
-    } else {
-      return 'success';
-    }
-  }
-
-  getStockStatusText(balance: any): string {
-    if (!balance) return 'Unknown';
-    if (balance.has_negative_balance) {
-      return 'Negative Stock';
-    } else if (balance.current_balance < 10) {
-      return 'Low Stock';
-    } else {
-      return 'In Stock';
-    }
-  }
-
-  // --- Charts & Export ---
-
-  createStockChart(balances: StockBalance[]): void {
-    this.destroyChart('stockChart');
+  showMaterialDetails(balanceRow: any): void {
+    const material = this.getMaterial(balanceRow.material_id);
+    if (!material) return;
     
-    const ctx = document.getElementById('stockChart') as HTMLCanvasElement;
-    if (!ctx) return;
-    
-    const topMaterials = balances
-      .filter(b => b.current_balance > 0)
-      .sort((a, b) => b.current_balance - a.current_balance)
-      .slice(0, 10);
-    
-    this.stockChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: topMaterials.map(b => b.material_name),
-        datasets: [
-          {
-            label: 'Current Stock',
-            data: topMaterials.map(b => b.current_balance),
-            backgroundColor: 'rgba(63, 81, 181, 0.7)',
-            borderColor: 'rgb(63, 81, 181)',
-            borderWidth: 1
-          },
-          {
-            label: 'Opening Stock',
-            data: topMaterials.map(b => b.opening_balance),
-            backgroundColor: 'rgba(76, 175, 80, 0.7)',
-            borderColor: 'rgb(76, 175, 80)',
-            borderWidth: 1
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          title: { display: true, text: 'Top Materials by Stock Balance' },
-          legend: { position: 'top' }
-        },
-        scales: {
-          y: { beginAtZero: true, title: { display: true, text: 'Quantity' } },
-          x: { ticks: { maxRotation: 45, minRotation: 45 } }
-        }
-      }
+    this.selectedMaterial = material;
+    this.selectedSiteName = balanceRow.site_name || 'Selected Site';
+    this.selectedMaterialHistory = [];
+    this.isLoadingHistory = true;
+
+    const dialogRef = this.dialog.open(this.materialDetailsDialog, { width: '900px', maxHeight: '90vh' });
+
+    dialogRef.afterOpened().subscribe(() => {
+      this.fetchHistoryAndDrawChart(balanceRow.material_id, balanceRow.site_id);
     });
   }
 
-  createMaterialChart(materialId: number): void {
+  fetchHistoryAndDrawChart(materialId: number, siteId: number): void {
+    this.stockService.getStockEntries({ site_id: siteId, material_id: materialId, limit: 15 }).subscribe({
+      next: (entries) => {
+        this.selectedMaterialHistory = entries;
+        this.isLoadingHistory = false;
+        if (entries.length > 0) { setTimeout(() => this.drawChart(entries), 100); }
+      },
+      error: () => { this.isLoadingHistory = false; }
+    });
+  }
+
+  drawChart(entries: any[]): void {
     this.destroyChart('materialChart');
-    
     const ctx = document.getElementById('materialChart') as HTMLCanvasElement;
     if (!ctx) return;
+
+    const sortedEntries = [...entries].reverse();
+    const labels = sortedEntries.map(e => new Date(e.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
     
-    if (this.selectedSiteId) {
-      this.stockService.getStockEntries({
-        site_id: this.selectedSiteId,
-        material_id: materialId,
-        limit: 30,
-        sort_by: 'entry_date',
-        sort_order: 'desc'
-      }).subscribe({
-        next: (entries) => {
-          const labels = entries.map(e => new Date(e.entry_date).toLocaleDateString()).reverse();
-          const quantities = entries.map(e => {
-            let qty = e.quantity;
-            if (e.entry_type === 'used' || e.entry_type === 'returned_supplier') {
-              qty = -qty;
-            }
-            return qty;
-          }).reverse();
-          
-          let runningBalance = 0;
-          const balances = quantities.map(qty => {
-            runningBalance += qty;
-            return runningBalance;
-          });
-          
-          this.materialChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels: labels,
-              datasets: [
-                {
-                  label: 'Stock Balance',
-                  data: balances,
-                  borderColor: 'rgb(63, 81, 181)',
-                  backgroundColor: 'rgba(63, 81, 181, 0.1)',
-                  fill: true,
-                  tension: 0.4
-                },
-                {
-                  label: 'Daily Movement',
-                  data: quantities,
-                  borderColor: 'rgb(255, 152, 0)',
-                  backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                  type: 'bar'
-                }
-              ]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { title: { display: true, text: 'Material Stock History (Last 30 Days)' } },
-              scales: { y: { title: { display: true, text: 'Quantity' } } }
-            }
-          });
-          this.materialStockHistory = entries;
-        }
-      });
+    const inData = sortedEntries.map(e => this.isEntryIn(e) ? Number(e.quantity) : 0);
+    const outData = sortedEntries.map(e => !this.isEntryIn(e) ? Number(e.quantity) : 0);
+
+    this.materialChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Stock IN', data: inData, backgroundColor: 'rgba(76, 175, 80, 0.7)' },
+          { label: 'Stock OUT', data: outData, backgroundColor: 'rgba(244, 67, 54, 0.7)' }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+    });
+  }
+
+  isEntryIn(entry: any): boolean {
+    const isOut = ['used', 'returned_supplier'].includes(entry.entry_type) || (entry.remarks && entry.remarks.includes('Transfer OUT'));
+    return !isOut;
+  }
+
+  formatEntryType(type: string, remarks?: string): string {
+    if (type === 'used' && remarks?.includes('Transfer OUT')) return 'SENT TO SITE';
+    if (type === 'returned_received' && remarks?.includes('Transfer IN')) return 'RECEIVED FROM SITE';
+    if (type === 'returned_received') return 'RETURNED FROM SITE';
+    return (type || '').replace('_', ' ').toUpperCase();
+  }
+
+  getEntryBadge(type: string, remarks?: string): string {
+    if (type === 'used' && remarks?.includes('Transfer OUT')) return 'bg-info text-dark border border-info';
+    if (type === 'returned_received' && remarks?.includes('Transfer IN')) return 'bg-primary text-white';
+    switch (type) {
+      case 'received': return 'bg-success';
+      case 'used': return 'bg-danger';
+      case 'returned_supplier': return 'bg-warning text-dark';
+      default: return 'bg-secondary';
     }
   }
 
-  showMaterialDetails(material: Material): void {
-    this.selectedMaterial = material;
-    this.createMaterialChart(material.id);
-    this.dialog.open(this.materialDetailsDialog, { width: '800px', maxHeight: '90vh' });
-  }
-
-  exportStockReport(): void {
-    const data = this.dataSource.data;
-    if (data.length === 0) {
+  openExportModal(): void {
+    if (this.dataSource.data.length === 0) {
       this.toastr.warning('No data to export', 'Warning');
       return;
     }
 
-    const headers = ['Material', 'Category', 'Current Balance', 'Opening Balance', 'Received', 'Used', 'Status'];
-    const rows = data.map(item => [
-      item.material_name,
-      this.getCategoryName(item.material_id),
-      item.current_balance,
-      item.opening_balance,
-      item.total_received,
-      item.total_used,
-      this.getStockStatusText(item)
-    ]);
+    this.exportColumns = [
+      { key: 'project', label: 'Project', selected: true },
+      { key: 'site_name', label: 'Site', selected: true },
+      { key: 'material_name', label: 'Material', selected: true },
+      { key: 'category', label: 'Category', selected: true },
+      { key: 'supplier_name', label: 'Supplier Name', selected: true },
+      { key: 'invoice_no', label: 'Invoice No', selected: true },
+      { key: 'invoice_date', label: 'Invoice Date', selected: true },
+      { key: 'current_balance', label: 'Current Balance', selected: true },
+      { key: 'opening_balance', label: 'Opening Balance', selected: true },
+      { key: 'total_received', label: 'Received Qty', selected: true },
+      { key: 'received_value', label: 'Received Cost', selected: true },
+      { key: 'total_used', label: 'Consumed Qty', selected: true },
+      { key: 'used_value', label: 'Consumed Cost', selected: true },
+      { key: 'total_transfer_out', label: 'Sent to Site', selected: true },
+      { key: 'total_transfer_in', label: 'Received from Site', selected: true },
+      { key: 'total_returned_supplier', label: 'Ret. (Supplier)', selected: true },
+      { key: 'dateStr', label: 'Date', selected: true },
+      { key: 'status', label: 'Status', selected: true }
+    ];
 
-    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `stock-balance-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    this.toastr.success('Stock report exported', 'Success');
+    this.showExportModal = true;
+  }
+
+  closeExportModal(): void { this.showExportModal = false; }
+
+  moveColumn(index: number, direction: number): void {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= this.exportColumns.length) return;
+    const temp = this.exportColumns[index];
+    this.exportColumns[index] = this.exportColumns[newIndex];
+    this.exportColumns[newIndex] = temp;
+  }
+
+  async confirmAndExport(): Promise<void> {
+    const selectedCols = this.exportColumns.filter(c => c.selected);
+    
+    if (selectedCols.length === 0) {
+      this.toastr.warning('You must select at least one column to export.');
+      return;
+    }
+
+    const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'All Projects';
+    const data = this.dataSource.data.map(item => {
+      return {
+        ...item,
+        project: this.getProjectNameForSite(item.site_id),
+        site_name: item.site_name || 'N/A',
+        received_value: item.received_value || 0,
+        used_value: item.used_value || 0,
+        total_transfer_out: item.total_transfer_out || 0,
+        total_transfer_in: item.total_transfer_in || 0,
+        total_returned_supplier: item.total_returned_supplier || 0,
+        dateStr: this.getFormattedDate(item),
+        status: this.getStockStatusText(item)
+      };
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Stock Balance');
+
+    worksheet.mergeCells(`A1:${String.fromCharCode(64 + selectedCols.length)}1`);
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = `Enterprise System: Stock Balance Report`;
+    titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }; 
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getRow(1).height = 30;
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    worksheet.mergeCells(`A2:${String.fromCharCode(64 + selectedCols.length)}2`);
+    const dateCell = worksheet.getCell('A2');
+    dateCell.value = `Generated on: ${new Date().toLocaleString()}`;
+    dateCell.font = { name: 'Arial', size: 10, italic: true };
+    dateCell.alignment = { horizontal: 'right' };
+
+    worksheet.addRow([]);
+
+    const headerRow = worksheet.addRow(selectedCols.map(c => c.label));
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } }; 
+      cell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    });
+
+    data.forEach((item, index) => {
+      const rowData = selectedCols.map(c => item[c.key as keyof typeof item]);
+      const row = worksheet.addRow(rowData);
+      if (index % 2 === 0) {
+        row.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; });
+      }
+    });
+
+    worksheet.columns.forEach(column => { column.width = 22; });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `stock-balance-${dateStr}.xlsx`);
+
+    this.toastr.success('Enterprise Report generated successfully!');
+    this.closeExportModal();
   }
 
   destroyChart(chartId: string): void {
     const canvas = document.getElementById(chartId) as HTMLCanvasElement;
-    if (canvas) {
-      const chart = Chart.getChart(canvas);
-      if (chart) { chart.destroy(); }
-    }
+    if (canvas) { const chart = Chart.getChart(canvas); if (chart) chart.destroy(); }
   }
-
-  ngOnDestroy(): void {
-    this.destroyChart('stockChart');
-    this.destroyChart('materialChart');
+  
+  ngOnDestroy(): void { this.destroyChart('materialChart'); }
+  toggleViewMode(): void { 
+    this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; 
+    this.updateTable(); 
+    if (this.viewMode === 'table') { setTimeout(() => { this.dataSource.paginator = this.paginator; this.dataSource.sort = this.sort; }); }
   }
-
-  toggleViewMode(): void {
-    this.viewMode = this.viewMode === 'table' ? 'cards' : 'table';
-  }
-
-  refreshData(): void {
-    this.loadStockBalances();
-    this.toastr.info('Stock data refreshed', 'Success');
-  }
+  refreshData(): void { this.loadSitesAndFetchData(this.filterForm.value.project_id); }
 }

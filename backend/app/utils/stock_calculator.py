@@ -1,7 +1,7 @@
 """
-Stock calculation utilities - Enterprise Lot Tracking Edition
+Stock calculation utilities - Enterprise Lot Tracking Edition (Strict Timeline)
 """
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -37,7 +37,7 @@ class StockCalculator:
             models.StockEntry.entry_date <= as_of_date
         )
         
-        # BATCH ISOLATION: Calculate only for this specific supplier/invoice lot
+        # BATCH ISOLATION
         if supplier_name is not None:
             query = query.filter(func.coalesce(models.StockEntry.supplier_name, '-') == supplier_name)
         if invoice_no is not None:
@@ -56,7 +56,8 @@ class StockCalculator:
                 
         current_balance = all_time_received - all_time_used
         
-        yesterday_end = datetime.combine((as_of_date - timedelta(days=1)).date(), datetime.max.time())
+        # STRICT TIMELINE: Yesterday ends exactly at 11:58:59 PM
+        yesterday_end = datetime.combine((as_of_date - timedelta(days=1)).date(), time(23, 58, 59))
         opening_balance = Decimal('0.00')
         
         for entry in all_entries:
@@ -67,8 +68,9 @@ class StockCalculator:
                 elif entry.entry_type in ['used', 'returned_supplier']:
                     opening_balance -= entry.quantity
 
-        today_start = datetime.combine(as_of_date.date(), datetime.min.time())
-        today_end = datetime.combine(as_of_date.date(), datetime.max.time())
+        # STRICT TIMELINE: Today boundaries
+        today_start = datetime.combine(as_of_date.date(), time(0, 0, 0))
+        today_end = datetime.combine(as_of_date.date(), time(23, 58, 59))
         
         today_received = Decimal('0.00')
         today_used = Decimal('0.00')
@@ -132,7 +134,6 @@ class StockCalculator:
     def get_site_stock_summary(db: Session, site_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None, supplier_name: Optional[str] = None, entry_type: Optional[str] = None) -> List[Dict[str, Any]]:
         summary = []
         
-        # LOT TRACKING: Identify distinct combinations of Material + Supplier + Invoice
         lots = db.query(
             models.StockEntry.material_id,
             func.coalesce(models.StockEntry.supplier_name, '-').label('supplier_name'),
@@ -143,8 +144,9 @@ class StockCalculator:
         effective_start = start_date if start_date else date.min
         effective_end = end_date if end_date else date.today()
         
-        start_dt = datetime.combine(effective_start, datetime.min.time())
-        end_dt = datetime.combine(effective_end, datetime.max.time())
+        # STRICT TIMELINE: Lock borders strictly inside 00:00:00 and 23:58:59
+        start_dt = datetime.combine(effective_start, time(0, 0, 0))
+        end_dt = datetime.combine(effective_end, time(23, 58, 59))
 
         for lot in lots:
             mat_id = lot.material_id
@@ -155,9 +157,9 @@ class StockCalculator:
             if not material:
                 continue
 
-            # 1. STRICT START DATE for this specific Lot
             if has_date_filter and start_date:
-                opening_calc = StockCalculator.calculate_balance(db, site_id, mat_id, start_dt - timedelta(microseconds=1), sup_name, inv_no)
+                # Get balance 1 second before the period begins
+                opening_calc = StockCalculator.calculate_balance(db, site_id, mat_id, start_dt - timedelta(seconds=1), sup_name, inv_no)
                 opening_bal = opening_calc["current_balance"]
                 prev_tot_rec_qty = opening_calc.get("total_received", Decimal('0.0'))
                 prev_tot_rec_val = opening_calc.get("received_value", Decimal('0.0'))
@@ -175,9 +177,8 @@ class StockCalculator:
                 func.coalesce(models.StockEntry.invoice_no, '-') == inv_no
             ).order_by(models.StockEntry.entry_date.asc()).all()
 
-            if has_date_filter and len(entries) == 0 and opening_bal == 0:
-                continue
-            if not has_date_filter and len(entries) == 0 and opening_bal == 0:
+            # Skip if absolutely zero activity and zero opening balance
+            if len(entries) == 0 and opening_bal == 0:
                 continue
 
             period_received = Decimal('0.0')
@@ -213,7 +214,6 @@ class StockCalculator:
             avg_cost = tot_rec_val / tot_rec_qty if tot_rec_qty > 0 else Decimal('0.0')
             dynamic_used_value = period_used * avg_cost
 
-            # Retrieve exact invoice date for this lot
             latest_inv_date = None
             if len(entries) > 0:
                 for e in entries:
@@ -227,7 +227,20 @@ class StockCalculator:
                 ).order_by(models.StockEntry.entry_date.desc()).first()
                 if last_entry:
                     latest_inv_date = last_entry.invoice_date
-                    latest_in_range = last_entry.entry_date
+
+            # Clean Display Date: If there is a Date Filter but NO new activity in this range, show the boundary date
+            if latest_in_range:
+                final_updated = latest_in_range
+            elif has_date_filter:
+                final_updated = end_dt
+            else:
+                last_historic_entry = db.query(models.StockEntry).filter(
+                    models.StockEntry.site_id == site_id,
+                    models.StockEntry.material_id == mat_id,
+                    func.coalesce(models.StockEntry.supplier_name, '-') == sup_name,
+                    func.coalesce(models.StockEntry.invoice_no, '-') == inv_no
+                ).order_by(models.StockEntry.entry_date.desc()).first()
+                final_updated = last_historic_entry.entry_date if last_historic_entry else None
 
             summary.append({
                 "material_id": mat_id,
@@ -247,7 +260,7 @@ class StockCalculator:
                 "supplier_name": sup_name,
                 "invoice_no": inv_no,
                 "invoice_date": latest_inv_date,
-                "last_updated": latest_in_range if latest_in_range else (end_dt if start_date else None)
+                "last_updated": final_updated
             })
 
         if supplier_name:
@@ -272,7 +285,6 @@ class StockCalculator:
         reports_generated = []
         report_datetime = datetime.combine(report_date, datetime.min.time())
         
-        # AGGREGATE LOTS: Merge batches back together before saving to daily history
         aggregated = {}
         for item in summary:
             mat_id = item["material_id"]

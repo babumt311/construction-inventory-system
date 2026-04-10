@@ -47,8 +47,18 @@ export class StockService {
     return this.api.get<StockBalance>('stock/balance', params);
   }
 
-  // Pass the pre-built params object directly to your API wrapper
-  getSiteStockSummary(siteId: number, params?: any) {
+  // --- ENTERPRISE FIX: Strictly encode URL parameters for the backend ---
+  getSiteStockSummary(siteId: number, filters?: any) {
+    let params = new HttpParams();
+    
+    if (filters) {
+      if (filters.start_date) params = params.set('start_date', filters.start_date);
+      if (filters.end_date) params = params.set('end_date', filters.end_date);
+      if (filters.supplier_name) params = params.set('supplier_name', filters.supplier_name);
+      if (filters.entry_type) params = params.set('entry_type', filters.entry_type);
+    }
+    
+    // Send to backend via strictly typed HTTP Query Parameters
     return this.api.get(`stock/site-summary/${siteId}`, params);
   }
 

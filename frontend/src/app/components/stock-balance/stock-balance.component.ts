@@ -51,7 +51,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   selectedProjectId?: number;
   viewMode: 'table' | 'cards' = 'table';
 
-  // State trackers
   private prevBackendState = { start: '', end: '', supplier: '', entryType: '', project: '' };
   private prevProjectId: any = '';
 
@@ -110,14 +109,14 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.loadCategories(); 
     this.loadMaterials();
     this.loadProjectsAndInitialData();
-    // --- NEW: Force End Date to be >= Start Date ---
+
+    // Lock end date if user tries to pick an invalid range
     this.filterForm.get('start_date')?.valueChanges.subscribe(startDate => {
       const endDate = this.filterForm.get('end_date')?.value;
       if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
         this.filterForm.patchValue({ end_date: startDate }, { emitEvent: false });
       }
     });
-    // -----------------------------------------------
 
     this.filterForm.valueChanges.pipe(debounceTime(400)).subscribe(vals => {
       const needsBackendFetch = 
@@ -141,6 +140,34 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         this.updateTable();
       }
     });
+  }
+
+  // --- ENTERPRISE BATCH MERGING FOR CARDS ---
+  get mergedCardsData(): any[] {
+    const merged = new Map<number, any>();
+    for (const item of this.dataSource.data) {
+      if (merged.has(item.material_id)) {
+        const existing = merged.get(item.material_id);
+        // Safely aggregate all numeric values
+        existing.current_balance = Number(existing.current_balance || 0) + Number(item.current_balance || 0);
+        existing.opening_balance = Number(existing.opening_balance || 0) + Number(item.opening_balance || 0);
+        existing.total_received = Number(existing.total_received || 0) + Number(item.total_received || 0);
+        existing.received_value = Number(existing.received_value || 0) + Number(item.received_value || 0);
+        existing.total_used = Number(existing.total_used || 0) + Number(item.total_used || 0);
+        existing.used_value = Number(existing.used_value || 0) + Number(item.used_value || 0);
+        existing.total_transfer_out = Number(existing.total_transfer_out || 0) + Number(item.total_transfer_out || 0);
+        existing.total_transfer_in = Number(existing.total_transfer_in || 0) + Number(item.total_transfer_in || 0);
+        existing.total_returned_supplier = Number(existing.total_returned_supplier || 0) + Number(item.total_returned_supplier || 0);
+        
+        // Nullify specific batch details since this card represents multiple batches
+        existing.supplier_name = '-';
+        existing.invoice_no = '-';
+      } else {
+        // Deep clone so we don't accidentally mutate the table data
+        merged.set(item.material_id, JSON.parse(JSON.stringify(item)));
+      }
+    }
+    return Array.from(merged.values());
   }
 
   getProjectNameForSite(siteId: any): string {
@@ -194,7 +221,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     let loaded = 0;
     const filters = this.filterForm.value;
 
-    // --- Pack all filters into a single object ---
     const apiParams: any = {};
     if (filters.start_date) apiParams.start_date = filters.start_date;
     if (filters.end_date) apiParams.end_date = filters.end_date;
@@ -202,7 +228,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     if (filters.entry_type) apiParams.entry_type = filters.entry_type;
 
     this.sites.forEach(site => {
-      // Pass the single apiParams object here!
       this.stockService.getSiteStockSummary(site.id, apiParams).subscribe({
         next: (balances: any) => {
           const tagged = balances.map((b: any) => ({ ...b, site_name: site.name, site_id: site.id }));
@@ -253,7 +278,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
     this.dataSource.data = baseData;
 
-    // --- DYNAMIC COLUMNS LOGIC ---
     const type = filters.entry_type;
     let cols = ['material', 'category', 'project', 'site', 'supplier_name', 'invoice_no', 'invoice_date', 'current_balance', 'opening_balance'];
 
@@ -272,7 +296,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     cols.push('updated_at', 'status');
     this.displayedColumns = cols;
 
-    // --- PAGINATION FIX ---
     if (this.viewMode === 'table') {
       setTimeout(() => {
         this.dataSource.paginator = this.paginator;

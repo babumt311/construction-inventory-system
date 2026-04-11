@@ -55,7 +55,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   showExportModal = false;
   exportColumns: { key: string, label: string, selected: boolean }[] = [];
-  includeExportTotals = true;
+  includeExportTotals = true; // Restored Export Totals Toggle
 
   constructor(
     private fb: FormBuilder,
@@ -463,6 +463,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.exportColumns[newIndex] = temp;
   }
 
+  // --- RESTORED EXCEL TOTALS LOGIC ---
   async confirmAndExport(): Promise<void> {
     const selectedCols = this.exportColumns.filter(c => c.selected);
     
@@ -530,7 +531,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       ];
 
       const totalsData = selectedCols.map((col, index) => {
-        if (index === 0) return 'TOTALS'; 
+        if (index === 0) return 'TOTALS';
         if (summableColumns.includes(col.key)) {
           const sum = data.reduce((acc, item) => acc + (Number(item[col.key as keyof typeof item]) || 0), 0);
           return Number(sum.toFixed(2));
@@ -564,15 +565,16 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   
   ngOnDestroy(): void { this.destroyChart('materialChart'); }
   
+  // --- CARDS RESET FIX ---
   toggleViewMode(): void { 
     this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; 
     
     if (this.viewMode === 'cards') {
+      // Clear ledger-specific filters when looking at overall warehouse cards
       this.filterForm.patchValue({
         start_date: '',
         end_date: '',
-        entry_type: '',
-        show_negative_only: false
+        entry_type: ''
       });
     }
 

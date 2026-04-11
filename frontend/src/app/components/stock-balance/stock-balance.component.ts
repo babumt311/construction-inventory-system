@@ -140,10 +140,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  // --- LEDGER PROTECTION: Isolate the absolute latest row for each batch ---
   getUniqueLotsData(dataArray: any[]): any[] {
     const lotMap = new Map<string, any>();
-    // Sort chronological so the loop overwrites older rows with the newest state
     const sorted = [...dataArray].sort((a, b) => {
         return new Date(a.last_updated || 0).getTime() - new Date(b.last_updated || 0).getTime();
     });
@@ -154,11 +152,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     return Array.from(lotMap.values());
   }
 
-  // --- ENTERPRISE BATCH MERGING FOR CARDS ---
   get mergedCardsData(): any[] {
     const merged = new Map<number, any>();
     
-    // 1. Accumulate all movement quantities across every ledger row
     for (const item of this.dataSource.data) {
       if (merged.has(item.material_id)) {
         const existing = merged.get(item.material_id);
@@ -174,7 +170,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       }
     }
 
-    // 2. Safely calculate true current balance using only the latest row for each lot
     const latestLots = this.getUniqueLotsData(this.dataSource.data);
     const trueBalances = new Map<number, number>();
     for(const lot of latestLots) {
@@ -543,10 +538,28 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
   
   ngOnDestroy(): void { this.destroyChart('materialChart'); }
+  
+  // --- CARD VIEW RESET FIX ---
   toggleViewMode(): void { 
     this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; 
+    
+    if (this.viewMode === 'cards') {
+      // Clear time-based and transaction filters when switching to Card View
+      this.filterForm.patchValue({
+        start_date: '',
+        end_date: '',
+        entry_type: ''
+      });
+    }
+
     this.updateTable(); 
-    if (this.viewMode === 'table') { setTimeout(() => { this.dataSource.paginator = this.paginator; this.dataSource.sort = this.sort; }); }
+    if (this.viewMode === 'table') { 
+      setTimeout(() => { 
+        this.dataSource.paginator = this.paginator; 
+        this.dataSource.sort = this.sort; 
+      }); 
+    }
   }
+
   refreshData(): void { this.loadSitesAndFetchData(this.filterForm.value.project_id); }
 }

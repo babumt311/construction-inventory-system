@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
-import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
 import {
   StockEntry,
@@ -47,18 +46,18 @@ export class StockService {
     return this.api.get<StockBalance>('stock/balance', params);
   }
 
-  // --- RESTORED: Safely encode parameters to prevent API failure ---
+  // --- ENTERPRISE FIX: Safely pass parameters as a plain object ---
   getSiteStockSummary(siteId: number, filters?: any) {
-    let params = new HttpParams();
+    const queryParams: any = {};
     
     if (filters) {
-      if (filters.start_date) params = params.set('start_date', filters.start_date);
-      if (filters.end_date) params = params.set('end_date', filters.end_date);
-      if (filters.supplier_name) params = params.set('supplier_name', filters.supplier_name);
-      if (filters.entry_type) params = params.set('entry_type', filters.entry_type);
+      if (filters.start_date) queryParams.start_date = filters.start_date;
+      if (filters.end_date) queryParams.end_date = filters.end_date;
+      if (filters.supplier_name) queryParams.supplier_name = filters.supplier_name;
+      if (filters.entry_type) queryParams.entry_type = filters.entry_type;
     }
     
-    return this.api.get(`stock/site-summary/${siteId}`, params);
+    return this.api.get(`stock/site-summary/${siteId}`, queryParams);
   }
 
   // Daily Reports

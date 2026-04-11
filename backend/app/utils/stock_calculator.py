@@ -45,13 +45,12 @@ class StockCalculator:
         }
 
     @staticmethod
-    def get_site_stock_summary(db: Session, site_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None, supplier_name: Optional[str] = None, entry_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_site_stock_summary(db: Session, site_id: int, start_date: Optional[date] = None, end_date: Optional[date] = None, supplier_name: Optional[str] = None, entry_type: Optional[str] = None, is_daily_report: bool = False) -> List[Dict[str, Any]]:
         summary = []
         materials = db.query(models.Material).join(models.StockEntry).filter(models.StockEntry.site_id == site_id).distinct().all()
 
         has_date_filter = bool(start_date or end_date)
         
-        # BULLETPROOF DATABASE TIMELINE: Prevent PostgreSQL Year 1 crash
         effective_start = start_date if start_date else date(2000, 1, 1)
         effective_end = end_date if end_date else (date.today() + timedelta(days=3650))
 
@@ -70,9 +69,7 @@ class StockCalculator:
 
             lots = [] 
             
-            # --- THE FIFO ENGINE ---
             for e in entries:
-                # SAFE DATE: Strips timezone to prevent 500 Server Crashes
                 safe_date = e.entry_date.replace(tzinfo=None) if getattr(e.entry_date, 'tzinfo', None) else e.entry_date
                 
                 in_period = (start_dt <= safe_date <= end_dt)
@@ -168,8 +165,16 @@ class StockCalculator:
 
             for key, g in grouped_lots.items():
                 has_activity = (g["total_received"] > 0 or g["total_used"] > 0 or g["total_transfer_out"] > 0 or g["total_transfer_in"] > 0 or g["total_returned_supplier"] > 0)
-                if has_date_filter and g["opening_balance"] == 0 and not has_activity:
+                
+                # --- NEW STRICT MOVEMENT LOGIC ---
+                # If checking a specific date range in the UI, hide lots that didn't move at all!
+                if has_date_filter and not has_activity and not is_daily_report:
                     continue
+                    
+                # If checking "All Time", hide ghost entries that have 0 balance and 0 activity
+                if not has_date_filter and g["opening_balance"] == 0 and not has_activity and g["current_balance"] == 0:
+                    continue
+                # ---------------------------------
                 
                 summary.append({
                     "material_id": material.id,
@@ -206,7 +211,8 @@ class StockCalculator:
 
     @staticmethod
     def generate_daily_report(db: Session, site_id: int, report_date: date) -> List[models.DailyStockReport]:
-        summary = StockCalculator.get_site_stock_summary(db, site_id, report_date, report_date)
+        # is_daily_report=True ensures the automated cron job STILL saves items even if they had 0 movement that day
+        summary = StockCalculator.get_site_stock_summary(db, site_id, report_date, report_date, is_daily_report=True)
         reports_generated = []
         report_datetime = datetime.combine(report_date, datetime.min.time())
         

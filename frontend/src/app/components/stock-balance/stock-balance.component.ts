@@ -55,6 +55,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   showExportModal = false;
   exportColumns: { key: string, label: string, selected: boolean }[] = [];
+  includeExportTotals = true;
 
   constructor(
     private fb: FormBuilder,
@@ -522,6 +523,30 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       }
     });
 
+    if (this.includeExportTotals && data.length > 0) {
+      const summableColumns = [
+        'current_balance', 'opening_balance', 'total_received', 'received_value', 
+        'total_used', 'used_value', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier'
+      ];
+
+      const totalsData = selectedCols.map((col, index) => {
+        if (index === 0) return 'TOTALS'; 
+        if (summableColumns.includes(col.key)) {
+          const sum = data.reduce((acc, item) => acc + (Number(item[col.key as keyof typeof item]) || 0), 0);
+          return Number(sum.toFixed(2));
+        }
+        return '-';
+      });
+
+      const totalRow = worksheet.addRow(totalsData);
+      totalRow.eachCell((cell) => {
+        cell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF000000' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
+        cell.border = { top: { style: 'double' }, bottom: { style: 'medium' } };
+        cell.alignment = { horizontal: typeof cell.value === 'number' ? 'right' : 'center' };
+      });
+    }
+
     worksheet.columns.forEach(column => { column.width = 22; });
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -539,16 +564,15 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   
   ngOnDestroy(): void { this.destroyChart('materialChart'); }
   
-  // --- CARD VIEW RESET FIX ---
   toggleViewMode(): void { 
     this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; 
     
     if (this.viewMode === 'cards') {
-      // Clear time-based and transaction filters when switching to Card View
       this.filterForm.patchValue({
         start_date: '',
         end_date: '',
-        entry_type: ''
+        entry_type: '',
+        show_negative_only: false
       });
     }
 

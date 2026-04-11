@@ -47,18 +47,18 @@ export class StockService {
     return this.api.get<StockBalance>('stock/balance', params);
   }
 
-  // --- ENTERPRISE FIX: Strictly encode URL parameters for the backend ---
+  // --- RESTORED: Safely encode parameters to prevent API failure ---
   getSiteStockSummary(siteId: number, filters?: any) {
-    const queryParams: any = {};
+    let params = new HttpParams();
     
     if (filters) {
-      if (filters.start_date) queryParams.start_date = filters.start_date;
-      if (filters.end_date) queryParams.end_date = filters.end_date;
-      if (filters.supplier_name) queryParams.supplier_name = filters.supplier_name;
-      if (filters.entry_type) queryParams.entry_type = filters.entry_type;
+      if (filters.start_date) params = params.set('start_date', filters.start_date);
+      if (filters.end_date) params = params.set('end_date', filters.end_date);
+      if (filters.supplier_name) params = params.set('supplier_name', filters.supplier_name);
+      if (filters.entry_type) params = params.set('entry_type', filters.entry_type);
     }
     
-    return this.api.get(`stock/site-summary/${siteId}`, queryParams);
+    return this.api.get(`stock/site-summary/${siteId}`, params);
   }
 
   // Daily Reports
@@ -69,13 +69,11 @@ export class StockService {
   generateDailyReport(siteId: number, reportDate?: Date): Observable<any> {
     let url = `stock/generate-daily-report/${siteId}`;
 
-    // Fix: Manually add the query parameter to the URL string
     if (reportDate) {
       const dateStr = reportDate.toISOString().split('T')[0];
       url += `?report_date=${dateStr}`;
     }
 
-    // Now call .post() with only 2 arguments: (URL, Body)
     return this.api.post<any>(url, {});
   }
 

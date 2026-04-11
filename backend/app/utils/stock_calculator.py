@@ -1,5 +1,5 @@
 """
-Stock calculation utilities - Enterprise FIFO Allocation Engine
+Stock calculation utilities - Enterprise FIFO Allocation Engine (Crash-Proof)
 """
 from datetime import datetime, date, timedelta, time
 from decimal import Decimal
@@ -51,7 +51,7 @@ class StockCalculator:
 
         has_date_filter = bool(start_date or end_date)
         
-        # BULLETPROOF DATABASE TIMELINE: Prevent PostgreSQL Year 1 crash, and never cut off future dates if no filter
+        # BULLETPROOF DATABASE TIMELINE: Prevent PostgreSQL Year 1 crash
         effective_start = start_date if start_date else date(2000, 1, 1)
         effective_end = end_date if end_date else (date.today() + timedelta(days=3650))
 
@@ -59,7 +59,6 @@ class StockCalculator:
         end_dt = datetime.combine(effective_end, time(23, 58, 59))
 
         for material in materials:
-            # Get all historic transactions up to the end_dt
             entries = db.query(models.StockEntry).filter(
                 models.StockEntry.site_id == site_id,
                 models.StockEntry.material_id == material.id,
@@ -69,12 +68,15 @@ class StockCalculator:
             if not entries:
                 continue
 
-            lots = [] # Active batches in the warehouse
+            lots = [] 
             
             # --- THE FIFO ENGINE ---
             for e in entries:
-                in_period = (start_dt <= e.entry_date <= end_dt)
-                before_period = (e.entry_date < start_dt)
+                # SAFE DATE: Strips timezone to prevent 500 Server Crashes
+                safe_date = e.entry_date.replace(tzinfo=None) if getattr(e.entry_date, 'tzinfo', None) else e.entry_date
+                
+                in_period = (start_dt <= safe_date <= end_dt)
+                before_period = (safe_date < start_dt)
                 
                 if e.entry_type in ['received', 'returned_received']:
                     unit_cost = (e.total_cost / e.quantity) if e.quantity and e.total_cost else Decimal('0.0')
@@ -92,13 +94,12 @@ class StockCalculator:
                         "total_transfer_out": Decimal('0.0'),
                         "total_transfer_in": e.quantity if (in_period and e.entry_type == 'returned_received') else Decimal('0.0'),
                         "total_returned_supplier": Decimal('0.0'),
-                        "last_updated": e.entry_date
+                        "last_updated": safe_date
                     })
                     
                 elif e.entry_type in ['used', 'returned_supplier']:
                     qty_to_consume = e.quantity
                     
-                    # FIFO Depletion (Oldest First)
                     for lot in lots:
                         if qty_to_consume <= Decimal('0.0'):
                             break
@@ -120,9 +121,8 @@ class StockCalculator:
                                 elif e.entry_type == 'returned_supplier':
                                     lot["total_returned_supplier"] += deduct
                             
-                            lot["last_updated"] = e.entry_date
+                            lot["last_updated"] = safe_date
 
-                    # Force negative balance if usage exceeds available batches
                     if qty_to_consume > Decimal('0.0'):
                         if not lots:
                             lots.append({
@@ -130,7 +130,7 @@ class StockCalculator:
                                 "current_balance": Decimal('0.0'), "opening_balance": Decimal('0.0'), "total_received": Decimal('0.0'),
                                 "received_value": Decimal('0.0'), "total_used": Decimal('0.0'), "used_value": Decimal('0.0'),
                                 "total_transfer_out": Decimal('0.0'), "total_transfer_in": Decimal('0.0'), "total_returned_supplier": Decimal('0.0'),
-                                "last_updated": e.entry_date
+                                "last_updated": safe_date
                             })
                         last_lot = lots[-1]
                         last_lot["current_balance"] -= qty_to_consume
@@ -145,12 +145,11 @@ class StockCalculator:
                                     last_lot["used_value"] += qty_to_consume * last_lot["unit_cost"]
                             elif e.entry_type == 'returned_supplier':
                                 last_lot["total_returned_supplier"] += qty_to_consume
-                        last_lot["last_updated"] = e.entry_date
+                        last_lot["last_updated"] = safe_date
 
-            # Combine output into unique Supplier/Invoice rows for the Table
             grouped_lots = {}
             for lot in lots:
-                key = (lot["supplier_name"], lot["invoice_no"])
+                key = (str(lot["supplier_name"]), str(lot["invoice_no"]))
                 if key not in grouped_lots:
                     grouped_lots[key] = lot.copy()
                 else:
@@ -167,10 +166,8 @@ class StockCalculator:
                     if lot["last_updated"] > g["last_updated"]: g["last_updated"] = lot["last_updated"]
                     if not g["invoice_date"] and lot["invoice_date"]: g["invoice_date"] = lot["invoice_date"]
 
-            # Output the finished summary rows
             for key, g in grouped_lots.items():
                 has_activity = (g["total_received"] > 0 or g["total_used"] > 0 or g["total_transfer_out"] > 0 or g["total_transfer_in"] > 0 or g["total_returned_supplier"] > 0)
-                # Hide zero-balance rows if there was no activity within the chosen date range
                 if has_date_filter and g["opening_balance"] == 0 and not has_activity:
                     continue
                 
@@ -195,7 +192,6 @@ class StockCalculator:
                     "last_updated": g["last_updated"] if has_activity else end_dt
                 })
 
-        # Apply Backend Filters
         if supplier_name:
             search_str = supplier_name.lower()
             summary = [s for s in summary if search_str in str(s['supplier_name']).lower()]
@@ -214,7 +210,6 @@ class StockCalculator:
         reports_generated = []
         report_datetime = datetime.combine(report_date, datetime.min.time())
         
-        # Merge batches together for daily overall material reporting
         aggregated = {}
         for item in summary:
             mat_id = item["material_id"]
@@ -270,7 +265,6 @@ class StockCalculator:
         return reports_generated
 
 # --- CLI Helpers ---
-
 def cli_calculate_stock(db: Session, site_id: int, material_id: int):
     calculator = StockCalculator()
     return calculator.calculate_balance(db, site_id, material_id)

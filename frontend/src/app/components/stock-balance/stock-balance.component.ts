@@ -42,7 +42,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   
   filterForm: FormGroup;
   
-  // --- DYNAMIC COLUMNS ---
   displayedColumns: string[] = [];
   dataSource = new MatTableDataSource<any>();
   
@@ -86,7 +85,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         case 'invoice_no': return (item.invoice_no || '').toLowerCase();
         case 'invoice_date': return item.invoice_date ? new Date(item.invoice_date).getTime() : 0;
         case 'updated_at': 
-          const dateStr = item.updated_at || item.created_at || item.last_updated || item.entry_date || item.report_date;
+          const dateStr = item.updated_at || item.last_updated;
           return dateStr ? new Date(dateStr).getTime() : 0;
         default: return item[property];
       }
@@ -110,7 +109,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.loadMaterials();
     this.loadProjectsAndInitialData();
 
-    // Lock end date if user tries to pick an invalid range
     this.filterForm.get('start_date')?.valueChanges.subscribe(startDate => {
       const endDate = this.filterForm.get('end_date')?.value;
       if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
@@ -142,15 +140,28 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
   }
 
+  // --- LEDGER PROTECTION: Isolate the absolute latest row for each batch ---
+  getUniqueLotsData(dataArray: any[]): any[] {
+    const lotMap = new Map<string, any>();
+    // Sort chronological so the loop overwrites older rows with the newest state
+    const sorted = [...dataArray].sort((a, b) => {
+        return new Date(a.last_updated || 0).getTime() - new Date(b.last_updated || 0).getTime();
+    });
+    for (const item of sorted) {
+        const key = `${item.material_id}_${item.supplier_name}_${item.invoice_no}`;
+        lotMap.set(key, item);
+    }
+    return Array.from(lotMap.values());
+  }
+
   // --- ENTERPRISE BATCH MERGING FOR CARDS ---
   get mergedCardsData(): any[] {
     const merged = new Map<number, any>();
+    
+    // 1. Accumulate all movement quantities across every ledger row
     for (const item of this.dataSource.data) {
       if (merged.has(item.material_id)) {
         const existing = merged.get(item.material_id);
-        // Safely aggregate all numeric values
-        existing.current_balance = Number(existing.current_balance || 0) + Number(item.current_balance || 0);
-        existing.opening_balance = Number(existing.opening_balance || 0) + Number(item.opening_balance || 0);
         existing.total_received = Number(existing.total_received || 0) + Number(item.total_received || 0);
         existing.received_value = Number(existing.received_value || 0) + Number(item.received_value || 0);
         existing.total_used = Number(existing.total_used || 0) + Number(item.total_used || 0);
@@ -158,16 +169,26 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         existing.total_transfer_out = Number(existing.total_transfer_out || 0) + Number(item.total_transfer_out || 0);
         existing.total_transfer_in = Number(existing.total_transfer_in || 0) + Number(item.total_transfer_in || 0);
         existing.total_returned_supplier = Number(existing.total_returned_supplier || 0) + Number(item.total_returned_supplier || 0);
-        
-        // Nullify specific batch details since this card represents multiple batches
-        existing.supplier_name = '-';
-        existing.invoice_no = '-';
       } else {
-        // Deep clone so we don't accidentally mutate the table data
         merged.set(item.material_id, JSON.parse(JSON.stringify(item)));
       }
     }
-    return Array.from(merged.values());
+
+    // 2. Safely calculate true current balance using only the latest row for each lot
+    const latestLots = this.getUniqueLotsData(this.dataSource.data);
+    const trueBalances = new Map<number, number>();
+    for(const lot of latestLots) {
+        trueBalances.set(lot.material_id, (trueBalances.get(lot.material_id) || 0) + Number(lot.current_balance || 0));
+    }
+
+    const result = Array.from(merged.values());
+    for(const card of result) {
+        card.current_balance = trueBalances.get(card.material_id) || 0;
+        card.supplier_name = '-';
+        card.invoice_no = '-';
+    }
+    
+    return result;
   }
 
   getProjectNameForSite(siteId: any): string {
@@ -311,7 +332,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   get totalUsedCost(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.used_value) || 0), 0); }
 
   getFormattedDate(balance: any): string {
-    const rawDate = balance.updated_at || balance.created_at || balance.last_updated || balance.entry_date || balance.report_date;
+    const rawDate = balance.updated_at || balance.last_updated;
     if (!rawDate) return 'N/A';
     return new Date(rawDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
@@ -325,7 +346,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   getMaterial(materialId: number | undefined): any { return this.materials?.find(m => m.id === materialId); }
   getStockStatus(balance: any): string { return balance?.has_negative_balance ? 'danger' : (balance?.current_balance < 10 ? 'warning' : 'success'); }
   getStockStatusText(balance: any): string { return balance?.has_negative_balance ? 'Negative Stock' : (balance?.current_balance < 10 ? 'Low Stock' : 'In Stock'); }
-  getCurrentStock(materialId: number | undefined): number { const balance = this.allTimeBalances.find(b => b.material_id === materialId); return balance ? balance.current_balance : 0; }
+  
+  getCurrentStock(materialId: number | undefined): number { 
+    if (!materialId) return 0;
+    const latestLots = this.getUniqueLotsData(this.allTimeBalances.filter(b => b.material_id === materialId));
+    return latestLots.reduce((sum, lot) => sum + Number(lot.current_balance || 0), 0);
+  }
 
   showMaterialDetails(balanceRow: any): void {
     const material = this.getMaterial(balanceRow.material_id);

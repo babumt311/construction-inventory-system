@@ -55,7 +55,7 @@
             </select>
           </div>
 
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label small fw-bold">Supplier Name Search</label>
             <div class="input-group">
               <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
@@ -63,7 +63,7 @@
             </div>
           </div>
 
-          <div class="col-md-3">
+          <div class="col-md-3" *ngIf="viewMode === 'table'">
             <label class="form-label small fw-bold">Transaction Type</label>
             <select class="form-select border-primary" formControlName="entry_type">
               <option value="">All Transactions</option>
@@ -74,16 +74,15 @@
             </select>
           </div>
 
-          <div class="col-md-2">
+          <div class="col-md-2" *ngIf="viewMode === 'table'">
             <label class="form-label small fw-bold">Start Date</label>
             <input type="date" class="form-control" formControlName="start_date">
           </div>
 
-          <div class="col-md-2">
+          <div class="col-md-2" *ngIf="viewMode === 'table'">
             <label class="form-label small fw-bold">End Date</label>
             <input type="date" class="form-control" formControlName="end_date" [min]="filterForm.get('start_date')?.value">
           </div>
-          
           <div class="col-md-2 d-flex align-items-end pb-2">
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" id="negativeOnly" formControlName="show_negative_only">

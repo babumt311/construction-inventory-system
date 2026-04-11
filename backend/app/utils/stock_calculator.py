@@ -46,11 +46,13 @@ class StockCalculator:
         all_entries = query.all()
         
         all_time_received = Decimal('0.00')
+        all_time_received_value = Decimal('0.00') # Keep track of exact historic cost
         all_time_used = Decimal('0.00')
         
         for entry in all_entries:
             if entry.entry_type in ['received', 'returned_received']:
                 all_time_received += entry.quantity
+                all_time_received_value += (entry.total_cost or Decimal('0.00'))
             elif entry.entry_type in ['used', 'returned_supplier']:
                 all_time_used += entry.quantity
                 
@@ -68,7 +70,7 @@ class StockCalculator:
                 elif entry.entry_type in ['used', 'returned_supplier']:
                     opening_balance -= entry.quantity
 
-        # STRICT TIMELINE: Today boundaries
+        # STRICT TIMELINE: Today boundaries (Ends at 11:58:59 PM)
         today_start = datetime.combine(as_of_date.date(), time(0, 0, 0))
         today_end = datetime.combine(as_of_date.date(), time(23, 58, 59))
         
@@ -113,7 +115,9 @@ class StockCalculator:
             "total_transfer_in": today_transfer_in,
             "total_transfer_out": today_transfer_out,
             "current_balance": current_balance,
-            "has_negative_balance": current_balance < Decimal('0.00')
+            "has_negative_balance": current_balance < Decimal('0.00'),
+            "all_time_received": all_time_received,
+            "all_time_received_value": all_time_received_value
         }
     
     @staticmethod
@@ -161,8 +165,9 @@ class StockCalculator:
                 # Get balance 1 second before the period begins
                 opening_calc = StockCalculator.calculate_balance(db, site_id, mat_id, start_dt - timedelta(seconds=1), sup_name, inv_no)
                 opening_bal = opening_calc["current_balance"]
-                prev_tot_rec_qty = opening_calc.get("total_received", Decimal('0.0'))
-                prev_tot_rec_val = opening_calc.get("received_value", Decimal('0.0'))
+                # Use absolute historical values so average cost isn't wiped out by the date filter
+                prev_tot_rec_qty = opening_calc.get("all_time_received", Decimal('0.0'))
+                prev_tot_rec_val = opening_calc.get("all_time_received_value", Decimal('0.0'))
             else:
                 opening_bal = Decimal('0.0')
                 prev_tot_rec_qty = Decimal('0.0')
@@ -228,7 +233,7 @@ class StockCalculator:
                 if last_entry:
                     latest_inv_date = last_entry.invoice_date
 
-            # Clean Display Date: If there is a Date Filter but NO new activity in this range, show the boundary date
+            # Clean Display Date: Show the exact date it was updated, or default to the End Date filter
             if latest_in_range:
                 final_updated = latest_in_range
             elif has_date_filter:

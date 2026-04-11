@@ -1,5 +1,5 @@
 """
-Stock calculation utilities - Daily Chronological Ledger
+Stock calculation utilities - Global Material Balance & FIFO Costing Engine
 """
 from datetime import datetime, date, timedelta, time
 from decimal import Decimal
@@ -17,6 +17,7 @@ class StockCalculator:
     def validate_stock_entry(db: Session, site_id: int, material_id: int, entry_type: str, quantity: Decimal) -> bool:
         if quantity <= 0: return False
         if entry_type in ['used', 'returned_supplier']:
+            # For validation, we check the global site balance
             balance = StockCalculator.calculate_balance(db, site_id, material_id)
             if balance['current_balance'] < quantity: return False
         return True
@@ -59,14 +60,12 @@ class StockCalculator:
                 func.date(models.StockEntry.entry_date) <= effective_end
             ).order_by(models.StockEntry.entry_date.asc(), models.StockEntry.id.asc()).all()
 
-            if not entries and not is_daily_report:
-                continue
+            if not entries and not is_daily_report: continue
 
-            lots = [] 
-            running_balances = {} 
-
-            # 1. Group all historical entries by exactly what day they happened
+            lots = [] # Track cost of each received batch for FIFO
+            global_running_balance = Decimal('0.0')
             entries_by_date = {}
+
             for e in entries:
                 safe_date = e.entry_date.replace(tzinfo=None) if getattr(e.entry_date, 'tzinfo', None) else e.entry_date
                 d = safe_date.date()
@@ -74,146 +73,122 @@ class StockCalculator:
                 entries_by_date[d].append(e)
 
             sorted_dates = sorted(entries_by_date.keys())
-            
-            # If cron job calls, ensure the report date is processed to capture sitting inventory
             if is_daily_report and effective_end not in entries_by_date:
                 sorted_dates.append(effective_end)
                 entries_by_date[effective_end] = []
 
-            # 2. Process Chronologically Day-by-Day
             for current_date in sorted_dates:
-                daily_entries = entries_by_date[current_date]
-                opening_balances_today = {k: v for k, v in running_balances.items()}
-                daily_activity = {}
-                
-                def get_daily(sup, inv):
-                    k = (sup, inv)
-                    if k not in daily_activity:
-                        daily_activity[k] = {
-                            "received": Decimal('0.0'), "received_val": Decimal('0.0'),
-                            "used": Decimal('0.0'), "used_val": Decimal('0.0'),
-                            "transfer_out": Decimal('0.0'), "transfer_in": Decimal('0.0'),
-                            "returned_supplier": Decimal('0.0'), "invoice_date": None
-                        }
-                    return daily_activity[k]
+                opening_balance_today = global_running_balance
+                daily_receipts = []
+                total_used_today = Decimal('0.0')
+                total_used_val_today = Decimal('0.0')
+                total_t_out_today = Decimal('0.0')
+                total_t_in_today = Decimal('0.0')
+                total_ret_sup_today = Decimal('0.0')
 
-                # Run FIFO logic strictly for the events that happened on THIS specific day
-                for e in daily_entries:
+                # Process all entries for this day
+                for e in entries_by_date[current_date]:
                     if e.entry_type in ['received', 'returned_received']:
-                        sup = e.supplier_name or '-'
-                        inv = e.invoice_no or '-'
-                        inv_date = e.invoice_date
                         qty = e.quantity
                         cost = e.total_cost or Decimal('0.0')
-                        u_cost = (cost / qty) if qty else Decimal('0.0')
-
-                        lots.append({
-                            "sup": sup, "inv": inv, "inv_date": inv_date,
-                            "qty": qty, "u_cost": u_cost
-                        })
-                        running_balances[(sup, inv)] = running_balances.get((sup, inv), Decimal('0.0')) + qty
+                        global_running_balance += qty
                         
-                        act = get_daily(sup, inv)
-                        act["invoice_date"] = inv_date
                         if e.entry_type == 'received':
-                            act["received"] += qty
-                            act["received_val"] += cost
+                            daily_receipts.append({
+                                "sup": e.supplier_name or '-',
+                                "inv": e.invoice_no or '-',
+                                "inv_date": e.invoice_date,
+                                "qty": qty,
+                                "val": cost
+                            })
+                            # Add to FIFO lot stack
+                            u_cost = (cost / qty) if qty > 0 else Decimal('0.0')
+                            lots.append({"qty": qty, "u_cost": u_cost})
                         else:
-                            act["transfer_in"] += qty
+                            total_t_in_today += qty
+                            lots.append({"qty": qty, "u_cost": Decimal('0.0')}) # Transfers usually neutral cost
                             
                     elif e.entry_type in ['used', 'returned_supplier']:
                         qty_to_consume = e.quantity
+                        global_running_balance -= qty_to_consume
+                        
+                        # Apply FIFO Costing logic
                         for lot in lots:
-                            if qty_to_consume <= Decimal('0.0'): break
-                            if lot["qty"] > Decimal('0.0'):
+                            if qty_to_consume <= 0: break
+                            if lot["qty"] > 0:
                                 deduct = min(lot["qty"], qty_to_consume)
                                 lot["qty"] -= deduct
                                 qty_to_consume -= deduct
-                                
-                                sup, inv = lot["sup"], lot["inv"]
-                                running_balances[(sup, inv)] -= deduct
-                                
-                                act = get_daily(sup, inv)
-                                act["invoice_date"] = lot["inv_date"]
                                 if e.entry_type == 'used':
                                     if e.remarks and 'Transfer OUT' in e.remarks:
-                                        act["transfer_out"] += deduct
+                                        total_t_out_today += deduct
                                     else:
-                                        act["used"] += deduct
-                                        act["used_val"] += deduct * lot["u_cost"]
+                                        total_used_today += deduct
+                                        total_used_val_today += deduct * lot["u_cost"]
                                 else:
-                                    act["returned_supplier"] += deduct
-                                    
-                        if qty_to_consume > Decimal('0.0'):
-                            sup, inv = '-', '-'
-                            running_balances[(sup, inv)] = running_balances.get((sup, inv), Decimal('0.0')) - qty_to_consume
-                            act = get_daily(sup, inv)
+                                    total_ret_sup_today += deduct
+                        
+                        # Handle usage exceeding known lots (Negative)
+                        if qty_to_consume > 0:
                             if e.entry_type == 'used':
-                                if e.remarks and 'Transfer OUT' in e.remarks:
-                                    act["transfer_out"] += qty_to_consume
-                                else:
-                                    act["used"] += qty_to_consume
-                            else:
-                                act["returned_supplier"] += qty_to_consume
+                                if e.remarks and 'Transfer OUT' in e.remarks: total_t_out_today += qty_to_consume
+                                else: total_used_today += qty_to_consume
+                            else: total_ret_sup_today += qty_to_consume
 
-                # 3. Create discrete output rows exclusively for this day
-                in_range = True
-                if has_date_filter:
-                    in_range = (effective_start <= current_date <= effective_end)
-                    
-                if in_range:
-                    keys_to_emit = set(daily_activity.keys())
-                    if is_daily_report:
-                        keys_to_emit.update(running_balances.keys())
-                        
-                    for k in keys_to_emit:
-                        sup, inv = k
-                        act = daily_activity.get(k, {
-                            "received": Decimal('0.0'), "received_val": Decimal('0.0'),
-                            "used": Decimal('0.0'), "used_val": Decimal('0.0'),
-                            "transfer_out": Decimal('0.0'), "transfer_in": Decimal('0.0'),
-                            "returned_supplier": Decimal('0.0'), "invoice_date": None
-                        })
-                        
-                        opening = opening_balances_today.get(k, Decimal('0.0'))
-                        closing = running_balances.get(k, Decimal('0.0'))
-                        
-                        has_act = any(act[x] > 0 for x in ["received", "used", "transfer_out", "transfer_in", "returned_supplier"])
-                        
-                        # LEDGER RULE: If the material wasn't touched on this day, DO NOT show it in the table.
-                        if not has_act and not is_daily_report:
-                            continue
-                            
-                        if opening == 0 and closing == 0 and not has_act:
-                            continue
-
-                        updated_dt = datetime.combine(current_date, time(12,0,0))
-                        
+                # Generate rows if within filter range
+                if effective_start <= current_date <= effective_end:
+                    # 1. Output Receipt Rows
+                    for r in daily_receipts:
                         summary.append({
-                            "material_id": material.id,
-                            "material_name": material.name,
+                            "material_id": material.id, "material_name": material.name,
                             "category": material.category.name if material.category else "N/A",
                             "unit": material.unit or "N/A",
-                            "current_balance": closing,
-                            "opening_balance": opening,
-                            "total_received": act["received"],
-                            "received_value": act["received_val"],
-                            "total_used": act["used"],
-                            "used_value": act["used_val"],
-                            "total_returned_supplier": act["returned_supplier"],
-                            "total_transfer_in": act["transfer_in"],
-                            "total_transfer_out": act["transfer_out"],
-                            "has_negative_balance": closing < 0,
-                            "supplier_name": sup,
-                            "invoice_no": inv,
-                            "invoice_date": act["invoice_date"],
-                            "last_updated": updated_dt
+                            "current_balance": global_running_balance, # Cumulative
+                            "opening_balance": opening_balance_today,
+                            "total_received": r["qty"], "received_value": r["val"],
+                            "total_used": 0, "used_value": 0,
+                            "total_returned_supplier": 0, "total_transfer_in": 0, "total_transfer_out": 0,
+                            "has_negative_balance": global_running_balance < 0,
+                            "supplier_name": r["sup"], "invoice_no": r["inv"], "invoice_date": r["inv_date"],
+                            "last_updated": datetime.combine(current_date, time(12,0,0))
+                        })
+
+                    # 2. Output Consolidated Movement Row (Usage/Transfers)
+                    has_movement = (total_used_today > 0 or total_t_out_today > 0 or total_t_in_today > 0 or total_ret_sup_today > 0)
+                    if has_movement:
+                        summary.append({
+                            "material_id": material.id, "material_name": material.name,
+                            "category": material.category.name if material.category else "N/A",
+                            "unit": material.unit or "N/A",
+                            "current_balance": global_running_balance, # Cumulative
+                            "opening_balance": opening_balance_today if not daily_receipts else global_running_balance + total_used_today + total_t_out_today + total_ret_sup_today - total_t_in_today,
+                            "total_received": 0, "received_value": 0,
+                            "total_used": total_used_today, "used_value": total_used_val_today,
+                            "total_returned_supplier": total_ret_sup_today,
+                            "total_transfer_in": total_t_in_today, "total_transfer_out": total_t_out_today,
+                            "has_negative_balance": global_running_balance < 0,
+                            "supplier_name": "CONSOLIDATED MOVEMENT", "invoice_no": "-", "invoice_date": None,
+                            "last_updated": datetime.combine(current_date, time(13,0,0))
+                        })
+
+                    # 3. Snapshot Row (For Daily Reports/Cron only)
+                    if is_daily_report and not daily_receipts and not has_movement:
+                        summary.append({
+                            "material_id": material.id, "material_name": material.name,
+                            "category": material.category.name if material.category else "N/A",
+                            "unit": material.unit or "N/A",
+                            "current_balance": global_running_balance,
+                            "opening_balance": global_running_balance,
+                            "total_received": 0, "received_value": 0, "total_used": 0, "used_value": 0,
+                            "total_returned_supplier": 0, "total_transfer_in": 0, "total_transfer_out": 0,
+                            "has_negative_balance": global_running_balance < 0,
+                            "supplier_name": "-", "invoice_no": "-", "invoice_date": None,
+                            "last_updated": datetime.combine(current_date, time(23,59,0))
                         })
 
         if supplier_name:
             search_str = supplier_name.lower()
             summary = [s for s in summary if search_str in str(s['supplier_name']).lower()]
-            
         if entry_type:
             if entry_type == 'received': summary = [s for s in summary if s['total_received'] > 0]
             elif entry_type == 'used': summary = [s for s in summary if s['total_used'] > 0]
@@ -227,14 +202,12 @@ class StockCalculator:
         summary = StockCalculator.get_site_stock_summary(db, site_id, report_date, report_date, is_daily_report=True)
         reports_generated = []
         report_datetime = datetime.combine(report_date, datetime.min.time())
-        
         aggregated = {}
         for item in summary:
             mat_id = item["material_id"]
             if mat_id not in aggregated:
                 aggregated[mat_id] = item.copy()
             else:
-                aggregated[mat_id]["opening_balance"] += item["opening_balance"]
                 aggregated[mat_id]["total_received"] += item["total_received"]
                 aggregated[mat_id]["received_value"] += item["received_value"]
                 aggregated[mat_id]["total_used"] += item["total_used"]
@@ -242,7 +215,7 @@ class StockCalculator:
                 aggregated[mat_id]["total_returned_supplier"] += item["total_returned_supplier"]
                 aggregated[mat_id]["total_transfer_in"] += item["total_transfer_in"]
                 aggregated[mat_id]["total_transfer_out"] += item["total_transfer_out"]
-                aggregated[mat_id]["current_balance"] += item["current_balance"]
+                aggregated[mat_id]["current_balance"] = item["current_balance"] # Take final of day
 
         for mat_id, item in aggregated.items():
             existing_report = db.query(models.DailyStockReport).filter(
@@ -250,43 +223,27 @@ class StockCalculator:
                 models.DailyStockReport.material_id == mat_id,
                 models.DailyStockReport.report_date == report_datetime
             ).first()
-            
             if existing_report:
-                existing_report.opening_stock = item["opening_balance"]
-                existing_report.received = item["total_received"]
-                existing_report.used = item["total_used"]
-                existing_report.returned_received = item["total_transfer_in"]
-                existing_report.returned_supplier = item["total_returned_supplier"]
-                existing_report.closing_stock = item["current_balance"]
-                existing_report.received_value = item["received_value"]
-                existing_report.used_value = item["used_value"]
+                existing_report.opening_stock = item["opening_balance"]; existing_report.received = item["total_received"]
+                existing_report.used = item["total_used"]; existing_report.returned_received = item["total_transfer_in"]
+                existing_report.returned_supplier = item["total_returned_supplier"]; existing_report.closing_stock = item["current_balance"]
+                existing_report.received_value = item["received_value"]; existing_report.used_value = item["used_value"]
                 reports_generated.append(existing_report)
             else:
                 new_report = models.DailyStockReport(
-                    site_id=site_id,
-                    material_id=item["material_id"],
-                    report_date=report_datetime,
-                    opening_stock=item["opening_balance"],
-                    received=item["total_received"],
-                    used=item["total_used"],
-                    returned_received=item["total_transfer_in"],
-                    returned_supplier=item["total_returned_supplier"],
-                    closing_stock=item["current_balance"],
-                    total_received=item["total_received"],
-                    received_value=item["received_value"],
-                    used_value=item["used_value"]
+                    site_id=site_id, material_id=item["material_id"], report_date=report_datetime,
+                    opening_stock=item["opening_balance"], received=item["total_received"], used=item["total_used"],
+                    returned_received=item["total_transfer_in"], returned_supplier=item["total_returned_supplier"],
+                    closing_stock=item["current_balance"], total_received=item["total_received"],
+                    received_value=item["received_value"], used_value=item["used_value"]
                 )
-                db.add(new_report)
-                reports_generated.append(new_report)
-                
+                db.add(new_report); reports_generated.append(new_report)
         db.commit()
         return reports_generated
 
-# --- CLI Helpers ---
+# --- Make sure these are at the VERY BOTTOM with ZERO indentation ---
 def cli_calculate_stock(db: Session, site_id: int, material_id: int):
-    calculator = StockCalculator()
-    return calculator.calculate_balance(db, site_id, material_id)
+    return StockCalculator().calculate_balance(db, site_id, material_id)
 
 def cli_generate_daily_report(db: Session, site_id: int, report_date: date):
-    calculator = StockCalculator()
-    return calculator.generate_daily_report(db, site_id, report_date)
+    return StockCalculator().generate_daily_report(db, site_id, report_date)

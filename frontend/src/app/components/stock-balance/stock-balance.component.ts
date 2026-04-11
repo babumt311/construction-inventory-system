@@ -491,70 +491,101 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Stock Balance');
 
+    // 1. HEADER TITLE
     worksheet.mergeCells(`A1:${String.fromCharCode(64 + selectedCols.length)}1`);
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `Enterprise System: Stock Balance Report`;
+    titleCell.value = `ENTERPRISE INVENTORY: STOCK LEDGER REPORT`;
     titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }; 
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(1).height = 30;
+    worksheet.getRow(1).height = 35;
 
-    const dateStr = new Date().toISOString().split('T')[0];
+    // 2. GENERATION DATE
     worksheet.mergeCells(`A2:${String.fromCharCode(64 + selectedCols.length)}2`);
     const dateCell = worksheet.getCell('A2');
-    dateCell.value = `Generated on: ${new Date().toLocaleString()}`;
-    dateCell.font = { name: 'Arial', size: 10, italic: true };
-    dateCell.alignment = { horizontal: 'right' };
+    dateCell.value = `Report generated on: ${new Date().toLocaleString()}`;
+    dateCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF595959' } };
+    dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-    worksheet.addRow([]);
+    worksheet.addRow([]); // Gap row
 
+    // 3. TABLE HEADERS
     const headerRow = worksheet.addRow(selectedCols.map(c => c.label));
+    headerRow.height = 25;
     headerRow.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } }; 
-      cell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.alignment = { horizontal: 'center' };
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } }; 
+      cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { 
+        top: { style: 'thin' }, left: { style: 'thin' }, 
+        bottom: { style: 'medium' }, right: { style: 'thin' } 
+      };
     });
 
+    // 4. DATA ROWS
     data.forEach((item, index) => {
       const rowData = selectedCols.map(c => item[c.key as keyof typeof item]);
       const row = worksheet.addRow(rowData);
-      if (index % 2 === 0) {
-        row.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; });
-      }
+      row.height = 20;
+      
+      row.eachCell((cell) => {
+        // Universal Center Alignment for professional look
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { 
+            left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, 
+            right: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+            bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+        };
+        if (index % 2 !== 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } };
+        }
+      });
     });
 
+    // 5. PROFESSIONAL TOTALS ROW
     if (this.includeExportTotals && data.length > 0) {
       const summableColumns = [
-        'current_balance', 'opening_balance', 'total_received', 'received_value', 
-        'total_used', 'used_value', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier'
+        'current_balance', 'opening_balance', 'total_received', 'received_cost', 
+        'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier'
       ];
 
       const totalsData = selectedCols.map((col, index) => {
-        if (index === 0) return 'TOTALS';
+        if (index === 0) return 'GRAND TOTALS';
         if (summableColumns.includes(col.key)) {
           const sum = data.reduce((acc, item) => acc + (Number(item[col.key as keyof typeof item]) || 0), 0);
           return Number(sum.toFixed(2));
         }
-        return '-';
+        return ''; // Return empty string instead of awkward dash
       });
 
       const totalRow = worksheet.addRow(totalsData);
-      totalRow.eachCell((cell) => {
-        cell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF000000' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
-        cell.border = { top: { style: 'double' }, bottom: { style: 'medium' } };
-        cell.alignment = { horizontal: typeof cell.value === 'number' ? 'right' : 'center' };
+      totalRow.height = 28;
+      totalRow.eachCell((cell, colNumber) => {
+        cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF000000' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; // Light blue professional accent
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        
+        // Ledger Style Borders: Double line on top, thick on bottom
+        cell.border = {
+          top: { style: 'double', color: { argb: 'FF4472C4' } },
+          bottom: { style: 'medium', color: { argb: 'FF4472C4' } },
+          left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+          right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+        };
       });
     }
 
-    worksheet.columns.forEach(column => { column.width = 22; });
+    // Set Column Widths
+    worksheet.columns.forEach(column => {
+      column.width = 20;
+    });
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `stock-balance-${dateStr}.xlsx`);
+    const dateStr = new Date().toISOString().split('T')[0];
+    saveAs(blob, `Stock_Ledger_Report_${dateStr}.xlsx`);
 
-    this.toastr.success('Enterprise Report generated successfully!');
+    this.toastr.success('Professional Report downloaded!');
     this.closeExportModal();
   }
 

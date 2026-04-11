@@ -156,34 +156,35 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   get mergedCardsData(): any[] {
     const merged = new Map<number, any>();
     
-    for (const item of this.dataSource.data) {
+    // Sort chronological to ensure we process the day's final row last
+    const sortedData = [...this.dataSource.data].sort((a, b) => 
+      new Date(a.last_updated).getTime() - new Date(b.last_updated).getTime()
+    );
+
+    for (const item of sortedData) {
       if (merged.has(item.material_id)) {
         const existing = merged.get(item.material_id);
-        existing.total_received = Number(existing.total_received || 0) + Number(item.total_received || 0);
-        existing.received_value = Number(existing.received_value || 0) + Number(item.received_value || 0);
-        existing.total_used = Number(existing.total_used || 0) + Number(item.total_used || 0);
-        existing.used_value = Number(existing.used_value || 0) + Number(item.used_value || 0);
-        existing.total_transfer_out = Number(existing.total_transfer_out || 0) + Number(item.total_transfer_out || 0);
-        existing.total_transfer_in = Number(existing.total_transfer_in || 0) + Number(item.total_transfer_in || 0);
-        existing.total_returned_supplier = Number(existing.total_returned_supplier || 0) + Number(item.total_returned_supplier || 0);
+        // Accumulate volumes
+        existing.total_received += Number(item.total_received || 0);
+        existing.received_value += Number(item.received_value || 0);
+        existing.total_used += Number(item.total_used || 0);
+        existing.used_value += Number(item.used_value || 0);
+        existing.total_transfer_out += Number(item.total_transfer_out || 0);
+        existing.total_transfer_in += Number(item.total_transfer_in || 0);
+        existing.total_returned_supplier += Number(item.total_returned_supplier || 0);
+        
+        // OVERWRITE with the latest cumulative balance from the row
+        existing.current_balance = item.current_balance;
       } else {
         merged.set(item.material_id, JSON.parse(JSON.stringify(item)));
       }
     }
 
-    const latestLots = this.getUniqueLotsData(this.dataSource.data);
-    const trueBalances = new Map<number, number>();
-    for(const lot of latestLots) {
-        trueBalances.set(lot.material_id, (trueBalances.get(lot.material_id) || 0) + Number(lot.current_balance || 0));
-    }
-
     const result = Array.from(merged.values());
     for(const card of result) {
-        card.current_balance = trueBalances.get(card.material_id) || 0;
         card.supplier_name = '-';
         card.invoice_no = '-';
     }
-    
     return result;
   }
 

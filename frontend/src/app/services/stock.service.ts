@@ -49,17 +49,16 @@ export class StockService {
 
   // --- ENTERPRISE FIX: Strictly encode URL parameters for the backend ---
   getSiteStockSummary(siteId: number, filters?: any) {
-    let params = new HttpParams();
+    const queryParams: any = {};
     
     if (filters) {
-      if (filters.start_date) params = params.set('start_date', filters.start_date);
-      if (filters.end_date) params = params.set('end_date', filters.end_date);
-      if (filters.supplier_name) params = params.set('supplier_name', filters.supplier_name);
-      if (filters.entry_type) params = params.set('entry_type', filters.entry_type);
+      if (filters.start_date) queryParams.start_date = filters.start_date;
+      if (filters.end_date) queryParams.end_date = filters.end_date;
+      if (filters.supplier_name) queryParams.supplier_name = filters.supplier_name;
+      if (filters.entry_type) queryParams.entry_type = filters.entry_type;
     }
     
-    // Send to backend via strictly typed HTTP Query Parameters
-    return this.api.get(`stock/site-summary/${siteId}`, params);
+    return this.api.get(`stock/site-summary/${siteId}`, queryParams);
   }
 
   // Daily Reports

@@ -267,3 +267,14 @@ class StockCalculator:
                 
         db.commit()
         return reports_generated
+
+
+# --- Make sure these are at the VERY BOTTOM with ZERO indentation ---
+
+def cli_calculate_stock(db: Session, site_id: int, material_id: int):
+    calculator = StockCalculator()
+    return calculator.calculate_balance(db, site_id, material_id)
+
+def cli_generate_daily_report(db: Session, site_id: int, report_date: date):
+    calculator = StockCalculator()
+    return calculator.generate_daily_report(db, site_id, report_date)

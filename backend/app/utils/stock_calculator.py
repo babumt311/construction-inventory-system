@@ -50,15 +50,16 @@ class StockCalculator:
         materials = db.query(models.Material).join(models.StockEntry).filter(models.StockEntry.site_id == site_id).distinct().all()
 
         has_date_filter = bool(start_date or end_date)
-        effective_start = start_date if start_date else date.min
-        effective_end = end_date if end_date else date.today()
+        
+        # BULLETPROOF DATABASE TIMELINE: Prevent PostgreSQL Year 1 crash, and never cut off future dates if no filter
+        effective_start = start_date if start_date else date(2000, 1, 1)
+        effective_end = end_date if end_date else (date.today() + timedelta(days=3650))
 
-        # STRICT TIMELINE boundaries
         start_dt = datetime.combine(effective_start, time(0, 0, 0))
         end_dt = datetime.combine(effective_end, time(23, 58, 59))
 
         for material in materials:
-            # Get all historic transactions for FIFO processing
+            # Get all historic transactions up to the end_dt
             entries = db.query(models.StockEntry).filter(
                 models.StockEntry.site_id == site_id,
                 models.StockEntry.material_id == material.id,
@@ -121,7 +122,7 @@ class StockCalculator:
                             
                             lot["last_updated"] = e.entry_date
 
-                    # If usage exceeds available batches, force negative balance on a dummy lot
+                    # Force negative balance if usage exceeds available batches
                     if qty_to_consume > Decimal('0.0'):
                         if not lots:
                             lots.append({
@@ -268,8 +269,7 @@ class StockCalculator:
         db.commit()
         return reports_generated
 
-
-# --- Make sure these are at the VERY BOTTOM with ZERO indentation ---
+# --- CLI Helpers ---
 
 def cli_calculate_stock(db: Session, site_id: int, material_id: int):
     calculator = StockCalculator()

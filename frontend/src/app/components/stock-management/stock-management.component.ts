@@ -37,6 +37,10 @@ export class StockManagementComponent implements OnInit {
   selectedSiteId: number | null = null;
   loadingStockEntries = false;
   submittingStock = false;
+  
+  // --- NEW: Edit Tracking Variables ---
+  isEditingStock = false;
+  editingStockId: number | null = null;
 
   // Category Table variables
   categoryColumns: string[] = ['name', 'description', 'actions'];
@@ -64,15 +68,14 @@ export class StockManagementComponent implements OnInit {
     private projectService: ProjectService,
     private toastr: ToastrService
   ) {
-    // --- MASTER-DETAIL FORM DEFINITION ---
     this.stockForm = this.fb.group({
       project_id: ['', Validators.required],
       site_id: [''],
       from_site_id: [''],
       to_site_id: [''],
-      supplier_name: ['', Validators.required], // NEW
-      invoice_no: ['', Validators.required],    // NEW (Required for received)
-      invoice_date: ['', Validators.required],  // NEW
+      supplier_name: ['', Validators.required], 
+      invoice_no: ['', Validators.required],    
+      invoice_date: ['', Validators.required],  
       entry_type: ['received', Validators.required],
       remarks: [''],
       items: this.fb.array([]) 
@@ -86,7 +89,6 @@ export class StockManagementComponent implements OnInit {
       const invoiceNoCtrl = this.stockForm.get('invoice_no');
       const invoiceDateCtrl = this.stockForm.get('invoice_date');
 
-      // --- NEW LOGIC: Zero out prices if transaction is NOT received ---
       if (type !== 'received') {
         const itemsArray = this.stockForm.get('items') as FormArray;
         itemsArray.controls.forEach(control => {
@@ -99,7 +101,6 @@ export class StockManagementComponent implements OnInit {
         });
       }
 
-      // Transfer Logic
       if (type === 'transfer') {
         siteCtrl?.clearValidators();
         fromCtrl?.setValidators(Validators.required);
@@ -110,7 +111,6 @@ export class StockManagementComponent implements OnInit {
         toCtrl?.clearValidators();
       }
 
-      // Received Logic (Supplier and Invoice)
       if (type === 'received') {
         supplierCtrl?.setValidators(Validators.required);
         invoiceNoCtrl?.setValidators(Validators.required);
@@ -119,10 +119,11 @@ export class StockManagementComponent implements OnInit {
         supplierCtrl?.clearValidators();
         invoiceNoCtrl?.clearValidators();
         invoiceDateCtrl?.clearValidators();
-        // Clear the values so they don't accidentally submit
-        supplierCtrl?.setValue('');
-        invoiceNoCtrl?.setValue('');
-        invoiceDateCtrl?.setValue('');
+        if(!this.isEditingStock) {
+          supplierCtrl?.setValue('');
+          invoiceNoCtrl?.setValue('');
+          invoiceDateCtrl?.setValue('');
+        }
       }
 
       siteCtrl?.updateValueAndValidity();
@@ -133,7 +134,6 @@ export class StockManagementComponent implements OnInit {
       invoiceDateCtrl?.updateValueAndValidity();
     });
 
-    // Category and Material Forms
     this.categoryForm = this.fb.group({ name: ['', Validators.required], description: [''] });
     this.materialForm = this.fb.group({ name: ['', Validators.required], category_id: ['', Validators.required], unit: ['Bags'], description: [''] });
   }
@@ -148,7 +148,6 @@ export class StockManagementComponent implements OnInit {
     if (savedTab && ['stock', 'category', 'material'].includes(savedTab)) this.switchTab(savedTab as 'stock' | 'category' | 'material');
   }
 
-  // --- NEW GETTER to conditionally hide columns in HTML ---
   get isReceivedType(): boolean {
     return this.stockForm.get('entry_type')?.value === 'received';
   }
@@ -178,7 +177,6 @@ export class StockManagementComponent implements OnInit {
       total_cost: [{ value: 0, disabled: true }]  
     });
 
-    // --- NEW: Auto-select category when material is chosen ---
     itemGroup.get('material_id')?.valueChanges.subscribe(matId => {
       if (matId) {
         const selectedMat = this.materials.find(m => m.id === Number(matId));
@@ -221,6 +219,7 @@ export class StockManagementComponent implements OnInit {
   }
 
   onProjectChange(projectId: any): void {
+    if (this.isEditingStock) return; // Prevent clearing during edit
     this.sites = []; 
     this.stockForm.patchValue({ site_id: '', from_site_id: '', to_site_id: '' }); 
     this.selectedSiteId = null; 
@@ -238,6 +237,74 @@ export class StockManagementComponent implements OnInit {
     } 
   }
 
+  // --- NEW: Load Transaction into Form for Editing ---
+  editStockEntry(entry: any): void {
+    this.isEditingStock = true;
+    this.editingStockId = entry.id;
+
+    // Format date for input field
+    const formattedDate = entry.invoice_date ? new Date(entry.invoice_date).toISOString().split('T')[0] : '';
+
+    this.stockForm.patchValue({
+      entry_type: entry.entry_type,
+      supplier_name: entry.supplier_name || '',
+      invoice_no: entry.invoice_no || '',
+      invoice_date: formattedDate,
+      remarks: entry.remarks || ''
+    });
+
+    // Clear and rebuild items array with the entry data
+    this.items.clear();
+    
+    const itemGroup = this.fb.group({
+      category_id: [''],
+      material_id: [entry.material_id, Validators.required],
+      quantity: [entry.quantity, [Validators.required, Validators.min(0.01)]],
+      unit_price: [entry.unit_cost, [Validators.min(0)]],
+      tax_percent: [entry.tax_percent, [Validators.min(0)]],
+      tax_amount: [{ value: entry.tax_amount, disabled: true }],
+      total_cost: [{ value: entry.total_cost, disabled: true }]
+    });
+
+    // Setup value changes listener to recalculate costs
+    itemGroup.valueChanges.subscribe(val => {
+      const qty = val.quantity || 0;
+      const price = val.unit_price || 0;
+      const taxPct = val.tax_percent || 0;
+      const taxAmt = price * (taxPct / 100);
+      const total = (price + taxAmt) * qty;
+
+      itemGroup.patchValue({
+        tax_amount: parseFloat(taxAmt.toFixed(2)),
+        total_cost: parseFloat(total.toFixed(2))
+      }, { emitEvent: false });
+    });
+
+    // Force Category Auto-select
+    const selectedMat = this.materials.find(m => m.id === Number(entry.material_id));
+    if (selectedMat && selectedMat.category_id) {
+      itemGroup.patchValue({ category_id: selectedMat.category_id }, { emitEvent: false });
+    }
+
+    this.items.push(itemGroup);
+
+    // Scroll smoothly to top form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    this.toastr.info('Transaction loaded for editing.');
+  }
+
+  // --- NEW: Cancel Editing ---
+  cancelEditStock(): void {
+    this.isEditingStock = false;
+    this.editingStockId = null;
+    const currentProject = this.stockForm.get('project_id')?.value;
+    const currentSite = this.stockForm.get('site_id')?.value;
+    
+    this.stockForm.reset({ project_id: currentProject, site_id: currentSite, entry_type: 'received' });
+    this.items.clear();
+    this.addItem();
+  }
+
   submitStock(): void {
     if (this.stockForm.invalid) { 
       this.stockForm.markAllAsTouched(); 
@@ -247,15 +314,49 @@ export class StockManagementComponent implements OnInit {
 
     this.submittingStock = true;
     const formValue = this.stockForm.getRawValue(); 
+
+    // --- NEW: Update Existing Entry Route ---
+    if (this.isEditingStock && this.editingStockId) {
+      const item = formValue.items[0]; // Edit is always 1 item
+      const updatePayload = {
+        site_id: formValue.site_id,
+        supplier_name: formValue.supplier_name || null,
+        invoice_no: formValue.invoice_no || null,
+        invoice_date: formValue.invoice_date || null,
+        reference_no: formValue.invoice_no || null,
+        material_id: item.material_id,
+        quantity: item.quantity,
+        unit_cost: item.unit_price,
+        total_cost: item.total_cost,
+        entry_type: formValue.entry_type,
+        remarks: formValue.remarks
+      };
+
+      this.stockService.updateStockEntry(this.editingStockId, updatePayload).subscribe({
+        next: () => {
+          this.toastr.success('Transaction updated successfully!');
+          this.cancelEditStock(); // Resets form
+          this.loadStockEntries();
+          this.submittingStock = false;
+        },
+        error: () => {
+          this.toastr.error('Failed to update transaction.');
+          this.submittingStock = false;
+        }
+      });
+      return; // Exit here if updating
+    }
+
+    // --- EXISTING: Create New Entries Route ---
     const apiRequests: any[] = [];
 
     formValue.items.forEach((item: any) => {
       const basePayload = {
         project_id: formValue.project_id,
-        supplier_name: formValue.supplier_name || null, // NEW
-        invoice_no: formValue.invoice_no || null,       // NEW
-        invoice_date: formValue.invoice_date || null,   // NEW
-        reference_no: formValue.invoice_no || null,     // Keep backward compatibility
+        supplier_name: formValue.supplier_name || null, 
+        invoice_no: formValue.invoice_no || null,       
+        invoice_date: formValue.invoice_date || null,   
+        reference_no: formValue.invoice_no || null,     
         material_id: item.material_id,
         quantity: item.quantity,
         unit_cost: item.unit_price,
@@ -343,6 +444,7 @@ export class StockManagementComponent implements OnInit {
     }
   }
 
+  // --- CATEGORY AND MATERIAL CODE BELOW REMAINS UNCHANGED ---
   loadCategories(): void { 
     this.materialService.getCategories().subscribe(res => { 
       this.categories = res; 

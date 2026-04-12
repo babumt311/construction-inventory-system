@@ -9,6 +9,9 @@ import { MatSort } from '@angular/material/sort';
 import { forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
+// IMPORT DRAG AND DROP
+import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+
 import { StockService } from '../../services/stock.service';
 import { ProjectService } from '../../services/project.service';
 import { MaterialService } from '../../services/material.service';
@@ -42,7 +45,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   
   filterForm: FormGroup;
   
-  // --- DYNAMIC COLUMNS ---
   displayedColumns: string[] = [];
   dataSource = new MatTableDataSource<any>();
   
@@ -56,6 +58,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   showExportModal = false;
   exportColumns: { key: string, label: string, selected: boolean }[] = [];
+  includeExportTotals = true; 
 
   constructor(
     private fb: FormBuilder,
@@ -86,7 +89,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         case 'invoice_no': return (item.invoice_no || '').toLowerCase();
         case 'invoice_date': return item.invoice_date ? new Date(item.invoice_date).getTime() : 0;
         case 'updated_at': 
-          const dateStr = item.updated_at || item.created_at || item.last_updated || item.entry_date || item.report_date;
+          const dateStr = item.updated_at || item.last_updated;
           return dateStr ? new Date(dateStr).getTime() : 0;
         default: return item[property];
       }
@@ -110,7 +113,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.loadMaterials();
     this.loadProjectsAndInitialData();
 
-    // Lock end date if user tries to pick an invalid range
     this.filterForm.get('start_date')?.valueChanges.subscribe(startDate => {
       const endDate = this.filterForm.get('end_date')?.value;
       if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
@@ -142,15 +144,45 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  // --- ENTERPRISE BATCH MERGING FOR CARDS ---
+  // --- FIXED DRAG AND DROP LOGIC ---
+  drop(event: CdkDragDrop<string[]>) {
+    // 1. Copy array to force Angular Table to redraw data cells!
+    const newCols = [...this.displayedColumns];
+    
+    // 2. Reorder items
+    moveItemInArray(newCols, event.previousIndex, event.currentIndex);
+    
+    // 3. Safety Lock: Force 'material' to ALWAYS stay at the very left
+    const matIndex = newCols.indexOf('material');
+    if (matIndex !== 0 && matIndex !== -1) {
+      newCols.splice(matIndex, 1);
+      newCols.unshift('material');
+    }
+
+    // 4. Overwrite original array to trigger table UI refresh
+    this.displayedColumns = newCols;
+
+    // 5. Save permanently
+    localStorage.setItem('stockTableColumnOrder', JSON.stringify(this.displayedColumns));
+  }
+
+  getUniqueLotsData(dataArray: any[]): any[] {
+    const lotMap = new Map<string, any>();
+    const sorted = [...dataArray].sort((a, b) => {
+        return new Date(a.last_updated || 0).getTime() - new Date(b.last_updated || 0).getTime();
+    });
+    for (const item of sorted) {
+        lotMap.set(item.material_id.toString(), item); 
+    }
+    return Array.from(lotMap.values());
+  }
+
   get mergedCardsData(): any[] {
     const merged = new Map<number, any>();
+    
     for (const item of this.dataSource.data) {
       if (merged.has(item.material_id)) {
         const existing = merged.get(item.material_id);
-        // Safely aggregate all numeric values
-        existing.current_balance = Number(existing.current_balance || 0) + Number(item.current_balance || 0);
-        existing.opening_balance = Number(existing.opening_balance || 0) + Number(item.opening_balance || 0);
         existing.total_received = Number(existing.total_received || 0) + Number(item.total_received || 0);
         existing.received_value = Number(existing.received_value || 0) + Number(item.received_value || 0);
         existing.total_used = Number(existing.total_used || 0) + Number(item.total_used || 0);
@@ -158,16 +190,25 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         existing.total_transfer_out = Number(existing.total_transfer_out || 0) + Number(item.total_transfer_out || 0);
         existing.total_transfer_in = Number(existing.total_transfer_in || 0) + Number(item.total_transfer_in || 0);
         existing.total_returned_supplier = Number(existing.total_returned_supplier || 0) + Number(item.total_returned_supplier || 0);
-        
-        // Nullify specific batch details since this card represents multiple batches
-        existing.supplier_name = '-';
-        existing.invoice_no = '-';
       } else {
-        // Deep clone so we don't accidentally mutate the table data
         merged.set(item.material_id, JSON.parse(JSON.stringify(item)));
       }
     }
-    return Array.from(merged.values());
+
+    const latestLots = this.getUniqueLotsData(this.dataSource.data);
+    const trueBalances = new Map<number, number>();
+    for(const lot of latestLots) {
+        trueBalances.set(lot.material_id, Number(lot.current_balance || 0));
+    }
+
+    const result = Array.from(merged.values());
+    for(const card of result) {
+        card.current_balance = trueBalances.get(card.material_id) || 0;
+        card.supplier_name = '-';
+        card.invoice_no = '-';
+    }
+    
+    return result;
   }
 
   getProjectNameForSite(siteId: any): string {
@@ -265,21 +306,19 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         const recordSupplier = (b.supplier_name || '').toLowerCase();
         if (!recordSupplier.includes(searchStr)) return false;
       }
-
-      if (filters.entry_type) {
-        if (filters.entry_type === 'received' && (!b.total_received || b.total_received <= 0)) return false;
-        if (filters.entry_type === 'used' && (!b.total_used || b.total_used <= 0)) return false;
-        if (filters.entry_type === 'transfer' && (!b.total_transfer_out || b.total_transfer_out <= 0) && (!b.total_transfer_in || b.total_transfer_in <= 0)) return false;
-        if (filters.entry_type === 'returned_supplier' && (!b.total_returned_supplier || b.total_returned_supplier <= 0)) return false;
-      }
-
       return true;
     });
 
     this.dataSource.data = baseData;
 
     const type = filters.entry_type;
-    let cols = ['material', 'category', 'project', 'site', 'supplier_name', 'invoice_no', 'invoice_date', 'current_balance', 'opening_balance'];
+    let cols = ['material', 'category', 'project', 'site'];
+
+    if (type === 'received') {
+      cols.push('supplier_name', 'invoice_no', 'invoice_date');
+    }
+
+    cols.push('current_balance', 'opening_balance');
 
     if (!type || type === '') {
       cols.push('total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier');
@@ -294,6 +333,24 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }
     
     cols.push('updated_at', 'status');
+
+    // Load saved columns, force Material to index 0
+    const savedOrderJson = localStorage.getItem('stockTableColumnOrder');
+    if (savedOrderJson) {
+      try {
+        const savedOrder = JSON.parse(savedOrderJson);
+        cols.sort((a, b) => {
+          if (a === 'material') return -1;
+          if (b === 'material') return 1;
+          let indexA = savedOrder.indexOf(a);
+          let indexB = savedOrder.indexOf(b);
+          if (indexA === -1) indexA = 999; 
+          if (indexB === -1) indexB = 999;
+          return indexA - indexB;
+        });
+      } catch (e) {}
+    }
+
     this.displayedColumns = cols;
 
     if (this.viewMode === 'table') {
@@ -311,7 +368,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   get totalUsedCost(): number { return this.dataSource.data.reduce((sum, item) => sum + (Number(item.used_value) || 0), 0); }
 
   getFormattedDate(balance: any): string {
-    const rawDate = balance.updated_at || balance.created_at || balance.last_updated || balance.entry_date || balance.report_date;
+    const rawDate = balance.updated_at || balance.last_updated;
     if (!rawDate) return 'N/A';
     return new Date(rawDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
@@ -325,7 +382,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   getMaterial(materialId: number | undefined): any { return this.materials?.find(m => m.id === materialId); }
   getStockStatus(balance: any): string { return balance?.has_negative_balance ? 'danger' : (balance?.current_balance < 10 ? 'warning' : 'success'); }
   getStockStatusText(balance: any): string { return balance?.has_negative_balance ? 'Negative Stock' : (balance?.current_balance < 10 ? 'Low Stock' : 'In Stock'); }
-  getCurrentStock(materialId: number | undefined): number { const balance = this.allTimeBalances.find(b => b.material_id === materialId); return balance ? balance.current_balance : 0; }
+  
+  getCurrentStock(materialId: number | undefined): number { 
+    if (!materialId) return 0;
+    const latestLots = this.getUniqueLotsData(this.allTimeBalances.filter(b => b.material_id === materialId));
+    return latestLots.reduce((sum, lot) => sum + Number(lot.current_balance || 0), 0);
+  }
 
   showMaterialDetails(balanceRow: any): void {
     const material = this.getMaterial(balanceRow.material_id);
@@ -407,14 +469,23 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const type = this.filterForm.value.entry_type;
     this.exportColumns = [
       { key: 'project', label: 'Project', selected: true },
       { key: 'site_name', label: 'Site', selected: true },
       { key: 'material_name', label: 'Material', selected: true },
-      { key: 'category', label: 'Category', selected: true },
-      { key: 'supplier_name', label: 'Supplier Name', selected: true },
-      { key: 'invoice_no', label: 'Invoice No', selected: true },
-      { key: 'invoice_date', label: 'Invoice Date', selected: true },
+      { key: 'category', label: 'Category', selected: true }
+    ];
+
+    if (type === 'received') {
+      this.exportColumns.push(
+        { key: 'supplier_name', label: 'Supplier Name', selected: true },
+        { key: 'invoice_no', label: 'Invoice No', selected: true },
+        { key: 'invoice_date', label: 'Invoice Date', selected: true }
+      );
+    }
+
+    this.exportColumns.push(
       { key: 'current_balance', label: 'Current Balance', selected: true },
       { key: 'opening_balance', label: 'Opening Balance', selected: true },
       { key: 'total_received', label: 'Received Qty', selected: true },
@@ -426,7 +497,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       { key: 'total_returned_supplier', label: 'Ret. (Supplier)', selected: true },
       { key: 'dateStr', label: 'Date', selected: true },
       { key: 'status', label: 'Status', selected: true }
-    ];
+    );
 
     this.showExportModal = true;
   }
@@ -449,7 +520,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'All Projects';
     const data = this.dataSource.data.map(item => {
       return {
         ...item,
@@ -470,44 +540,74 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
     worksheet.mergeCells(`A1:${String.fromCharCode(64 + selectedCols.length)}1`);
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `Enterprise System: Stock Balance Report`;
+    titleCell.value = `ENTERPRISE INVENTORY: STOCK LEDGER REPORT`;
     titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }; 
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(1).height = 30;
+    worksheet.getRow(1).height = 35;
 
-    const dateStr = new Date().toISOString().split('T')[0];
     worksheet.mergeCells(`A2:${String.fromCharCode(64 + selectedCols.length)}2`);
     const dateCell = worksheet.getCell('A2');
-    dateCell.value = `Generated on: ${new Date().toLocaleString()}`;
-    dateCell.font = { name: 'Arial', size: 10, italic: true };
-    dateCell.alignment = { horizontal: 'right' };
+    dateCell.value = `Report generated on: ${new Date().toLocaleString()}`;
+    dateCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF595959' } };
+    dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     worksheet.addRow([]);
 
     const headerRow = worksheet.addRow(selectedCols.map(c => c.label));
+    headerRow.height = 25;
     headerRow.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } }; 
-      cell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.alignment = { horizontal: 'center' };
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } }; 
+      cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'medium' }, right: { style: 'thin' } };
     });
 
     data.forEach((item, index) => {
       const rowData = selectedCols.map(c => item[c.key as keyof typeof item]);
       const row = worksheet.addRow(rowData);
-      if (index % 2 === 0) {
-        row.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; });
-      }
+      row.height = 20;
+      
+      row.eachCell((cell) => {
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, right: { style: 'thin', color: { argb: 'FFD9D9D9' } }, bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } }};
+        if (index % 2 !== 0) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } }; }
+      });
     });
 
-    worksheet.columns.forEach(column => { column.width = 22; });
+    if (this.includeExportTotals && data.length > 0) {
+      const summableColumns = [
+        'current_balance', 'opening_balance', 'total_received', 'received_cost', 
+        'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier'
+      ];
+
+      const totalsData = selectedCols.map((col, index) => {
+        if (index === 0) return 'GRAND TOTALS';
+        if (summableColumns.includes(col.key)) {
+          const sum = data.reduce((acc, item) => acc + (Number(item[col.key as keyof typeof item]) || 0), 0);
+          return Number(sum.toFixed(2));
+        }
+        return '';
+      });
+
+      const totalRow = worksheet.addRow(totalsData);
+      totalRow.height = 28;
+      totalRow.eachCell((cell) => {
+        cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF000000' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { top: { style: 'double', color: { argb: 'FF4472C4' } }, bottom: { style: 'medium', color: { argb: 'FF4472C4' } }, left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, right: { style: 'thin', color: { argb: 'FFD9D9D9' } }};
+      });
+    }
+
+    worksheet.columns.forEach(column => { column.width = 20; });
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `stock-balance-${dateStr}.xlsx`);
+    const dateStr = new Date().toISOString().split('T')[0];
+    saveAs(blob, `Stock_Ledger_Report_${dateStr}.xlsx`);
 
-    this.toastr.success('Enterprise Report generated successfully!');
+    this.toastr.success('Professional Report downloaded!');
     this.closeExportModal();
   }
 
@@ -517,10 +617,27 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
   
   ngOnDestroy(): void { this.destroyChart('materialChart'); }
+  
   toggleViewMode(): void { 
     this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; 
+    
+    if (this.viewMode === 'cards') {
+      this.filterForm.patchValue({
+        start_date: '',
+        end_date: '',
+        entry_type: '',
+        supplier_name: ''
+      });
+    }
+
     this.updateTable(); 
-    if (this.viewMode === 'table') { setTimeout(() => { this.dataSource.paginator = this.paginator; this.dataSource.sort = this.sort; }); }
+    if (this.viewMode === 'table') { 
+      setTimeout(() => { 
+        this.dataSource.paginator = this.paginator; 
+        this.dataSource.sort = this.sort; 
+      }); 
+    }
   }
+
   refreshData(): void { this.loadSitesAndFetchData(this.filterForm.value.project_id); }
 }

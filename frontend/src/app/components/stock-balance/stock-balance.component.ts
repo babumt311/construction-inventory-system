@@ -147,7 +147,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         return new Date(a.last_updated || 0).getTime() - new Date(b.last_updated || 0).getTime();
     });
     for (const item of sorted) {
-        // Backend handles consolidation now, so material_id alone is safe for card view tracking
         lotMap.set(item.material_id.toString(), item); 
     }
     return Array.from(lotMap.values());
@@ -191,6 +190,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     if (!siteId) return '-';
     const site = this.sites?.find(s => s.id === Number(siteId));
     if (!site || !site.project_id) return '-';
+    
+    const proj = this.projects?.find(p => p.id === site.project_id);
     return proj ? proj.name : '-';
   }
 
@@ -273,6 +274,12 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       if (filters.category_id) {
         const mat = this.materials.find(m => m.id === b.material_id);
         if (!mat || mat.category_id !== Number(filters.category_id)) return false;
+      }
+      
+      if (filters.supplier_name) {
+        const searchStr = filters.supplier_name.toLowerCase().trim();
+        const recordSupplier = (b.supplier_name || '').toLowerCase();
+        if (!recordSupplier.includes(searchStr)) return false;
       }
       return true;
     });
@@ -463,6 +470,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.exportColumns[newIndex] = temp;
   }
 
+  // --- PROFESSIONAL CENTERED EXCEL EXPORT ---
   async confirmAndExport(): Promise<void> {
     const selectedCols = this.exportColumns.filter(c => c.selected);
     
@@ -520,8 +528,13 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       row.height = 20;
       
       row.eachCell((cell) => {
+        // Universal centering applied to all cells
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = { left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, right: { style: 'thin', color: { argb: 'FFD9D9D9' } }, bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } }};
+        cell.border = { 
+            left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, 
+            right: { style: 'thin', color: { argb: 'FFD9D9D9' } }, 
+            bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+        };
         if (index % 2 !== 0) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } }; }
       });
     });
@@ -538,16 +551,21 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
           const sum = data.reduce((acc, item) => acc + (Number(item[col.key as keyof typeof item]) || 0), 0);
           return Number(sum.toFixed(2));
         }
-        return '';
+        return ''; // Replaced dash with empty string for cleaner look
       });
 
       const totalRow = worksheet.addRow(totalsData);
       totalRow.height = 28;
       totalRow.eachCell((cell) => {
         cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF000000' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = { top: { style: 'double', color: { argb: 'FF4472C4' } }, bottom: { style: 'medium', color: { argb: 'FF4472C4' } }, left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, right: { style: 'thin', color: { argb: 'FFD9D9D9' } }};
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; // Corporate light blue
+        cell.alignment = { horizontal: 'center', vertical: 'middle' }; // Centered
+        cell.border = { 
+            top: { style: 'double', color: { argb: 'FF4472C4' } }, 
+            bottom: { style: 'medium', color: { argb: 'FF4472C4' } }, 
+            left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, 
+            right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+        };
       });
     }
 
@@ -577,7 +595,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         start_date: '',
         end_date: '',
         entry_type: '',
-        supplier_name: '' // Hide supplier filter in card view
+        supplier_name: ''
       });
     }
 

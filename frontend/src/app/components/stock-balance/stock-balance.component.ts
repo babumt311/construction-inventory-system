@@ -55,7 +55,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   showExportModal = false;
   exportColumns: { key: string, label: string, selected: boolean }[] = [];
-  includeExportTotals = true; // Restored Export Totals Toggle
+  includeExportTotals = true; 
 
   constructor(
     private fb: FormBuilder,
@@ -147,8 +147,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         return new Date(a.last_updated || 0).getTime() - new Date(b.last_updated || 0).getTime();
     });
     for (const item of sorted) {
-        const key = `${item.material_id}_${item.supplier_name}_${item.invoice_no}`;
-        lotMap.set(key, item);
+        // Backend handles consolidation now, so material_id alone is safe for card view tracking
+        lotMap.set(item.material_id.toString(), item); 
     }
     return Array.from(lotMap.values());
   }
@@ -156,35 +156,34 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   get mergedCardsData(): any[] {
     const merged = new Map<number, any>();
     
-    // Sort chronological to ensure we process the day's final row last
-    const sortedData = [...this.dataSource.data].sort((a, b) => 
-      new Date(a.last_updated).getTime() - new Date(b.last_updated).getTime()
-    );
-
-    for (const item of sortedData) {
+    for (const item of this.dataSource.data) {
       if (merged.has(item.material_id)) {
         const existing = merged.get(item.material_id);
-        // Accumulate volumes
-        existing.total_received += Number(item.total_received || 0);
-        existing.received_value += Number(item.received_value || 0);
-        existing.total_used += Number(item.total_used || 0);
-        existing.used_value += Number(item.used_value || 0);
-        existing.total_transfer_out += Number(item.total_transfer_out || 0);
-        existing.total_transfer_in += Number(item.total_transfer_in || 0);
-        existing.total_returned_supplier += Number(item.total_returned_supplier || 0);
-        
-        // OVERWRITE with the latest cumulative balance from the row
-        existing.current_balance = item.current_balance;
+        existing.total_received = Number(existing.total_received || 0) + Number(item.total_received || 0);
+        existing.received_value = Number(existing.received_value || 0) + Number(item.received_value || 0);
+        existing.total_used = Number(existing.total_used || 0) + Number(item.total_used || 0);
+        existing.used_value = Number(existing.used_value || 0) + Number(item.used_value || 0);
+        existing.total_transfer_out = Number(existing.total_transfer_out || 0) + Number(item.total_transfer_out || 0);
+        existing.total_transfer_in = Number(existing.total_transfer_in || 0) + Number(item.total_transfer_in || 0);
+        existing.total_returned_supplier = Number(existing.total_returned_supplier || 0) + Number(item.total_returned_supplier || 0);
       } else {
         merged.set(item.material_id, JSON.parse(JSON.stringify(item)));
       }
     }
 
+    const latestLots = this.getUniqueLotsData(this.dataSource.data);
+    const trueBalances = new Map<number, number>();
+    for(const lot of latestLots) {
+        trueBalances.set(lot.material_id, Number(lot.current_balance || 0));
+    }
+
     const result = Array.from(merged.values());
     for(const card of result) {
+        card.current_balance = trueBalances.get(card.material_id) || 0;
         card.supplier_name = '-';
         card.invoice_no = '-';
     }
+    
     return result;
   }
 
@@ -192,8 +191,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     if (!siteId) return '-';
     const site = this.sites?.find(s => s.id === Number(siteId));
     if (!site || !site.project_id) return '-';
-    
-    const proj = this.projects?.find(p => p.id === site.project_id);
     return proj ? proj.name : '-';
   }
 
@@ -277,27 +274,20 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         const mat = this.materials.find(m => m.id === b.material_id);
         if (!mat || mat.category_id !== Number(filters.category_id)) return false;
       }
-      
-      if (filters.supplier_name) {
-        const searchStr = filters.supplier_name.toLowerCase().trim();
-        const recordSupplier = (b.supplier_name || '').toLowerCase();
-        if (!recordSupplier.includes(searchStr)) return false;
-      }
-
-      if (filters.entry_type) {
-        if (filters.entry_type === 'received' && (!b.total_received || b.total_received <= 0)) return false;
-        if (filters.entry_type === 'used' && (!b.total_used || b.total_used <= 0)) return false;
-        if (filters.entry_type === 'transfer' && (!b.total_transfer_out || b.total_transfer_out <= 0) && (!b.total_transfer_in || b.total_transfer_in <= 0)) return false;
-        if (filters.entry_type === 'returned_supplier' && (!b.total_returned_supplier || b.total_returned_supplier <= 0)) return false;
-      }
-
       return true;
     });
 
     this.dataSource.data = baseData;
 
     const type = filters.entry_type;
-    let cols = ['material', 'category', 'project', 'site', 'supplier_name', 'invoice_no', 'invoice_date', 'current_balance', 'opening_balance'];
+    let cols = ['material', 'category', 'project', 'site'];
+
+    // DYNAMIC COLUMNS: Only show supplier/invoice if looking strictly at "Received"
+    if (type === 'received') {
+      cols.push('supplier_name', 'invoice_no', 'invoice_date');
+    }
+
+    cols.push('current_balance', 'opening_balance');
 
     if (!type || type === '') {
       cols.push('total_received', 'received_cost', 'total_used', 'used_cost', 'total_transfer_out', 'total_transfer_in', 'total_returned_supplier');
@@ -430,14 +420,23 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const type = this.filterForm.value.entry_type;
     this.exportColumns = [
       { key: 'project', label: 'Project', selected: true },
       { key: 'site_name', label: 'Site', selected: true },
       { key: 'material_name', label: 'Material', selected: true },
-      { key: 'category', label: 'Category', selected: true },
-      { key: 'supplier_name', label: 'Supplier Name', selected: true },
-      { key: 'invoice_no', label: 'Invoice No', selected: true },
-      { key: 'invoice_date', label: 'Invoice Date', selected: true },
+      { key: 'category', label: 'Category', selected: true }
+    ];
+
+    if (type === 'received') {
+      this.exportColumns.push(
+        { key: 'supplier_name', label: 'Supplier Name', selected: true },
+        { key: 'invoice_no', label: 'Invoice No', selected: true },
+        { key: 'invoice_date', label: 'Invoice Date', selected: true }
+      );
+    }
+
+    this.exportColumns.push(
       { key: 'current_balance', label: 'Current Balance', selected: true },
       { key: 'opening_balance', label: 'Opening Balance', selected: true },
       { key: 'total_received', label: 'Received Qty', selected: true },
@@ -449,7 +448,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       { key: 'total_returned_supplier', label: 'Ret. (Supplier)', selected: true },
       { key: 'dateStr', label: 'Date', selected: true },
       { key: 'status', label: 'Status', selected: true }
-    ];
+    );
 
     this.showExportModal = true;
   }
@@ -464,7 +463,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.exportColumns[newIndex] = temp;
   }
 
-  // --- RESTORED EXCEL TOTALS LOGIC ---
   async confirmAndExport(): Promise<void> {
     const selectedCols = this.exportColumns.filter(c => c.selected);
     
@@ -473,7 +471,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const projectName = this.projects.find(p => p.id === this.selectedProjectId)?.name || 'All Projects';
     const data = this.dataSource.data.map(item => {
       return {
         ...item,
@@ -492,7 +489,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Stock Balance');
 
-    // 1. HEADER TITLE
     worksheet.mergeCells(`A1:${String.fromCharCode(64 + selectedCols.length)}1`);
     const titleCell = worksheet.getCell('A1');
     titleCell.value = `ENTERPRISE INVENTORY: STOCK LEDGER REPORT`;
@@ -501,49 +497,35 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
     worksheet.getRow(1).height = 35;
 
-    // 2. GENERATION DATE
     worksheet.mergeCells(`A2:${String.fromCharCode(64 + selectedCols.length)}2`);
     const dateCell = worksheet.getCell('A2');
     dateCell.value = `Report generated on: ${new Date().toLocaleString()}`;
     dateCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF595959' } };
     dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-    worksheet.addRow([]); // Gap row
+    worksheet.addRow([]);
 
-    // 3. TABLE HEADERS
     const headerRow = worksheet.addRow(selectedCols.map(c => c.label));
     headerRow.height = 25;
     headerRow.eachCell((cell) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } }; 
       cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = { 
-        top: { style: 'thin' }, left: { style: 'thin' }, 
-        bottom: { style: 'medium' }, right: { style: 'thin' } 
-      };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'medium' }, right: { style: 'thin' } };
     });
 
-    // 4. DATA ROWS
     data.forEach((item, index) => {
       const rowData = selectedCols.map(c => item[c.key as keyof typeof item]);
       const row = worksheet.addRow(rowData);
       row.height = 20;
       
       row.eachCell((cell) => {
-        // Universal Center Alignment for professional look
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = { 
-            left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, 
-            right: { style: 'thin', color: { argb: 'FFD9D9D9' } },
-            bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } }
-        };
-        if (index % 2 !== 0) {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } };
-        }
+        cell.border = { left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, right: { style: 'thin', color: { argb: 'FFD9D9D9' } }, bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } }};
+        if (index % 2 !== 0) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } }; }
       });
     });
 
-    // 5. PROFESSIONAL TOTALS ROW
     if (this.includeExportTotals && data.length > 0) {
       const summableColumns = [
         'current_balance', 'opening_balance', 'total_received', 'received_cost', 
@@ -556,30 +538,20 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
           const sum = data.reduce((acc, item) => acc + (Number(item[col.key as keyof typeof item]) || 0), 0);
           return Number(sum.toFixed(2));
         }
-        return ''; // Return empty string instead of awkward dash
+        return '';
       });
 
       const totalRow = worksheet.addRow(totalsData);
       totalRow.height = 28;
-      totalRow.eachCell((cell, colNumber) => {
+      totalRow.eachCell((cell) => {
         cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF000000' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; // Light blue professional accent
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        
-        // Ledger Style Borders: Double line on top, thick on bottom
-        cell.border = {
-          top: { style: 'double', color: { argb: 'FF4472C4' } },
-          bottom: { style: 'medium', color: { argb: 'FF4472C4' } },
-          left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
-          right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
-        };
+        cell.border = { top: { style: 'double', color: { argb: 'FF4472C4' } }, bottom: { style: 'medium', color: { argb: 'FF4472C4' } }, left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, right: { style: 'thin', color: { argb: 'FFD9D9D9' } }};
       });
     }
 
-    // Set Column Widths
-    worksheet.columns.forEach(column => {
-      column.width = 20;
-    });
+    worksheet.columns.forEach(column => { column.width = 20; });
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -597,16 +569,15 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   
   ngOnDestroy(): void { this.destroyChart('materialChart'); }
   
-  // --- CARDS RESET FIX ---
   toggleViewMode(): void { 
     this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; 
     
     if (this.viewMode === 'cards') {
-      // Clear ledger-specific filters when looking at overall warehouse cards
       this.filterForm.patchValue({
         start_date: '',
         end_date: '',
-        entry_type: ''
+        entry_type: '',
+        supplier_name: '' // Hide supplier filter in card view
       });
     }
 

@@ -124,7 +124,7 @@ export function tokenGetter() {
     UnauthorizedComponent,
     AuditLogsComponent,
     TruncatePipe,
-    DragDropModule
+    DragDropModule,
 
     // Material
     MatToolbarModule,

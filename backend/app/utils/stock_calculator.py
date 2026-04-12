@@ -1,5 +1,5 @@
 """
-Stock calculation utilities - Global Material Balance & FIFO Costing Engine
+Stock calculation utilities - Running Balance Ledger & FIFO Costing
 """
 from datetime import datetime, date, timedelta, time
 from decimal import Decimal
@@ -17,7 +17,6 @@ class StockCalculator:
     def validate_stock_entry(db: Session, site_id: int, material_id: int, entry_type: str, quantity: Decimal) -> bool:
         if quantity <= 0: return False
         if entry_type in ['used', 'returned_supplier']:
-            # For validation, we check the global site balance
             balance = StockCalculator.calculate_balance(db, site_id, material_id)
             if balance['current_balance'] < quantity: return False
         return True
@@ -62,7 +61,7 @@ class StockCalculator:
 
             if not entries and not is_daily_report: continue
 
-            lots = [] # Track cost of each received batch for FIFO
+            lots = [] 
             global_running_balance = Decimal('0.0')
             entries_by_date = {}
 
@@ -79,40 +78,49 @@ class StockCalculator:
 
             for current_date in sorted_dates:
                 opening_balance_today = global_running_balance
-                daily_receipts = []
+                daily_receipt_rows = []
+                
+                # Today's movement accumulators
                 total_used_today = Decimal('0.0')
                 total_used_val_today = Decimal('0.0')
                 total_t_out_today = Decimal('0.0')
                 total_t_in_today = Decimal('0.0')
                 total_ret_sup_today = Decimal('0.0')
 
-                # Process all entries for this day
+                # Process entries row-by-row for Running Balance logic
                 for e in entries_by_date[current_date]:
                     if e.entry_type in ['received', 'returned_received']:
                         qty = e.quantity
                         cost = e.total_cost or Decimal('0.0')
-                        global_running_balance += qty
+                        global_running_balance += qty # UPDATE BALANCE PER ROW
                         
                         if e.entry_type == 'received':
-                            daily_receipts.append({
-                                "sup": e.supplier_name or '-',
-                                "inv": e.invoice_no or '-',
-                                "inv_date": e.invoice_date,
-                                "qty": qty,
-                                "val": cost
+                            # Add specific row for this receipt with CURRENT Running Balance
+                            daily_receipt_rows.append({
+                                "material_id": material.id, "material_name": material.name,
+                                "category": material.category.name if material.category else "N/A",
+                                "unit": material.unit or "N/A",
+                                "current_balance": global_running_balance, # Running total till this invoice
+                                "opening_balance": global_running_balance - qty,
+                                "total_received": qty, "received_value": cost,
+                                "total_used": 0, "used_value": 0,
+                                "total_returned_supplier": 0, "total_transfer_in": 0, "total_transfer_out": 0,
+                                "has_negative_balance": global_running_balance < 0,
+                                "supplier_name": e.supplier_name or '-', 
+                                "invoice_no": e.invoice_no or '-', 
+                                "invoice_date": e.invoice_date,
+                                "last_updated": datetime.combine(current_date, time(10,0,0))
                             })
-                            # Add to FIFO lot stack
                             u_cost = (cost / qty) if qty > 0 else Decimal('0.0')
                             lots.append({"qty": qty, "u_cost": u_cost})
                         else:
                             total_t_in_today += qty
-                            lots.append({"qty": qty, "u_cost": Decimal('0.0')}) # Transfers usually neutral cost
+                            lots.append({"qty": qty, "u_cost": Decimal('0.0')})
                             
                     elif e.entry_type in ['used', 'returned_supplier']:
                         qty_to_consume = e.quantity
                         global_running_balance -= qty_to_consume
                         
-                        # Apply FIFO Costing logic
                         for lot in lots:
                             if qty_to_consume <= 0: break
                             if lot["qty"] > 0:
@@ -120,15 +128,12 @@ class StockCalculator:
                                 lot["qty"] -= deduct
                                 qty_to_consume -= deduct
                                 if e.entry_type == 'used':
-                                    if e.remarks and 'Transfer OUT' in e.remarks:
-                                        total_t_out_today += deduct
+                                    if e.remarks and 'Transfer OUT' in e.remarks: total_t_out_today += deduct
                                     else:
                                         total_used_today += deduct
                                         total_used_val_today += deduct * lot["u_cost"]
-                                else:
-                                    total_ret_sup_today += deduct
+                                else: total_ret_sup_today += deduct
                         
-                        # Handle usage exceeding known lots (Negative)
                         if qty_to_consume > 0:
                             if e.entry_type == 'used':
                                 if e.remarks and 'Transfer OUT' in e.remarks: total_t_out_today += qty_to_consume
@@ -137,31 +142,19 @@ class StockCalculator:
 
                 # Generate rows if within filter range
                 if effective_start <= current_date <= effective_end:
-                    # 1. Output Receipt Rows
-                    for r in daily_receipts:
-                        summary.append({
-                            "material_id": material.id, "material_name": material.name,
-                            "category": material.category.name if material.category else "N/A",
-                            "unit": material.unit or "N/A",
-                            "current_balance": global_running_balance, # Cumulative
-                            "opening_balance": opening_balance_today,
-                            "total_received": r["qty"], "received_value": r["val"],
-                            "total_used": 0, "used_value": 0,
-                            "total_returned_supplier": 0, "total_transfer_in": 0, "total_transfer_out": 0,
-                            "has_negative_balance": global_running_balance < 0,
-                            "supplier_name": r["sup"], "invoice_no": r["inv"], "invoice_date": r["inv_date"],
-                            "last_updated": datetime.combine(current_date, time(12,0,0))
-                        })
+                    # 1. Add the Receipt Rows (already calculated per-row)
+                    for row in daily_receipt_rows:
+                        summary.append(row)
 
-                    # 2. Output Consolidated Movement Row (Usage/Transfers)
+                    # 2. Add the Daily Consolidated Movement row
                     has_movement = (total_used_today > 0 or total_t_out_today > 0 or total_t_in_today > 0 or total_ret_sup_today > 0)
                     if has_movement:
                         summary.append({
                             "material_id": material.id, "material_name": material.name,
                             "category": material.category.name if material.category else "N/A",
                             "unit": material.unit or "N/A",
-                            "current_balance": global_running_balance, # Cumulative
-                            "opening_balance": opening_balance_today if not daily_receipts else global_running_balance + total_used_today + total_t_out_today + total_ret_sup_today - total_t_in_today,
+                            "current_balance": global_running_balance, # Cumulative end of day movement
+                            "opening_balance": global_running_balance + total_used_today + total_t_out_today + total_ret_sup_today - total_t_in_today,
                             "total_received": 0, "received_value": 0,
                             "total_used": total_used_today, "used_value": total_used_val_today,
                             "total_returned_supplier": total_ret_sup_today,
@@ -171,8 +164,8 @@ class StockCalculator:
                             "last_updated": datetime.combine(current_date, time(13,0,0))
                         })
 
-                    # 3. Snapshot Row (For Daily Reports/Cron only)
-                    if is_daily_report and not daily_receipts and not has_movement:
+                    # 3. Automated Daily Snapshot (For background reports)
+                    if is_daily_report and not daily_receipt_rows and not has_movement:
                         summary.append({
                             "material_id": material.id, "material_name": material.name,
                             "category": material.category.name if material.category else "N/A",
@@ -186,6 +179,7 @@ class StockCalculator:
                             "last_updated": datetime.combine(current_date, time(23,59,0))
                         })
 
+        # Apply Filters
         if supplier_name:
             search_str = supplier_name.lower()
             summary = [s for s in summary if search_str in str(s['supplier_name']).lower()]
@@ -215,7 +209,7 @@ class StockCalculator:
                 aggregated[mat_id]["total_returned_supplier"] += item["total_returned_supplier"]
                 aggregated[mat_id]["total_transfer_in"] += item["total_transfer_in"]
                 aggregated[mat_id]["total_transfer_out"] += item["total_transfer_out"]
-                aggregated[mat_id]["current_balance"] = item["current_balance"] # Take final of day
+                aggregated[mat_id]["current_balance"] = item["current_balance"] 
 
         for mat_id, item in aggregated.items():
             existing_report = db.query(models.DailyStockReport).filter(
@@ -241,7 +235,7 @@ class StockCalculator:
         db.commit()
         return reports_generated
 
-# --- Make sure these are at the VERY BOTTOM with ZERO indentation ---
+# CLI helpers must remain outside the class
 def cli_calculate_stock(db: Session, site_id: int, material_id: int):
     return StockCalculator().calculate_balance(db, site_id, material_id)
 

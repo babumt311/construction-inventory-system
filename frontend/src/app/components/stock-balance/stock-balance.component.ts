@@ -9,6 +9,9 @@ import { MatSort } from '@angular/material/sort';
 import { forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
+// NEW IMPORTS FOR DRAG AND DROP
+import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+
 import { StockService } from '../../services/stock.service';
 import { ProjectService } from '../../services/project.service';
 import { MaterialService } from '../../services/material.service';
@@ -139,6 +142,21 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         this.updateTable();
       }
     });
+  }
+
+  // --- DRAG AND DROP COLUMN REORDERING ---
+  drop(event: CdkDragDrop<string[]>) {
+    moveItemInArray(this.displayedColumns, event.previousIndex, event.currentIndex);
+    
+    // Safety Lock: Force 'material' to ALWAYS stay at index 0
+    const matIndex = this.displayedColumns.indexOf('material');
+    if (matIndex !== 0 && matIndex !== -1) {
+      this.displayedColumns.splice(matIndex, 1);
+      this.displayedColumns.unshift('material');
+    }
+
+    // Save user preference permanently
+    localStorage.setItem('stockTableColumnOrder', JSON.stringify(this.displayedColumns));
   }
 
   getUniqueLotsData(dataArray: any[]): any[] {
@@ -289,7 +307,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const type = filters.entry_type;
     let cols = ['material', 'category', 'project', 'site'];
 
-    // DYNAMIC COLUMNS: Only show supplier/invoice if looking strictly at "Received"
     if (type === 'received') {
       cols.push('supplier_name', 'invoice_no', 'invoice_date');
     }
@@ -309,6 +326,24 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     }
     
     cols.push('updated_at', 'status');
+
+    // Restore user's custom saved column order
+    const savedOrderJson = localStorage.getItem('stockTableColumnOrder');
+    if (savedOrderJson) {
+      try {
+        const savedOrder = JSON.parse(savedOrderJson);
+        cols.sort((a, b) => {
+          if (a === 'material') return -1; // Material always locked to index 0
+          if (b === 'material') return 1;
+          let indexA = savedOrder.indexOf(a);
+          let indexB = savedOrder.indexOf(b);
+          if (indexA === -1) indexA = 999; 
+          if (indexB === -1) indexB = 999;
+          return indexA - indexB;
+        });
+      } catch (e) {}
+    }
+
     this.displayedColumns = cols;
 
     if (this.viewMode === 'table') {
@@ -470,7 +505,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.exportColumns[newIndex] = temp;
   }
 
-  // --- PROFESSIONAL CENTERED EXCEL EXPORT ---
   async confirmAndExport(): Promise<void> {
     const selectedCols = this.exportColumns.filter(c => c.selected);
     
@@ -528,13 +562,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       row.height = 20;
       
       row.eachCell((cell) => {
-        // Universal centering applied to all cells
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = { 
-            left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, 
-            right: { style: 'thin', color: { argb: 'FFD9D9D9' } }, 
-            bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } }
-        };
+        cell.border = { left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, right: { style: 'thin', color: { argb: 'FFD9D9D9' } }, bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } }};
         if (index % 2 !== 0) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } }; }
       });
     });
@@ -551,21 +580,16 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
           const sum = data.reduce((acc, item) => acc + (Number(item[col.key as keyof typeof item]) || 0), 0);
           return Number(sum.toFixed(2));
         }
-        return ''; // Replaced dash with empty string for cleaner look
+        return '';
       });
 
       const totalRow = worksheet.addRow(totalsData);
       totalRow.height = 28;
       totalRow.eachCell((cell) => {
         cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF000000' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; // Corporate light blue
-        cell.alignment = { horizontal: 'center', vertical: 'middle' }; // Centered
-        cell.border = { 
-            top: { style: 'double', color: { argb: 'FF4472C4' } }, 
-            bottom: { style: 'medium', color: { argb: 'FF4472C4' } }, 
-            left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, 
-            right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
-        };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { top: { style: 'double', color: { argb: 'FF4472C4' } }, bottom: { style: 'medium', color: { argb: 'FF4472C4' } }, left: { style: 'thin', color: { argb: 'FFD9D9D9' } }, right: { style: 'thin', color: { argb: 'FFD9D9D9' } }};
       });
     }
 

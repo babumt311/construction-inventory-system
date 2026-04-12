@@ -4,6 +4,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 
 // Third-party
 import { JwtModule } from '@auth0/angular-jwt';
@@ -123,6 +124,7 @@ export function tokenGetter() {
     UnauthorizedComponent,
     AuditLogsComponent,
     TruncatePipe,
+    DragDropModule
 
     // Material
     MatToolbarModule,

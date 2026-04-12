@@ -9,7 +9,6 @@ import { MatSort } from '@angular/material/sort';
 import { forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
-// IMPORT DRAG AND DROP
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 
 import { StockService } from '../../services/stock.service';
@@ -53,7 +52,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   selectedProjectId?: number;
   viewMode: 'table' | 'cards' = 'table';
 
-  private prevBackendState = { start: '', end: '', supplier: '', entryType: '', project: '' };
+  private prevBackendState = { start: '', end: '', supplier: '', entryType: '', project: '', asOfDate: '' };
   private prevProjectId: any = '';
 
   showExportModal = false;
@@ -102,6 +101,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       material_id: [''],
       start_date: [''],
       end_date: [''],
+      as_of_date: [''], // NEW: Snapshot date for Card View
       supplier_name: [''],
       entry_type: [''],    
       show_negative_only: [false]
@@ -126,10 +126,14 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         vals.end_date !== this.prevBackendState.end ||
         vals.supplier_name !== this.prevBackendState.supplier ||
         vals.entry_type !== this.prevBackendState.entryType ||
+        vals.as_of_date !== this.prevBackendState.asOfDate ||
         vals.project_id !== this.prevBackendState.project;
 
       if (needsBackendFetch) {
-        this.prevBackendState = { start: vals.start_date, end: vals.end_date, supplier: vals.supplier_name, entryType: vals.entry_type, project: vals.project_id };
+        this.prevBackendState = { 
+          start: vals.start_date, end: vals.end_date, supplier: vals.supplier_name, 
+          entryType: vals.entry_type, asOfDate: vals.as_of_date, project: vals.project_id 
+        };
         
         if (vals.project_id !== this.prevProjectId) {
           this.prevProjectId = vals.project_id;
@@ -144,25 +148,17 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  // --- FIXED DRAG AND DROP LOGIC ---
   drop(event: CdkDragDrop<string[]>) {
-    // 1. Copy array to force Angular Table to redraw data cells!
     const newCols = [...this.displayedColumns];
-    
-    // 2. Reorder items
     moveItemInArray(newCols, event.previousIndex, event.currentIndex);
     
-    // 3. Safety Lock: Force 'material' to ALWAYS stay at the very left
     const matIndex = newCols.indexOf('material');
     if (matIndex !== 0 && matIndex !== -1) {
       newCols.splice(matIndex, 1);
       newCols.unshift('material');
     }
 
-    // 4. Overwrite original array to trigger table UI refresh
     this.displayedColumns = newCols;
-
-    // 5. Save permanently
     localStorage.setItem('stockTableColumnOrder', JSON.stringify(this.displayedColumns));
   }
 
@@ -263,10 +259,19 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const filters = this.filterForm.value;
 
     const apiParams: any = {};
-    if (filters.start_date) apiParams.start_date = filters.start_date;
-    if (filters.end_date) apiParams.end_date = filters.end_date;
-    if (filters.supplier_name) apiParams.supplier_name = filters.supplier_name;
-    if (filters.entry_type) apiParams.entry_type = filters.entry_type;
+
+    // --- TIME TRAVEL ENGINE ---
+    if (this.viewMode === 'cards') {
+      if (filters.as_of_date) {
+        apiParams.end_date = filters.as_of_date; // Fetch everything from dawn of time up to this date
+      }
+    } else {
+      if (filters.start_date) apiParams.start_date = filters.start_date;
+      if (filters.end_date) apiParams.end_date = filters.end_date;
+      if (filters.supplier_name) apiParams.supplier_name = filters.supplier_name;
+      if (filters.entry_type) apiParams.entry_type = filters.entry_type;
+    }
+    // --------------------------
 
     this.sites.forEach(site => {
       this.stockService.getSiteStockSummary(site.id, apiParams).subscribe({
@@ -301,7 +306,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         if (!mat || mat.category_id !== Number(filters.category_id)) return false;
       }
       
-      if (filters.supplier_name) {
+      if (this.viewMode === 'table' && filters.supplier_name) {
         const searchStr = filters.supplier_name.toLowerCase().trim();
         const recordSupplier = (b.supplier_name || '').toLowerCase();
         if (!recordSupplier.includes(searchStr)) return false;
@@ -314,9 +319,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const type = filters.entry_type;
     let cols = ['material', 'category', 'project', 'site'];
 
-    if (type === 'received') {
-      cols.push('supplier_name', 'invoice_no', 'invoice_date');
-    }
+    if (type === 'received') cols.push('supplier_name', 'invoice_no', 'invoice_date');
 
     cols.push('current_balance', 'opening_balance');
 
@@ -334,7 +337,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     
     cols.push('updated_at', 'status');
 
-    // Load saved columns, force Material to index 0
     const savedOrderJson = localStorage.getItem('stockTableColumnOrder');
     if (savedOrderJson) {
       try {
@@ -622,12 +624,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; 
     
     if (this.viewMode === 'cards') {
-      this.filterForm.patchValue({
-        start_date: '',
-        end_date: '',
-        entry_type: '',
-        supplier_name: ''
-      });
+      this.filterForm.patchValue({ start_date: '', end_date: '', entry_type: '', supplier_name: '' });
+    } else {
+      this.filterForm.patchValue({ as_of_date: '' });
     }
 
     this.updateTable(); 

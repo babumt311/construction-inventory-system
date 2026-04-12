@@ -56,11 +56,8 @@
           </div>
 
           <div class="col-md-4" *ngIf="viewMode === 'cards'">
-            <label class="form-label small fw-bold">Supplier Name Search</label>
-            <div class="input-group">
-              <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
-              <input type="text" class="form-control border-start-0 ps-0" formControlName="supplier_name" placeholder="Search supplier...">
-            </div>
+            <label class="form-label small fw-bold text-primary"><i class="far fa-calendar-check me-1"></i> Stock As Of Date</label>
+            <input type="date" class="form-control border-primary" formControlName="as_of_date" title="Leave blank for Current Stock">
           </div>
 
           <div class="col-md-3" *ngIf="viewMode === 'table' && filterForm.get('entry_type')?.value === 'received'">
@@ -91,7 +88,8 @@
             <label class="form-label small fw-bold">End Date</label>
             <input type="date" class="form-control" formControlName="end_date" [min]="filterForm.get('start_date')?.value">
           </div>
-          <div class="col-md-2 d-flex align-items-end pb-2">
+          
+          <div class="col-md-2 d-flex align-items-end pb-2" *ngIf="viewMode === 'table'">
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" id="negativeOnly" formControlName="show_negative_only">
               <label class="form-check-label fw-bold" for="negativeOnly">Negative Only</label>
@@ -158,8 +156,8 @@
         <table mat-table [dataSource]="dataSource" matSort class="table table-hover align-middle mb-0 text-nowrap" cdkDropList cdkDropListOrientation="horizontal" (cdkDropListDropped)="drop($event)">
           
           <ng-container matColumnDef="material" sticky>
-            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag [cdkDragDisabled]="true" class="bg-light fw-bold text-muted text-uppercase py-3 z-3 border-end">Material</th>
-            <td mat-cell *matCellDef="let balance" class="py-3 bg-white border-end shadow-sm position-relative z-1 pe-4">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag [cdkDragDisabled]="true" class="bg-light fw-bold text-muted text-uppercase py-3 z-3 border-end ps-4">Material</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 bg-white border-end shadow-sm position-relative z-1 pe-4 ps-4">
               <div>
                 <strong class="d-block text-dark">{{ balance.material_name }}</strong>
                 <small class="text-muted">ID: {{ balance.material_id }}</small>
@@ -274,11 +272,11 @@
           </ng-container>
 
           <ng-container matColumnDef="status">
-            <th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted text-uppercase py-3 text-center ps-4">Actions</th>
+            <th mat-header-cell *matHeaderCellDef cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-center ps-4 cursor-move">Actions</th>
             <td mat-cell *matCellDef="let balance" class="py-3 text-center ps-4"><button class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold text-nowrap" (click)="showMaterialDetails(balance)"><i class="fas fa-chart-line me-1"></i> History</button></td>
           </ng-container>
 
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-header-row *matHeaderRowDef="displayedColumns" cdkDropList cdkDropListOrientation="horizontal" (cdkDropListDropped)="drop($event)"></tr>
           <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="border-bottom"></tr>
         </table>
       </div>

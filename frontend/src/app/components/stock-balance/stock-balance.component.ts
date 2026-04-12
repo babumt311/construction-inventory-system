@@ -9,7 +9,7 @@ import { MatSort } from '@angular/material/sort';
 import { forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
-// NEW IMPORTS FOR DRAG AND DROP
+// IMPORT DRAG AND DROP
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 
 import { StockService } from '../../services/stock.service';
@@ -144,18 +144,25 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     });
   }
 
-  // --- DRAG AND DROP COLUMN REORDERING ---
+  // --- FIXED DRAG AND DROP LOGIC ---
   drop(event: CdkDragDrop<string[]>) {
-    moveItemInArray(this.displayedColumns, event.previousIndex, event.currentIndex);
+    // 1. Copy array to force Angular Table to redraw data cells!
+    const newCols = [...this.displayedColumns];
     
-    // Safety Lock: Force 'material' to ALWAYS stay at index 0
-    const matIndex = this.displayedColumns.indexOf('material');
+    // 2. Reorder items
+    moveItemInArray(newCols, event.previousIndex, event.currentIndex);
+    
+    // 3. Safety Lock: Force 'material' to ALWAYS stay at the very left
+    const matIndex = newCols.indexOf('material');
     if (matIndex !== 0 && matIndex !== -1) {
-      this.displayedColumns.splice(matIndex, 1);
-      this.displayedColumns.unshift('material');
+      newCols.splice(matIndex, 1);
+      newCols.unshift('material');
     }
 
-    // Save user preference permanently
+    // 4. Overwrite original array to trigger table UI refresh
+    this.displayedColumns = newCols;
+
+    // 5. Save permanently
     localStorage.setItem('stockTableColumnOrder', JSON.stringify(this.displayedColumns));
   }
 
@@ -327,13 +334,13 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     
     cols.push('updated_at', 'status');
 
-    // Restore user's custom saved column order
+    // Load saved columns, force Material to index 0
     const savedOrderJson = localStorage.getItem('stockTableColumnOrder');
     if (savedOrderJson) {
       try {
         const savedOrder = JSON.parse(savedOrderJson);
         cols.sort((a, b) => {
-          if (a === 'material') return -1; // Material always locked to index 0
+          if (a === 'material') return -1;
           if (b === 'material') return 1;
           let indexA = savedOrder.indexOf(a);
           let indexB = savedOrder.indexOf(b);

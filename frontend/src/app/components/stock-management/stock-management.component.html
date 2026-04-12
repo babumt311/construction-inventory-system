@@ -26,8 +26,11 @@
   <div *ngIf="activeTab === 'stock'" class="animate__animated animate__fadeIn">
     
     <div class="card shadow-sm border-0 mb-4">
-      <div class="card-header bg-light py-3 border-bottom-0">
-        <h5 class="fw-bold mb-0 text-success"><i class="fas fa-plus-circle me-2"></i>Record Transaction</h5>
+      <div class="card-header py-3 border-bottom-0" [ngClass]="isEditingStock ? 'bg-warning bg-opacity-10' : 'bg-light'">
+        <h5 class="fw-bold mb-0" [ngClass]="isEditingStock ? 'text-warning text-dark' : 'text-success'">
+          <i class="fas" [ngClass]="isEditingStock ? 'fa-edit' : 'fa-plus-circle'"></i> 
+          {{ isEditingStock ? 'Edit Transaction' : 'Record Transaction' }}
+        </h5>
       </div>
       <div class="card-body p-4 pt-3">
         <form [formGroup]="stockForm" (ngSubmit)="submitStock()">
@@ -104,14 +107,14 @@
           <div formArrayName="items">
             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
               <h6 class="fw-bold text-primary mb-0">Materials List</h6>
-              <button type="button" class="btn btn-sm btn-outline-primary" (click)="addItem()">
+              <button type="button" class="btn btn-sm btn-outline-primary" (click)="addItem()" *ngIf="!isEditingStock">
                 <i class="fas fa-plus me-1"></i> Add Another Material
               </button>
             </div>
 
             <div *ngFor="let item of items.controls; let i=index" [formGroupName]="i" class="row g-2 mb-3 align-items-end border p-3 rounded position-relative bg-white shadow-sm">
               
-              <button type="button" class="btn btn-sm btn-danger position-absolute shadow" style="width:30px; height:30px; top:-10px; right:-10px; border-radius:50%; z-index:10;" (click)="removeItem(i)" title="Remove item">
+              <button type="button" class="btn btn-sm btn-danger position-absolute shadow" style="width:30px; height:30px; top:-10px; right:-10px; border-radius:50%; z-index:10;" (click)="removeItem(i)" title="Remove item" *ngIf="!isEditingStock">
                 <i class="fas fa-times"></i>
               </button>
 
@@ -159,10 +162,20 @@
             </div>
           </div>
 
-          <div class="col-12 mt-4 text-end">
-            <button type="submit" class="btn btn-success fw-bold px-5 py-2" [disabled]="submittingStock || stockForm.invalid">
-              <span *ngIf="!submittingStock"><i class="fas fa-save me-2"></i>Save All Materials</span>
-              <span *ngIf="submittingStock"><i class="fas fa-spinner fa-spin me-2"></i>Saving...</span>
+          <div class="col-12 mt-4 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-bold" 
+                    *ngIf="isEditingStock" (click)="cancelEditStock()">
+              <i class="fas fa-times me-2"></i>Cancel
+            </button>
+
+            <button type="submit" class="btn px-5 py-2 fw-bold shadow-sm" 
+                    [ngClass]="isEditingStock ? 'btn-warning text-dark' : 'btn-success'"
+                    [disabled]="submittingStock || stockForm.invalid">
+              <span *ngIf="!submittingStock">
+                <i class="fas me-2" [ngClass]="isEditingStock ? 'fa-edit' : 'fa-save'"></i>
+                {{ isEditingStock ? 'Update Transaction' : 'Save All Materials' }}
+              </span>
+              <span *ngIf="submittingStock"><i class="fas fa-spinner fa-spin me-2"></i>Processing...</span>
             </button>
           </div>
 
@@ -216,7 +229,21 @@
                 <span *ngIf="!element.invoice_no">-</span>
               </td>
             </ng-container>
-            <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted text-end px-3">Act</th><td mat-cell *matCellDef="let element" class="text-end px-3"><button class="btn btn-sm text-danger" (click)="deleteStockEntry(element.id)"><i class="fas fa-trash-alt"></i></button></td></ng-container>
+            
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted text-end px-4">Act</th>
+              <td mat-cell *matCellDef="let element" class="text-end px-4">
+                <div class="btn-group shadow-sm">
+                  <button class="btn btn-sm btn-outline-primary" (click)="editStockEntry(element)" title="Edit Transaction">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger" (click)="deleteStockEntry(element.id)" title="Delete Transaction">
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
+                </div>
+              </td>
+            </ng-container>
+            
             <tr mat-header-row *matHeaderRowDef="stockColumns"></tr><tr mat-row *matRowDef="let row; columns: stockColumns;" class="border-bottom"></tr>
           </table>
           <div class="text-center py-4" *ngIf="stockDataSource.data.length === 0 && selectedSiteId">No transactions yet.</div>

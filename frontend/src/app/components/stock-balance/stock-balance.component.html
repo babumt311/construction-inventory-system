@@ -63,7 +63,7 @@
             </div>
           </div>
 
-          <div class="col-md-3" *ngIf="viewMode === 'table'">
+          <div class="col-md-3" *ngIf="viewMode === 'table' && filterForm.get('entry_type')?.value === 'received'">
             <label class="form-label small fw-bold">Supplier Name Search</label>
             <div class="input-group">
               <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>

@@ -45,7 +45,7 @@
 
             <div class="col-md-3">
               <label class="form-label fw-bold small text-muted">Transaction Type *</label>
-              <select class="form-select border-primary bg-white" formControlName="entry_type">
+              <select class="form-select bg-white" formControlName="entry_type">
                 <option value="received">Received (Delivery IN)</option>
                 <option value="used">Used (Consumed OUT)</option>
                 <option value="returned_supplier">Returned to Supplier (OUT)</option>
@@ -60,29 +60,29 @@
 
             <ng-container *ngIf="stockForm.get('entry_type')?.value === 'transfer'">
               <div class="col-md-3">
-                <label class="form-label fw-bold small text-danger">From Site *</label>
-                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Origin" formControlName="from_site_id" class="border-danger rounded"></ng-select>
+                <label class="form-label fw-bold small text-muted">From Site *</label>
+                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Origin" formControlName="from_site_id" [ngClass]="{'is-invalid': stockForm.get('from_site_id')?.invalid && stockForm.get('from_site_id')?.touched}"></ng-select>
               </div>
               <div class="col-md-3">
-                <label class="form-label fw-bold small text-success">To Site *</label>
-                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Destination" formControlName="to_site_id" (change)="onSiteChange($event ? $event.id : null)" class="border-success rounded"></ng-select>
+                <label class="form-label fw-bold small text-muted">To Site *</label>
+                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Destination" formControlName="to_site_id" (change)="onSiteChange($event ? $event.id : null)" [ngClass]="{'is-invalid': stockForm.get('to_site_id')?.invalid && stockForm.get('to_site_id')?.touched}"></ng-select>
               </div>
             </ng-container>
 
             <ng-container *ngIf="stockForm.get('entry_type')?.value === 'received'">
               <div class="col-md-4 mt-3">
-                <label class="form-label fw-bold small text-success">Supplier Name *</label>
-                <input type="text" class="form-control border-success" formControlName="supplier_name" [class.is-invalid]="stockForm.get('supplier_name')?.invalid && stockForm.get('supplier_name')?.touched" placeholder="Enter Supplier Name">
+                <label class="form-label fw-bold small text-muted">Supplier Name *</label>
+                <input type="text" class="form-control" formControlName="supplier_name" [class.is-invalid]="stockForm.get('supplier_name')?.invalid && stockForm.get('supplier_name')?.touched" placeholder="Enter Supplier Name">
               </div>
 
               <div class="col-md-4 mt-3">
-                <label class="form-label fw-bold small text-success">Invoice / Ref No *</label>
-                <input type="text" class="form-control border-success" formControlName="invoice_no" [class.is-invalid]="stockForm.get('invoice_no')?.invalid && stockForm.get('invoice_no')?.touched" placeholder="Enter invoice number">
+                <label class="form-label fw-bold small text-muted">Invoice / Ref No *</label>
+                <input type="text" class="form-control" formControlName="invoice_no" [class.is-invalid]="stockForm.get('invoice_no')?.invalid && stockForm.get('invoice_no')?.touched" placeholder="Enter invoice number">
               </div>
 
               <div class="col-md-4 mt-3">
-                <label class="form-label fw-bold small text-success">Invoice Date *</label>
-                <input type="date" class="form-control border-success" formControlName="invoice_date" [class.is-invalid]="stockForm.get('invoice_date')?.invalid && stockForm.get('invoice_date')?.touched">
+                <label class="form-label fw-bold small text-muted">Invoice Date *</label>
+                <input type="date" class="form-control" formControlName="invoice_date" [class.is-invalid]="stockForm.get('invoice_date')?.invalid && stockForm.get('invoice_date')?.touched">
               </div>
             </ng-container>
 

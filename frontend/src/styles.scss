@@ -171,7 +171,7 @@ a {
 
 /* Form Styles */
 .form-control, .form-select, .input-group-text {
-  border: 1px solid var(--gray-500); /* UPDATED: Unified dark border */
+  border: 1px solid var(--gray-600); /* STRONGER, DARKER BORDER */
   border-radius: var(--border-radius);
   padding: 0.5rem 0.75rem;
   font-size: 14px;
@@ -197,7 +197,7 @@ a {
 .ng-select .ng-select-container {
   min-height: 38px;
   border-radius: var(--border-radius);
-  border: 1px solid var(--gray-500) !important; /* UPDATED: Unified dark border */
+  border: 1px solid var(--gray-600) !important; /* STRONGER, DARKER BORDER */
   font-size: 14px;
   transition: all var(--transition-speed);
   background-color: #fff;

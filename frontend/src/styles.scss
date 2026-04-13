@@ -170,8 +170,8 @@ a {
 }
 
 /* Form Styles */
-.form-control, .form-select {
-  border: 1px solid var(--gray-300);
+.form-control, .form-select, .input-group-text {
+  border: 1px solid var(--gray-500); /* UPDATED: Unified dark border */
   border-radius: var(--border-radius);
   padding: 0.5rem 0.75rem;
   font-size: 14px;
@@ -183,7 +183,7 @@ a {
   }
   
   &.is-invalid {
-    border-color: var(--danger-color);
+    border-color: var(--danger-color) !important;
     
     &:focus {
       box-shadow: 0 0 0 0.2rem rgba(244, 67, 54, 0.25);
@@ -195,21 +195,21 @@ a {
 /* NG-SELECT BOOTSTRAP 5 INTEGRATION         */
 /* ========================================= */
 .ng-select .ng-select-container {
-  min-height: 38px; /* Matches Bootstrap standard height */
+  min-height: 38px;
   border-radius: var(--border-radius);
-  border: 1px solid var(--gray-300);
+  border: 1px solid var(--gray-500) !important; /* UPDATED: Unified dark border */
   font-size: 14px;
   transition: all var(--transition-speed);
   background-color: #fff;
 }
 
 .ng-select.ng-select-focused .ng-select-container {
-  border-color: var(--primary-color);
+  border-color: var(--primary-color) !important;
   box-shadow: 0 0 0 0.2rem rgba(63, 81, 181, 0.25);
 }
 
 .ng-select.is-invalid .ng-select-container {
-  border-color: var(--danger-color);
+  border-color: var(--danger-color) !important;
 }
 
 .ng-select.is-invalid.ng-select-focused .ng-select-container {

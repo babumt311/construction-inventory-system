@@ -108,18 +108,12 @@
 
               <div class="col-md-2">
                 <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Category Filter</label>
-                <select class="form-select form-select-sm" formControlName="category_id">
-                  <option value="">All</option>
-                  <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
-                </select>
+                <ng-select [items]="categories" bindLabel="name" bindValue="id" placeholder="All" formControlName="category_id"></ng-select>
               </div>
 
               <div class="col-md-3">
                 <label class="form-label fw-bold small text-muted" style="font-size: 0.75rem;">Material *</label>
-                <select class="form-select form-select-sm" formControlName="material_id" [class.is-invalid]="item.get('material_id')?.invalid && item.get('material_id')?.touched">
-                  <option value="">Select Material</option>
-                  <option *ngFor="let m of getFilteredMaterials(item.get('category_id')?.value)" [value]="m.id">{{ m.name }}</option>
-                </select>
+                <ng-select [items]="getFilteredMaterials(item.get('category_id')?.value)" bindLabel="name" bindValue="id" placeholder="Select Material" formControlName="material_id" [ngClass]="{'is-invalid': item.get('material_id')?.invalid && item.get('material_id')?.touched}"></ng-select>
               </div>
 
               <div class="col-md-1">

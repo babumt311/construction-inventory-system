@@ -5,6 +5,8 @@
 /* Import Material Design Theme */
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 
+@import "~@ng-select/ng-select/themes/default.theme.css";
+
 /* Custom Variables */
 :root {
   // Colors

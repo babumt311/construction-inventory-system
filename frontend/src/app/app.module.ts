@@ -4,6 +4,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { NgSelectModule } from '@ng-select/ng-select';
 
 // Third-party
 import { JwtModule } from '@auth0/angular-jwt';
@@ -115,6 +116,7 @@ export function tokenGetter() {
     UnauthorizedComponent,
     AuditLogsComponent,
     TruncatePipe,
+    
 
     // Material
     MatToolbarModule,

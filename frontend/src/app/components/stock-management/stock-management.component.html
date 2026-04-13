@@ -35,12 +35,12 @@
       <div class="card-body p-4 pt-3">
         <form [formGroup]="stockForm" (ngSubmit)="submitStock()">
           
-          <div class="row g-3 mb-4 bg-light p-3 rounded">
-            <h6 class="fw-bold text-primary mb-2 border-bottom pb-2">Common Transaction Details</h6>
+          <div class="row g-3 mb-4 bg-light p-3 rounded border">
+            <h6 class="fw-bold text-primary mb-3 border-bottom pb-2">Common Transaction Details</h6>
             
             <div class="col-md-3">
               <label class="form-label fw-bold small text-muted">Project *</label>
-              <ng-select [items]="projects" bindLabel="name" bindValue="id" placeholder="Select Project" formControlName="project_id" (change)="onProjectChange($event ? $event.id : '')" [ngClass]="{'is-invalid': stockForm.get('project_id')?.invalid && stockForm.get('project_id')?.touched}"></ng-select>
+              <ng-select [items]="projects" bindLabel="name" bindValue="id" placeholder="Select Project" formControlName="project_id" (change)="onProjectChange($event ? $event.id : null)" [ngClass]="{'is-invalid': stockForm.get('project_id')?.invalid && stockForm.get('project_id')?.touched}"></ng-select>
             </div>
 
             <div class="col-md-3">
@@ -55,38 +55,38 @@
 
             <div class="col-md-3" *ngIf="stockForm.get('entry_type')?.value !== 'transfer'">
               <label class="form-label fw-bold small text-muted">Site *</label>
-              <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Site" formControlName="site_id" (change)="onSiteChange($event ? $event.id : '')" [ngClass]="{'is-invalid': stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched}"></ng-select>
+              <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Site" formControlName="site_id" (change)="onSiteChange($event ? $event.id : null)" [ngClass]="{'is-invalid': stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched}"></ng-select>
             </div>
 
             <ng-container *ngIf="stockForm.get('entry_type')?.value === 'transfer'">
               <div class="col-md-3">
-                <label class="form-label fw-bold small text-muted text-danger">From Site *</label>
-                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Origin" formControlName="from_site_id" class="border-danger"></ng-select>
+                <label class="form-label fw-bold small text-danger">From Site *</label>
+                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Origin" formControlName="from_site_id" class="border-danger rounded"></ng-select>
               </div>
               <div class="col-md-3">
-                <label class="form-label fw-bold small text-muted text-success">To Site *</label>
-                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Destination" formControlName="to_site_id" (change)="onSiteChange($event ? $event.id : '')" class="border-success"></ng-select>
+                <label class="form-label fw-bold small text-success">To Site *</label>
+                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Destination" formControlName="to_site_id" (change)="onSiteChange($event ? $event.id : null)" class="border-success rounded"></ng-select>
               </div>
             </ng-container>
 
             <ng-container *ngIf="stockForm.get('entry_type')?.value === 'received'">
-              <div class="col-md-3">
-                <label class="form-label fw-bold small text-muted text-success">Supplier Name *</label>
+              <div class="col-md-4 mt-3">
+                <label class="form-label fw-bold small text-success">Supplier Name *</label>
                 <input type="text" class="form-control border-success" formControlName="supplier_name" [class.is-invalid]="stockForm.get('supplier_name')?.invalid && stockForm.get('supplier_name')?.touched" placeholder="Enter Supplier Name">
               </div>
 
-              <div class="col-md-3">
-                <label class="form-label fw-bold small text-muted text-success">Invoice / Ref No *</label>
+              <div class="col-md-4 mt-3">
+                <label class="form-label fw-bold small text-success">Invoice / Ref No *</label>
                 <input type="text" class="form-control border-success" formControlName="invoice_no" [class.is-invalid]="stockForm.get('invoice_no')?.invalid && stockForm.get('invoice_no')?.touched" placeholder="Enter invoice number">
               </div>
 
-              <div class="col-md-3">
-                <label class="form-label fw-bold small text-muted text-success">Invoice Date *</label>
+              <div class="col-md-4 mt-3">
+                <label class="form-label fw-bold small text-success">Invoice Date *</label>
                 <input type="date" class="form-control border-success" formControlName="invoice_date" [class.is-invalid]="stockForm.get('invoice_date')?.invalid && stockForm.get('invoice_date')?.touched">
               </div>
             </ng-container>
 
-            <div class="col-md-12">
+            <div class="col-md-12 mt-3">
               <label class="form-label fw-bold small text-muted">Remarks</label>
               <input type="text" class="form-control" formControlName="remarks" placeholder="General remarks for all items">
             </div>

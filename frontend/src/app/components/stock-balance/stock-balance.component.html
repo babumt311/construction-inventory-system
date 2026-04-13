@@ -50,7 +50,7 @@
           <ng-container *ngIf="viewMode === 'table'">
             <div class="col-md-3">
               <label class="form-label small fw-bold text-muted">Transaction Type</label>
-              <select class="form-select border-primary bg-white" formControlName="entry_type">
+              <select class="form-select bg-white" formControlName="entry_type">
                 <option value="">All Transactions</option>
                 <option value="received">Received (Delivery IN)</option>
                 <option value="used">Used (Consumed OUT)</option>
@@ -60,10 +60,10 @@
             </div>
 
             <div class="col-md-3" *ngIf="filterForm.get('entry_type')?.value === 'received'">
-              <label class="form-label small fw-bold text-success">Supplier Search</label>
+              <label class="form-label small fw-bold text-muted">Supplier Search</label>
               <div class="input-group">
                 <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
-                <input type="text" class="form-control border-start-0 ps-0 border-success" formControlName="supplier_name" placeholder="Search supplier...">
+                <input type="text" class="form-control border-start-0 ps-0" formControlName="supplier_name" placeholder="Search supplier...">
               </div>
             </div>
 
@@ -87,8 +87,8 @@
 
           <ng-container *ngIf="viewMode === 'cards'">
             <div class="col-md-4">
-              <label class="form-label small fw-bold text-primary"><i class="far fa-calendar-check me-1"></i> Stock As Of Date</label>
-              <input type="date" class="form-control border-primary" formControlName="as_of_date" title="Leave blank for Current Stock">
+              <label class="form-label small fw-bold text-muted"><i class="far fa-calendar-check me-1"></i> Stock As Of Date</label>
+              <input type="date" class="form-control" formControlName="as_of_date" title="Leave blank for Current Stock">
             </div>
             <div class="col-md-4">
               <label class="form-label small fw-bold text-muted">Supplier Search</label>

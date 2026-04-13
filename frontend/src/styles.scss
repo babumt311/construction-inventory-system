@@ -5,6 +5,7 @@
 /* Import Material Design Theme */
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 
+/* Import ng-select Default Theme */
 @import "~@ng-select/ng-select/themes/default.theme.css";
 
 /* Custom Variables */
@@ -190,6 +191,39 @@ a {
   }
 }
 
+/* ========================================= */
+/* NG-SELECT BOOTSTRAP 5 INTEGRATION         */
+/* ========================================= */
+.ng-select .ng-select-container {
+  min-height: 38px; /* Matches Bootstrap standard height */
+  border-radius: var(--border-radius);
+  border: 1px solid var(--gray-300);
+  font-size: 14px;
+  transition: all var(--transition-speed);
+  background-color: #fff;
+}
+
+.ng-select.ng-select-focused .ng-select-container {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(63, 81, 181, 0.25);
+}
+
+.ng-select.is-invalid .ng-select-container {
+  border-color: var(--danger-color);
+}
+
+.ng-select.is-invalid.ng-select-focused .ng-select-container {
+  box-shadow: 0 0 0 0.2rem rgba(244, 67, 54, 0.25);
+}
+
+/* Hide extra padding if wrapped in standard form-control classes */
+.ng-select.form-control {
+  padding: 0 !important;
+  border: none !important;
+  height: auto !important;
+}
+/* ========================================= */
+
 .form-label {
   font-weight: 500;
   color: var(--gray-700);
@@ -237,11 +271,13 @@ a {
 .btn-secondary {
   background-color: var(--secondary-color);
   border-color: var(--secondary-color);
+  color: white; /* Force white text on secondary background */
   
   &:hover:not(:disabled) {
     background-color: var(--secondary-dark);
     border-color: var(--secondary-dark);
     transform: translateY(-1px);
+    color: white;
   }
 }
 
@@ -332,6 +368,9 @@ a {
   font-size: 0.75em;
   letter-spacing: 0.5px;
 }
+.badge.bg-secondary {
+  color: white !important; /* Ensure secondary badges always have readable text */
+}
 
 /* Alert Styles */
 .alert {
@@ -372,50 +411,24 @@ a {
 
 /* Animations */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-  }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
-.fade-in {
-  animation: fadeIn 0.3s ease;
-}
-
-.slide-in-right {
-  animation: slideInRight 0.3s ease;
-}
-
-.pulse {
-  animation: pulse 2s infinite;
-}
+.fade-in { animation: fadeIn 0.3s ease; }
+.slide-in-right { animation: slideInRight 0.3s ease; }
+.pulse { animation: pulse 2s infinite; }
 
 /* Responsive Design */
 @media (max-width: 768px) {

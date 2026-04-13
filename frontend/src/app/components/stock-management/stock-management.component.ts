@@ -27,6 +27,9 @@ export class StockManagementComponent implements OnInit {
   categories: any[] = [];
   materials: any[] = [];
 
+  // --- NEW: Cache for Ng-Select to prevent infinite redraw loops ---
+  private materialCache: { [key: string]: any[] } = {};
+
   stockColumns: string[] = ['entry_date', 'material_name', 'entry_type', 'quantity', 'supplier_name', 'invoice_no', 'actions'];
   stockDataSource = new MatTableDataSource<any>();
   @ViewChild('stockPaginator') stockPaginator!: MatPaginator;
@@ -62,7 +65,6 @@ export class StockManagementComponent implements OnInit {
     private projectService: ProjectService,
     private toastr: ToastrService
   ) {
-    // FIXED: Form now initializes with null for ng-select compatibility
     this.stockForm = this.fb.group({
       project_id: [null, Validators.required],
       site_id: [null],
@@ -172,6 +174,7 @@ export class StockManagementComponent implements OnInit {
       total_cost: [{ value: 0, disabled: true }]  
     });
 
+    // 1. If Material changes -> Auto Select Category
     itemGroup.get('material_id')?.valueChanges.subscribe(matId => {
       if (matId) {
         const selectedMat = this.materials.find(m => m.id === Number(matId));
@@ -180,7 +183,21 @@ export class StockManagementComponent implements OnInit {
         }
       }
     });
+
+    // 2. If Category changes -> Auto Clear Material if they don't match
+    itemGroup.get('category_id')?.valueChanges.subscribe(catId => {
+      if (catId) {
+        const currentMatId = itemGroup.get('material_id')?.value;
+        if (currentMatId) {
+          const mat = this.materials.find(m => m.id === Number(currentMatId));
+          if (mat && mat.category_id !== Number(catId)) {
+            itemGroup.patchValue({ material_id: null }, { emitEvent: false });
+          }
+        }
+      }
+    });
     
+    // Auto-calculate costs
     itemGroup.valueChanges.subscribe(val => {
       const qty = val.quantity || 0;
       const price = val.unit_price || 0;
@@ -208,9 +225,17 @@ export class StockManagementComponent implements OnInit {
 
   loadProjects(): void { this.projectService.getProjects().subscribe(res => this.projects = res); }
   
+  // --- FIXED: Cache ensures ng-select doesn't redraw infinitely ---
   getFilteredMaterials(categoryId: any): any[] {
-    if (!categoryId) return this.materials;
-    return this.materials.filter(m => m.category_id === Number(categoryId));
+    const key = categoryId ? String(categoryId) : 'all';
+    
+    if (!this.materialCache[key]) {
+      this.materialCache[key] = categoryId 
+        ? this.materials.filter(m => m.category_id === Number(categoryId))
+        : this.materials;
+    }
+    
+    return this.materialCache[key];
   }
 
   onProjectChange(projectId: any): void {
@@ -256,6 +281,28 @@ export class StockManagementComponent implements OnInit {
       tax_percent: [entry.tax_percent, [Validators.min(0)]],
       tax_amount: [{ value: entry.tax_amount, disabled: true }],
       total_cost: [{ value: entry.total_cost, disabled: true }]
+    });
+
+    // Apply the same smart dropdown logic to the Edit Row
+    itemGroup.get('material_id')?.valueChanges.subscribe(matId => {
+      if (matId) {
+        const selectedMat = this.materials.find(m => m.id === Number(matId));
+        if (selectedMat && selectedMat.category_id) {
+          itemGroup.patchValue({ category_id: selectedMat.category_id }, { emitEvent: false });
+        }
+      }
+    });
+
+    itemGroup.get('category_id')?.valueChanges.subscribe(catId => {
+      if (catId) {
+        const currentMatId = itemGroup.get('material_id')?.value;
+        if (currentMatId) {
+          const mat = this.materials.find(m => m.id === Number(currentMatId));
+          if (mat && mat.category_id !== Number(catId)) {
+            itemGroup.patchValue({ material_id: null }, { emitEvent: false });
+          }
+        }
+      }
     });
 
     itemGroup.valueChanges.subscribe(val => {
@@ -477,6 +524,7 @@ export class StockManagementComponent implements OnInit {
   loadMaterials(): void { 
     this.materialService.getMaterials().subscribe(res => { 
       this.materials = res; 
+      this.materialCache = {}; // Reset cache when materials reload
       this.materialDataSource.data = res; 
       this.materialDataSource.filterPredicate = (data: any, filter: string): boolean => { 
         return data.name.toLowerCase().includes(filter) || (data.description && data.description.toLowerCase().includes(filter)); 

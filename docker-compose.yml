@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database - Data stored on EBS
   postgres:
     image: postgres:15-alpine
     container_name: construction_db
@@ -11,25 +11,27 @@ services:
       POSTGRES_PASSWORD: Admin123
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - /mnt/docker-data/postgres:/var/lib/postgresql/data
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
     networks:
       - construction_network
+    restart: always
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Redis for Celery
+  # Redis - AOF enabled and stored on EBS
   redis:
     image: redis:7-alpine
     container_name: construction_redis
     command: redis-server --appendonly yes --requirepass RedisPass123
     volumes:
-      - redis_data:/data
+      - /mnt/docker-data/redis:/data
+    restart: always
     ports:
       - "6379:6379"
     networks:
@@ -40,7 +42,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend Application
+  # Backend Application - Logs and Uploads on EBS
   backend:
     build:
       context: ./backend
@@ -56,8 +58,8 @@ services:
       SECRET_KEY: your-super-secret-jwt-token-key-change-in-production
       DEBUG: "false"
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
+      - /mnt/docker-data/uploads:/app/uploads
+      - /mnt/docker-data/logs/backend:/app/logs
     ports:
       - "8000:8000"
     networks:
@@ -71,6 +73,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: always
 
   # Celery Worker
   celery-worker:
@@ -90,20 +93,14 @@ services:
       CELERY_WORKER_MAX_TASKS_PER_CHILD: 100
       CELERY_WORKER_AUTOSCALE: "10,3"
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
-      - ./backend/backups:/app/backups
+      - /mnt/docker-data/uploads:/app/uploads
+      - /mnt/docker-data/logs/celery-worker:/app/logs
+      - /mnt/docker-data/backups:/app/backups
     networks:
       - construction_network
-    # Command is in Dockerfile
-    #    healthcheck:
-    # test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping", "-d", "celery@$$HOSTNAME"]
-    # interval: 30s
-    # timeout: 10s
-    # retries: 3
-    restart: unless-stopped
+    restart: always
 
-  # Celery Beat
+  # Celery Beat - Schedule stored on EBS
   celery-beat:
     build:
       context: ./backend
@@ -118,20 +115,19 @@ services:
       CELERY_BROKER_URL: redis://:RedisPass123@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:RedisPass123@redis:6379/0
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
-      - celery_beat_data:/tmp
+      - /mnt/docker-data/uploads:/app/uploads
+      - /mnt/docker-data/logs/celery-beat:/app/logs
+      - /mnt/docker-data/celery_beat:/tmp
     networks:
       - construction_network
-    # Command is in Dockerfile
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/celerybeat-schedule"]
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
+    restart: always
 
-  # Flower - Celery Monitoring (optional)
+  # Flower - Monitoring
   flower:
     build:
       context: ./backend
@@ -150,24 +146,9 @@ services:
     networks:
       - construction_network
     command: celery -A app.tasks.celery_app flower --port=5555 --basic_auth=admin:Admin@123
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+    restart: always
 
-  # Frontend 
-#  frontend:
-#    build: ./frontend
-#    container_name: construction_frontend
-#    depends_on:
-#      - backend
-#    ports:
-#      - "80:80"
-#    networks:
-#     - construction_network */
+  # Frontend
   frontend:
     build:
       context: ./frontend
@@ -181,23 +162,14 @@ services:
     environment:
       - NODE_ENV=production
     volumes:
-      - ./logs:/var/log/nginx
+      - /mnt/docker-data/logs/nginx:/var/log/nginx
       - ./ssl:/etc/nginx/ssl:ro
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    restart: always
     networks:
       - construction_network
-
 
 networks:
   construction_network:
     driver: bridge
 
-volumes:
-  postgres_data:
-  redis_data:
-  celery_beat_data:
+# Note: Top-level volumes are removed because we are using Bind Mounts to /mnt/docker-data

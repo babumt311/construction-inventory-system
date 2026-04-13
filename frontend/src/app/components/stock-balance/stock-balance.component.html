@@ -22,67 +22,83 @@
   <div class="card shadow-sm border-0 rounded-3 mb-4">
     <div class="card-body p-4">
       <form [formGroup]="filterForm">
-        <div class="row g-4">
-          <div class="col-md-2">
-            <label class="form-label small fw-bold">Project</label>
+        
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-muted">Project</label>
             <ng-select [items]="projects" bindLabel="name" bindValue="id" placeholder="All Projects" formControlName="project_id"></ng-select>
           </div>
           
-          <div class="col-md-2">
-            <label class="form-label small fw-bold">Site</label>
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-muted">Site</label>
             <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="All Sites" formControlName="site_id"></ng-select>
           </div>
           
-          <div class="col-md-2">
-            <label class="form-label small fw-bold">Category</label>
-            <ng-select [items]="categories" bindLabel="name" bindValue="id" placeholder="All Categories" formControlName="category_id" (change)="onCategoryChange($event ? $event.id : '')"></ng-select>
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-muted">Category</label>
+            <ng-select [items]="categories" bindLabel="name" bindValue="id" placeholder="All Categories" formControlName="category_id" (change)="onCategoryChange($event ? $event.id : null)"></ng-select>
           </div>
 
-          <div class="col-md-2">
-            <label class="form-label small fw-bold">Material</label>
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-muted">Material</label>
             <ng-select [items]="filteredMaterials" bindLabel="name" bindValue="id" placeholder="All Materials" formControlName="material_id"></ng-select>
           </div>
+        </div>
 
-          <div class="col-md-4" *ngIf="viewMode === 'cards'">
-            <label class="form-label small fw-bold text-primary"><i class="far fa-calendar-check me-1"></i> Stock As Of Date</label>
-            <input type="date" class="form-control border-primary" formControlName="as_of_date" title="Leave blank for Current Stock">
-          </div>
-
-          <div class="col-md-3" *ngIf="viewMode === 'table' && filterForm.get('entry_type')?.value === 'received'">
-            <label class="form-label small fw-bold">Supplier Name Search</label>
-            <div class="input-group">
-              <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
-              <input type="text" class="form-control border-start-0 ps-0" formControlName="supplier_name" placeholder="Search supplier...">
-            </div>
-          </div>
-
-          <div class="col-md-3" *ngIf="viewMode === 'table'">
-            <label class="form-label small fw-bold">Transaction Type</label>
-            <select class="form-select border-primary" formControlName="entry_type">
-              <option value="">All Transactions</option>
-              <option value="received">Received (Delivery IN)</option>
-              <option value="used">Used (Consumed OUT)</option>
-              <option value="transfer">Site-to-Site Transfer</option>
-              <option value="returned_supplier">Returned to Supplier (OUT)</option>
-            </select>
-          </div>
-
-          <div class="col-md-2" *ngIf="viewMode === 'table'">
-            <label class="form-label small fw-bold">Start Date</label>
-            <input type="date" class="form-control" formControlName="start_date">
-          </div>
-
-          <div class="col-md-2" *ngIf="viewMode === 'table'">
-            <label class="form-label small fw-bold">End Date</label>
-            <input type="date" class="form-control" formControlName="end_date" [min]="filterForm.get('start_date')?.value">
-          </div>
+        <div class="row g-3 border-top pt-2">
           
-          <div class="col-md-2 d-flex align-items-end pb-2" *ngIf="viewMode === 'table'">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="negativeOnly" formControlName="show_negative_only">
-              <label class="form-check-label fw-bold" for="negativeOnly">Negative Only</label>
+          <ng-container *ngIf="viewMode === 'table'">
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-muted">Transaction Type</label>
+              <select class="form-select border-primary bg-white" formControlName="entry_type">
+                <option value="">All Transactions</option>
+                <option value="received">Received (Delivery IN)</option>
+                <option value="used">Used (Consumed OUT)</option>
+                <option value="transfer">Site-to-Site Transfer</option>
+                <option value="returned_supplier">Returned to Supplier (OUT)</option>
+              </select>
             </div>
-          </div>
+
+            <div class="col-md-3" *ngIf="filterForm.get('entry_type')?.value === 'received'">
+              <label class="form-label small fw-bold text-success">Supplier Search</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0 border-success" formControlName="supplier_name" placeholder="Search supplier...">
+              </div>
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label small fw-bold text-muted">Start Date</label>
+              <input type="date" class="form-control" formControlName="start_date">
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label small fw-bold text-muted">End Date</label>
+              <input type="date" class="form-control" formControlName="end_date" [min]="filterForm.get('start_date')?.value">
+            </div>
+            
+            <div class="col-md-2 d-flex align-items-end pb-2">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="negativeOnly" formControlName="show_negative_only">
+                <label class="form-check-label fw-bold text-danger" for="negativeOnly">Negative Only</label>
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="viewMode === 'cards'">
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-primary"><i class="far fa-calendar-check me-1"></i> Stock As Of Date</label>
+              <input type="date" class="form-control border-primary" formControlName="as_of_date" title="Leave blank for Current Stock">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">Supplier Search</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0" formControlName="supplier_name" placeholder="Search supplier...">
+              </div>
+            </div>
+          </ng-container>
+
         </div>
       </form>
     </div>

@@ -52,8 +52,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   selectedProjectId?: number;
   viewMode: 'table' | 'cards' = 'table';
 
-  private prevBackendState = { start: '', end: '', supplier: '', entryType: '', project: '', asOfDate: '' };
-  private prevProjectId: any = '';
+  private prevBackendState = { start: null, end: null, supplier: null, entryType: null, project: null, asOfDate: null };
+  private prevProjectId: any = null;
 
   showExportModal = false;
   exportColumns: { key: string, label: string, selected: boolean }[] = [];
@@ -94,16 +94,17 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       }
     };
 
+    // FIXED: Initialized with null instead of '' for ng-select compatibility
     this.filterForm = this.fb.group({
-      project_id: [''],
-      site_id: [''],
-      category_id: [''], 
-      material_id: [''],
-      start_date: [''],
-      end_date: [''],
-      as_of_date: [''], // NEW: Snapshot date for Card View
-      supplier_name: [''],
-      entry_type: [''],    
+      project_id: [null],
+      site_id: [null],
+      category_id: [null], 
+      material_id: [null],
+      start_date: [null],
+      end_date: [null],
+      as_of_date: [null],
+      supplier_name: [null],
+      entry_type: [''], // Native select, empty string is fine here   
       show_negative_only: [false]
     });
   }
@@ -137,7 +138,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
         
         if (vals.project_id !== this.prevProjectId) {
           this.prevProjectId = vals.project_id;
-          this.filterForm.patchValue({ site_id: '' }, { emitEvent: false });
+          this.filterForm.patchValue({ site_id: null }, { emitEvent: false });
           this.loadSitesAndFetchData(vals.project_id);
         } else {
           this.fetchDataFromBackend();
@@ -219,7 +220,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   loadProjectsAndInitialData(): void { 
     this.projectService.getProjects().subscribe(p => {
       this.projects = p;
-      this.loadSitesAndFetchData(''); 
+      this.loadSitesAndFetchData(null); 
     }); 
   }
 
@@ -260,10 +261,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
     const apiParams: any = {};
 
-    // --- TIME TRAVEL ENGINE ---
     if (this.viewMode === 'cards') {
       if (filters.as_of_date) {
-        apiParams.end_date = filters.as_of_date; // Fetch everything from dawn of time up to this date
+        apiParams.end_date = filters.as_of_date; 
       }
     } else {
       if (filters.start_date) apiParams.start_date = filters.start_date;
@@ -271,7 +271,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       if (filters.supplier_name) apiParams.supplier_name = filters.supplier_name;
       if (filters.entry_type) apiParams.entry_type = filters.entry_type;
     }
-    // --------------------------
 
     this.sites.forEach(site => {
       this.stockService.getSiteStockSummary(site.id, apiParams).subscribe({
@@ -287,7 +286,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   }
 
   onCategoryChange(categoryId: any): void {
-    this.filterForm.patchValue({ material_id: '' }, { emitEvent: false }); 
+    this.filterForm.patchValue({ material_id: null }, { emitEvent: false }); 
     if (categoryId) { this.filteredMaterials = this.materials.filter(m => m.category_id === Number(categoryId)); } 
     else { this.filteredMaterials = this.materials; }
     this.updateTable(); 
@@ -624,9 +623,9 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.viewMode = this.viewMode === 'table' ? 'cards' : 'table'; 
     
     if (this.viewMode === 'cards') {
-      this.filterForm.patchValue({ start_date: '', end_date: '', entry_type: '', supplier_name: '' });
+      this.filterForm.patchValue({ start_date: null, end_date: null, entry_type: '', supplier_name: null });
     } else {
-      this.filterForm.patchValue({ as_of_date: '' });
+      this.filterForm.patchValue({ as_of_date: null });
     }
 
     this.updateTable(); 

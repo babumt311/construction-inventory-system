@@ -18,18 +18,15 @@ export class StockManagementComponent implements OnInit {
   
   activeTab: 'stock' | 'category' | 'material' = 'stock';
   
-  // Forms
   stockForm: FormGroup;
   categoryForm: FormGroup;
   materialForm: FormGroup;
 
-  // Data arrays
   projects: any[] = [];
   sites: any[] = [];
   categories: any[] = [];
   materials: any[] = [];
 
-  // Stock Table variables
   stockColumns: string[] = ['entry_date', 'material_name', 'entry_type', 'quantity', 'supplier_name', 'invoice_no', 'actions'];
   stockDataSource = new MatTableDataSource<any>();
   @ViewChild('stockPaginator') stockPaginator!: MatPaginator;
@@ -38,11 +35,9 @@ export class StockManagementComponent implements OnInit {
   loadingStockEntries = false;
   submittingStock = false;
   
-  // --- NEW: Edit Tracking Variables ---
   isEditingStock = false;
   editingStockId: number | null = null;
 
-  // Category Table variables
   categoryColumns: string[] = ['name', 'description', 'actions'];
   categoryDataSource = new MatTableDataSource<any>();
   @ViewChild('categoryPaginator') categoryPaginator!: MatPaginator;
@@ -51,7 +46,6 @@ export class StockManagementComponent implements OnInit {
   editingCategoryId: number | null = null;
   submittingCategory = false;
 
-  // Material Table variables
   materialColumns: string[] = ['name', 'category', 'unit', 'actions'];
   materialDataSource = new MatTableDataSource<any>();
   @ViewChild('materialPaginator') materialPaginator!: MatPaginator;
@@ -68,16 +62,17 @@ export class StockManagementComponent implements OnInit {
     private projectService: ProjectService,
     private toastr: ToastrService
   ) {
+    // FIXED: Form now initializes with null for ng-select compatibility
     this.stockForm = this.fb.group({
-      project_id: ['', Validators.required],
-      site_id: [''],
-      from_site_id: [''],
-      to_site_id: [''],
-      supplier_name: ['', Validators.required], 
-      invoice_no: ['', Validators.required],    
-      invoice_date: ['', Validators.required],  
+      project_id: [null, Validators.required],
+      site_id: [null],
+      from_site_id: [null],
+      to_site_id: [null],
+      supplier_name: [null, Validators.required], 
+      invoice_no: [null, Validators.required],    
+      invoice_date: [null, Validators.required],  
       entry_type: ['received', Validators.required],
-      remarks: [''],
+      remarks: [null],
       items: this.fb.array([]) 
     });
 
@@ -120,9 +115,9 @@ export class StockManagementComponent implements OnInit {
         invoiceNoCtrl?.clearValidators();
         invoiceDateCtrl?.clearValidators();
         if(!this.isEditingStock) {
-          supplierCtrl?.setValue('');
-          invoiceNoCtrl?.setValue('');
-          invoiceDateCtrl?.setValue('');
+          supplierCtrl?.setValue(null);
+          invoiceNoCtrl?.setValue(null);
+          invoiceDateCtrl?.setValue(null);
         }
       }
 
@@ -134,8 +129,8 @@ export class StockManagementComponent implements OnInit {
       invoiceDateCtrl?.updateValueAndValidity();
     });
 
-    this.categoryForm = this.fb.group({ name: ['', Validators.required], description: [''] });
-    this.materialForm = this.fb.group({ name: ['', Validators.required], category_id: ['', Validators.required], unit: ['Bags'], description: [''] });
+    this.categoryForm = this.fb.group({ name: [null, Validators.required], description: [null] });
+    this.materialForm = this.fb.group({ name: [null, Validators.required], category_id: [null, Validators.required], unit: ['Bags'], description: [null] });
   }
 
   ngOnInit(): void {
@@ -168,8 +163,8 @@ export class StockManagementComponent implements OnInit {
 
   addItem(): void {
     const itemGroup = this.fb.group({
-      category_id: [''],
-      material_id: ['', Validators.required],
+      category_id: [null],
+      material_id: [null, Validators.required],
       quantity: [1, [Validators.required, Validators.min(0.01)]],
       unit_price: [0, [Validators.min(0)]],
       tax_percent: [0, [Validators.min(0)]],
@@ -219,9 +214,9 @@ export class StockManagementComponent implements OnInit {
   }
 
   onProjectChange(projectId: any): void {
-    if (this.isEditingStock) return; // Prevent clearing during edit
+    if (this.isEditingStock) return; 
     this.sites = []; 
-    this.stockForm.patchValue({ site_id: '', from_site_id: '', to_site_id: '' }); 
+    this.stockForm.patchValue({ site_id: null, from_site_id: null, to_site_id: null }); 
     this.selectedSiteId = null; 
     this.stockDataSource.data = [];
     if (projectId) this.projectService.getProjectSites(Number(projectId)).subscribe(res => this.sites = res);
@@ -237,12 +232,10 @@ export class StockManagementComponent implements OnInit {
     } 
   }
 
-  // --- NEW: Load Transaction into Form for Editing ---
   editStockEntry(entry: any): void {
     this.isEditingStock = true;
     this.editingStockId = entry.id;
 
-    // Format date for input field
     const formattedDate = entry.invoice_date ? new Date(entry.invoice_date).toISOString().split('T')[0] : '';
 
     this.stockForm.patchValue({
@@ -253,11 +246,10 @@ export class StockManagementComponent implements OnInit {
       remarks: entry.remarks || ''
     });
 
-    // Clear and rebuild items array with the entry data
     this.items.clear();
     
     const itemGroup = this.fb.group({
-      category_id: [''],
+      category_id: [null],
       material_id: [entry.material_id, Validators.required],
       quantity: [entry.quantity, [Validators.required, Validators.min(0.01)]],
       unit_price: [entry.unit_cost, [Validators.min(0)]],
@@ -266,7 +258,6 @@ export class StockManagementComponent implements OnInit {
       total_cost: [{ value: entry.total_cost, disabled: true }]
     });
 
-    // Setup value changes listener to recalculate costs
     itemGroup.valueChanges.subscribe(val => {
       const qty = val.quantity || 0;
       const price = val.unit_price || 0;
@@ -280,20 +271,16 @@ export class StockManagementComponent implements OnInit {
       }, { emitEvent: false });
     });
 
-    // Force Category Auto-select
     const selectedMat = this.materials.find(m => m.id === Number(entry.material_id));
     if (selectedMat && selectedMat.category_id) {
       itemGroup.patchValue({ category_id: selectedMat.category_id }, { emitEvent: false });
     }
 
     this.items.push(itemGroup);
-
-    // Scroll smoothly to top form
     window.scrollTo({ top: 0, behavior: 'smooth' });
     this.toastr.info('Transaction loaded for editing.');
   }
 
-  // --- NEW: Cancel Editing ---
   cancelEditStock(): void {
     this.isEditingStock = false;
     this.editingStockId = null;
@@ -315,9 +302,8 @@ export class StockManagementComponent implements OnInit {
     this.submittingStock = true;
     const formValue = this.stockForm.getRawValue(); 
 
-    // --- NEW: Update Existing Entry Route ---
     if (this.isEditingStock && this.editingStockId) {
-      const item = formValue.items[0]; // Edit is always 1 item
+      const item = formValue.items[0]; 
       const updatePayload = {
         site_id: formValue.site_id,
         supplier_name: formValue.supplier_name || null,
@@ -335,7 +321,7 @@ export class StockManagementComponent implements OnInit {
       this.stockService.updateStockEntry(this.editingStockId, updatePayload).subscribe({
         next: () => {
           this.toastr.success('Transaction updated successfully!');
-          this.cancelEditStock(); // Resets form
+          this.cancelEditStock(); 
           this.loadStockEntries();
           this.submittingStock = false;
         },
@@ -344,10 +330,9 @@ export class StockManagementComponent implements OnInit {
           this.submittingStock = false;
         }
       });
-      return; // Exit here if updating
+      return; 
     }
 
-    // --- EXISTING: Create New Entries Route ---
     const apiRequests: any[] = [];
 
     formValue.items.forEach((item: any) => {
@@ -444,7 +429,6 @@ export class StockManagementComponent implements OnInit {
     }
   }
 
-  // --- CATEGORY AND MATERIAL CODE BELOW REMAINS UNCHANGED ---
   loadCategories(): void { 
     this.materialService.getCategories().subscribe(res => { 
       this.categories = res; 

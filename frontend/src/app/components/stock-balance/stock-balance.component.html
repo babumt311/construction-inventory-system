@@ -173,7 +173,7 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 cursor-move ps-4">Category</th>
             <td mat-cell *matCellDef="let balance" class="py-3 ps-4">
               <span class="badge bg-secondary rounded-pill px-3 py-2 text-white shadow-sm">
-                {{ getCategoryName(balance.material_id) }}
+                {{ balance.category }}
               </span>
             </td>
           </ng-container>

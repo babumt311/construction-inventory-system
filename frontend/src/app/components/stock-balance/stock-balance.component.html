@@ -25,34 +25,22 @@
         <div class="row g-4">
           <div class="col-md-2">
             <label class="form-label small fw-bold">Project</label>
-            <select class="form-select" formControlName="project_id">
-              <option value="">All Projects</option>
-              <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
-            </select>
+            <ng-select [items]="projects" bindLabel="name" bindValue="id" placeholder="All Projects" formControlName="project_id"></ng-select>
           </div>
           
           <div class="col-md-2">
             <label class="form-label small fw-bold">Site</label>
-            <select class="form-select" formControlName="site_id">
-              <option value="">All Sites</option>
-              <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
-            </select>
+            <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="All Sites" formControlName="site_id"></ng-select>
           </div>
           
           <div class="col-md-2">
             <label class="form-label small fw-bold">Category</label>
-            <select class="form-select" formControlName="category_id" (change)="onCategoryChange($any($event.target).value)">
-              <option value="">All Categories</option>
-              <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
-            </select>
+            <ng-select [items]="categories" bindLabel="name" bindValue="id" placeholder="All Categories" formControlName="category_id" (change)="onCategoryChange($event ? $event.id : '')"></ng-select>
           </div>
 
           <div class="col-md-2">
             <label class="form-label small fw-bold">Material</label>
-            <select class="form-select" formControlName="material_id">
-              <option value="">All Materials</option>
-              <option *ngFor="let m of filteredMaterials" [value]="m.id">{{ m.name }}</option>
-            </select>
+            <ng-select [items]="filteredMaterials" bindLabel="name" bindValue="id" placeholder="All Materials" formControlName="material_id"></ng-select>
           </div>
 
           <div class="col-md-4" *ngIf="viewMode === 'cards'">

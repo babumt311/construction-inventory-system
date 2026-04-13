@@ -40,10 +40,7 @@
             
             <div class="col-md-3">
               <label class="form-label fw-bold small text-muted">Project *</label>
-              <select class="form-select" formControlName="project_id" (change)="onProjectChange($any($event.target).value)" [class.is-invalid]="stockForm.get('project_id')?.invalid && stockForm.get('project_id')?.touched">
-                <option value="">Select Project</option>
-                <option *ngFor="let p of projects" [value]="p.id">{{ p.name }}</option>
-              </select>
+              <ng-select [items]="projects" bindLabel="name" bindValue="id" placeholder="Select Project" formControlName="project_id" (change)="onProjectChange($event ? $event.id : '')" [ngClass]="{'is-invalid': stockForm.get('project_id')?.invalid && stockForm.get('project_id')?.touched}"></ng-select>
             </div>
 
             <div class="col-md-3">
@@ -58,26 +55,17 @@
 
             <div class="col-md-3" *ngIf="stockForm.get('entry_type')?.value !== 'transfer'">
               <label class="form-label fw-bold small text-muted">Site *</label>
-              <select class="form-select" formControlName="site_id" (change)="onSiteChange($any($event.target).value)" [class.is-invalid]="stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched">
-                <option value="">Select Site</option>
-                <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
-              </select>
+              <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Site" formControlName="site_id" (change)="onSiteChange($event ? $event.id : '')" [ngClass]="{'is-invalid': stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched}"></ng-select>
             </div>
 
             <ng-container *ngIf="stockForm.get('entry_type')?.value === 'transfer'">
               <div class="col-md-3">
                 <label class="form-label fw-bold small text-muted text-danger">From Site *</label>
-                <select class="form-select border-danger" formControlName="from_site_id" [class.is-invalid]="stockForm.get('from_site_id')?.invalid && stockForm.get('from_site_id')?.touched">
-                  <option value="">Select Origin</option>
-                  <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
-                </select>
+                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Origin" formControlName="from_site_id" class="border-danger"></ng-select>
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold small text-muted text-success">To Site *</label>
-                <select class="form-select border-success" formControlName="to_site_id" (change)="onSiteChange($any($event.target).value)" [class.is-invalid]="stockForm.get('to_site_id')?.invalid && stockForm.get('to_site_id')?.touched">
-                  <option value="">Select Destination</option>
-                  <option *ngFor="let s of sites" [value]="s.id">{{ s.name }}</option>
-                </select>
+                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Destination" formControlName="to_site_id" (change)="onSiteChange($event ? $event.id : '')" class="border-success"></ng-select>
               </div>
             </ng-container>
 

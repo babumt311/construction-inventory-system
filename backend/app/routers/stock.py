@@ -2,6 +2,7 @@
 Stock management router
 """
 
+import time
 from app.auth import check_project_access
 from typing import Any, List, Optional
 from datetime import datetime, date
@@ -21,6 +22,9 @@ from app.utils.logger import log_activity
 
 router = APIRouter(prefix="/stock", tags=["stock"])
 logger = logging.getLogger(__name__)
+
+# Cache dictionary to prevent log spamming when fetching multiple sites
+REPORT_LOG_CACHE = {}
 
 @router.post("/entries", response_model=schemas.StockEntryInDB)
 async def create_stock_entry(
@@ -90,12 +94,12 @@ async def create_stock_entry(
     db.commit()
     db.refresh(stock_entry)
     
-    # SYSTEM LOGGING
+    # SYSTEM LOGGING (Capitalized entry type for better readability)
     log_activity(
         db, 
         current_user.username, 
         "Stock Entry", 
-        f"Recorded {stock_entry.entry_type} of {stock_entry.quantity} units for Material '{material.name}' at Site '{site.name}'."
+        f"Recorded '{stock_entry.entry_type.upper()}' of {stock_entry.quantity} units for Material '{material.name}' at Site '{site.name}'."
     )
     
     return stock_entry
@@ -198,16 +202,16 @@ async def update_stock_entry(
     db.commit()
     db.refresh(entry)
 
-    # UPDATED: Fetch names for a highly descriptive audit log
     material = crud.crud_material.get(db, id=entry.material_id)
     mat_name = material.name if material else f"ID {entry.material_id}"
     site_name = site.name if site else "Unknown Site"
     
+    # SYSTEM LOGGING
     log_activity(
         db, 
         current_user.username, 
         "Stock Update", 
-        f"Updated {entry.entry_type} entry to {entry.quantity} units for Material '{mat_name}' at Site '{site_name}'."
+        f"Updated '{entry.entry_type.upper()}' entry to {entry.quantity} units for Material '{mat_name}' at Site '{site_name}'."
     )
     
     return entry
@@ -222,7 +226,6 @@ async def delete_stock_entry(
     if current_user.role not in [schemas.UserRole.ADMIN, schemas.UserRole.OWNER]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires admin or owner role")
     
-    # Grab details BEFORE deleting for the log
     entry = crud.crud_stock_entry.get(db, id=entry_id)
     if not entry:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stock entry not found")
@@ -234,15 +237,14 @@ async def delete_stock_entry(
     qty = entry.quantity
     e_type = entry.entry_type
 
-    # Proceed with deletion
     crud.crud_stock_entry.delete(db, id=entry_id)
     
-    # UPDATED: Detailed Deletion Log
+    # SYSTEM LOGGING
     log_activity(
         db, 
         current_user.username, 
         "Stock Deletion", 
-        f"Deleted {e_type} entry of {qty} units for Material '{mat_name}' at Site '{site_name}'."
+        f"Deleted '{e_type.upper()}' entry of {qty} units for Material '{mat_name}' at Site '{site_name}'."
     )
     
     return {"message": "Stock entry deleted successfully"}
@@ -288,13 +290,18 @@ async def get_site_stock_summary(
     calculator = StockCalculator()
     summary = calculator.get_site_stock_summary(db, site_id, start_date, end_date, supplier_name, entry_type)
     
-    # NEW: Log when a user pulls/views a Stock Report
-    log_activity(
-        db, 
-        current_user.username, 
-        "Report Generated", 
-        f"Pulled Stock Ledger/Report for Site '{site.name}'."
-    )
+    # NEW: DEBOUNCED LOGGING (Logs only once every 30 seconds per user, prevents spam!)
+    current_time = time.time()
+    cache_key = f"{current_user.id}_report_pull"
+    
+    if current_time - REPORT_LOG_CACHE.get(cache_key, 0) > 30:
+        log_activity(
+            db, 
+            current_user.username, 
+            "Report Generated", 
+            "Pulled comprehensive Stock Ledger & Balances report."
+        )
+        REPORT_LOG_CACHE[cache_key] = current_time
     
     return summary
 

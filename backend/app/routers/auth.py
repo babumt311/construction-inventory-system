@@ -14,6 +14,7 @@ from app.auth import authenticate_user, create_access_token, get_current_user
 from app.database import get_db
 from app.config import settings
 from app.dependencies import log_audit_action
+from app.utils.logger import log_activity
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = logging.getLogger(__name__)
@@ -24,9 +25,6 @@ async def login(
     db: Session = Depends(get_db),
     audit_log: dict = Depends(lambda: {"action": "LOGIN"})
 ) -> Any:
-    """
-    OAuth2 compatible token login, get an access token for future requests
-    """
     logger.info(f"Login attempt for username: {form_data.username}")
     
     user = authenticate_user(db, form_data.username, form_data.password)
@@ -57,7 +55,8 @@ async def login(
     
     logger.info(f"Successful login for user: {user.username}")
     
-    # Audit log is handled by dependency
+    # SYSTEM LOGGING
+    log_activity(db, user.username, "Login", "User successfully logged into the system.")
     
     return {
         "access_token": access_token,
@@ -70,9 +69,6 @@ async def refresh_token(
     current_user: models.User = Depends(get_current_user),
     audit_log: dict = Depends(lambda: {"action": "REFRESH_TOKEN"})
 ) -> Any:
-    """
-    Refresh access token
-    """
     logger.info(f"Token refresh requested for user: {current_user.username}")
     
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -80,8 +76,6 @@ async def refresh_token(
         data={"sub": current_user.username, "user_id": current_user.id, "role": current_user.role.value},
         expires_delta=access_token_expires
     )
-    
-    logger.debug(f"Token refreshed for user: {current_user.username}")
     
     return {
         "access_token": access_token,
@@ -93,21 +87,17 @@ async def refresh_token(
 async def read_users_me(
     current_user: models.User = Depends(get_current_user)
 ) -> Any:
-    """
-    Get current user information
-    """
-    logger.debug(f"User info requested for: {current_user.username}")
     return current_user
 
 @router.post("/logout")
 async def logout(
     current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
     audit_log: dict = Depends(lambda: {"action": "LOGOUT"})
 ) -> Any:
-    """
-    Logout user (client should discard token)
-    """
     logger.info(f"User logout: {current_user.username}")
+    # SYSTEM LOGGING
+    log_activity(db, current_user.username, "Logout", "User logged out of the system.")
     return {"message": "Successfully logged out"}
 
 @router.post("/change-password")
@@ -118,38 +108,34 @@ async def change_password(
     db: Session = Depends(get_db),
     audit_log: dict = Depends(lambda: {"action": "CHANGE_PASSWORD"})
 ) -> Any:
-    """
-    Change user password
-    """
-    logger.info(f"Password change requested for user: {current_user.username}")
+    from app.auth import verify_password, get_password_hash
     
-    # Verify old password
-    from app.auth import verify_password
     if not verify_password(old_password, current_user.hashed_password):
-        logger.warning(f"Wrong old password for user: {current_user.username}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect old password"
         )
     
-    # Update password
-    from app.auth import get_password_hash
     current_user.hashed_password = get_password_hash(new_password)
     db.add(current_user)
     db.commit()
     
-    logger.info(f"Password changed successfully for user: {current_user.username}")
+    # SYSTEM LOGGING
+    log_activity(db, current_user.username, "Password Change", "User changed their account password.")
     
     return {"message": "Password changed successfully"}
 
-# CLI endpoint for testing
-@router.get("/cli-test")
-async def cli_test_auth():
-    """CLI test endpoint for authentication"""
-    print("🔐 CLI Authentication Test")
-    print("✅ Auth router is working correctly")
-    return {
-        "status": "ok",
-        "message": "Auth router is functional",
-        "endpoints": ["/login", "/refresh", "/me", "/logout", "/change-password"]
-    }
+# NEW: ACTIVITY LOGS ENDPOINT FOR DASHBOARD
+@router.get("/activity-logs")
+def get_recent_activities(db: Session = Depends(get_db), limit: int = 20):
+    """Fetch the most recent system activities for the dashboard."""
+    logs = db.query(models.ActivityLog).order_by(models.ActivityLog.created_at.desc()).limit(limit).all()
+    return [
+        {
+            "id": log.id,
+            "user_name": log.user_name,
+            "action": log.action,
+            "details": log.details,
+            "created_at": log.created_at
+        } for log in logs
+    ]

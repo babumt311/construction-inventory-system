@@ -236,5 +236,14 @@ class ReportCache(Base):
     generated_at = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True))
 
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_name = Column(String, index=True)       # Who did it (e.g., "System Administrator")
+    action = Column(String, index=True)          # What they did (e.g., "Login", "Stock Entry")
+    details = Column(String, nullable=True)      # Specifics (e.g., "Received 300 Bags of Cement")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
 def log_model_creation():
     logger.info("Database models initialized successfully (Enterprise Immutable Ledger)")

@@ -89,7 +89,7 @@
       <div class="stat-header">
         <div class="stat-info">
           <h6>Recent Activity</h6>
-          <h2>{{ recentProjects.length }}</h2>
+          <h2>{{ recentActivities.length }}</h2>
         </div>
         <div class="stat-icon activity"><i class="fas fa-history"></i></div>
       </div>
@@ -160,48 +160,48 @@
 
   </div>
 
-  <div class="recent-table-card" id="recentActivitySection">
-    <div class="card-header">
-      <h5><i class="fas fa-project-diagram"></i> Recent Projects</h5>
+  <div class="card shadow-sm border-0 mb-4 fade-in" id="recentActivitySection" style="margin-top: 2rem;">
+    <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+      <h5 class="fw-bold mb-0 text-dark"><i class="fas fa-history text-primary me-2"></i>System Activity Log</h5>
+      <button class="btn btn-sm btn-outline-secondary fw-bold" (click)="loadActivities()">
+        <i class="fas fa-sync-alt me-1"></i> Refresh
+      </button>
     </div>
-    <div class="card-body">
-      <div class="table-responsive" *ngIf="recentProjects.length > 0">
-        <table class="table">
-          <thead>
+    <div class="card-body p-0 border-top">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-nowrap">
+          <thead class="bg-light">
             <tr>
-              <th>Project Code</th>
-              <th>Project Name</th>
-              <th>Status</th>
-              <th>Sites</th>
-              <th>Start Date</th>
-              <th>Actions</th>
+              <th class="py-3 px-4 text-muted small fw-bold border-bottom-0">DATE & TIME</th>
+              <th class="py-3 text-muted small fw-bold border-bottom-0">USER</th>
+              <th class="py-3 text-muted small fw-bold border-bottom-0">ACTION</th>
+              <th class="py-3 px-4 text-muted small fw-bold border-bottom-0">DETAILS</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let project of recentProjects">
-              <td><span class="project-code">{{ project.code }}</span></td>
-              <td>{{ project.name }}</td>
-              <td>
-                <span class="badge" [ngClass]="{
-                  'bg-success': project.status === 'COMPLETED' || project.status === 'active',
-                  'bg-primary': project.status === 'IN_PROGRESS',
-                  'bg-warning': project.status === 'ON_HOLD' || project.status === 'on-hold',
-                  'bg-secondary': project.status === 'PLANNING' || project.status === 'completed'
-                }">{{ project.status | titlecase }}</span>
+            <tr *ngFor="let log of recentActivities" class="border-bottom">
+              <td class="py-3 px-4 text-muted">
+                <i class="far fa-clock me-2"></i>{{ log.created_at | date:'MMM d, y, h:mm a' }}
               </td>
-              <td><span class="badge bg-info">{{ project.sites?.length || 0 }}</span></td>
-              <td>{{ project.start_date | date:'mediumDate' }}</td>
-              <td>
-                <button class="btn btn-outline-primary btn-sm" routerLink="/projects"><i class="fas fa-eye"></i> View</button>
+              <td class="py-3 fw-bold text-dark">
+                <i class="fas fa-user-circle text-muted me-2 fs-5 align-middle"></i>{{ log.user_name }}
+              </td>
+              <td class="py-3">
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2">
+                  {{ log.action }}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-muted">{{ log.details }}</td>
+            </tr>
+            
+            <tr *ngIf="recentActivities.length === 0">
+              <td colspan="4" class="text-center py-5">
+                <div class="text-muted mb-2"><i class="fas fa-clipboard-list fa-2x opacity-50"></i></div>
+                <span class="fw-bold text-muted">No recent activity found.</span>
               </td>
             </tr>
           </tbody>
         </table>
-      </div>
-
-      <div class="empty-state" *ngIf="recentProjects.length === 0">
-        <i class="fas fa-folder-open"></i>
-        <p>No projects found</p>
       </div>
     </div>
   </div>

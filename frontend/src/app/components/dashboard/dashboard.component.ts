@@ -23,14 +23,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   projectStats: any = null;
   stockStats: any = null;
 
-  recentProjects: Project[] = [];
+  // NEW: Store Recent Activities instead of Projects
+  recentActivities: any[] = [];
   
   lowStockItems: any[] = [];
   actionableTasks: any[] = [];
 
   loading = false;
-
-  // Enterprise strict typing for the latest report date
   latestReportDate: string | Date | null = null;
 
   private subscriptions: Subscription[] = [];
@@ -55,14 +54,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
 
-  // ===============================
-  // DASHBOARD DATA LOADER
-  // ===============================
   loadDashboardData(): void {
     this.loading = true;
     this.pendingCalls = 0;
 
-    // Admin user stats
     if (this.isAdmin()) {
       this.trackCall();
       const sub = this.userService.getUserStats().subscribe({
@@ -72,36 +67,23 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.subscriptions.push(sub);
     }
 
-    // Recent projects for the table
-    this.trackCall();
-    const projectsSub = this.projectService.getProjects({ limit: 5, sort_by: 'created_at', sort_order: 'desc' }).subscribe({
-      next: projects => {
-        this.recentProjects = projects;
-        this.calculateProjectStats(projects);
-      },
-      complete: () => this.finishCall()
-    });
-    this.subscriptions.push(projectsSub);
+    // NEW: Fetch System Activity Log
+    this.loadActivities();
 
-    // Global fetch for widgets (All Projects)
     this.trackCall();
     this.projectService.getProjects().subscribe({
       next: (allProjects) => {
+        this.calculateProjectStats(allProjects);
         this.loadActionableTasks(allProjects);
         this.loadLowStockItems(allProjects);
       },
       complete: () => this.finishCall()
     });
 
-    // ==========================================
-    // NEW: FETCH LATEST REPORT / ACTIVITY DATE
-    // ==========================================
     this.trackCall();
-    // We use the generic ApiService to grab the most recent global stock entry
     const reportsSub = this.api.get<any[]>('stock/entries/', { limit: 1 }).subscribe({
       next: (entries) => {
         if (entries && entries.length > 0) {
-          // Extracts the most recent transaction date
           this.latestReportDate = entries[0].entry_date || entries[0].created_at; 
         } else {
           this.latestReportDate = null;
@@ -109,21 +91,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Failed to load latest activity date', err);
-        this.latestReportDate = null; // Failsafe triggers the HTML "No reports" message
+        this.latestReportDate = null; 
       },
       complete: () => this.finishCall()
     });
     this.subscriptions.push(reportsSub);
-    // ==========================================
 
     this.loadStockSummary();
   }
   
-  // ===============================
-  // WIDGET DATA FETCHERS
-  // ===============================
-  
-  // Fetch Overdue and Review Tasks
+  // NEW: Fetch Activity Log from backend
+  loadActivities(): void {
+    this.trackCall();
+    const sub = this.api.get<any[]>('auth/activity-logs').subscribe({
+      next: (data) => this.recentActivities = data,
+      error: (err) => console.error('Failed to load activities', err),
+      complete: () => this.finishCall()
+    });
+    this.subscriptions.push(sub);
+  }
+
   loadActionableTasks(projects: Project[]): void {
     this.actionableTasks = [];
     projects.forEach(p => {
@@ -138,7 +125,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  // Fetch Low Stock across all sites
   loadLowStockItems(projects: Project[]): void {
     this.lowStockItems = [];
     projects.forEach(p => {
@@ -194,9 +180,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ===============================
-  // HELPERS & LOADER CONTROL
-  // ===============================
   isOverdue(task: any): boolean {
     if (!task.dueDate) return false;
     return new Date(task.dueDate) < new Date() && task.status !== 'completed';

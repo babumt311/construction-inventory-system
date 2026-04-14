@@ -3,6 +3,7 @@ Stock management router
 """
 
 import time
+import threading
 from app.auth import check_project_access
 from typing import Any, List, Optional
 from datetime import datetime, date
@@ -23,8 +24,9 @@ from app.utils.logger import log_activity
 router = APIRouter(prefix="/stock", tags=["stock"])
 logger = logging.getLogger(__name__)
 
-# Cache dictionary to prevent log spamming when fetching multiple sites
+# Cache dictionary and Thread Lock to prevent async race conditions
 REPORT_LOG_CACHE = {}
+REPORT_LOG_LOCK = threading.Lock()
 
 @router.post("/entries", response_model=schemas.StockEntryInDB)
 async def create_stock_entry(
@@ -94,7 +96,7 @@ async def create_stock_entry(
     db.commit()
     db.refresh(stock_entry)
     
-    # SYSTEM LOGGING (Capitalized entry type for better readability)
+    # SYSTEM LOGGING
     log_activity(
         db, 
         current_user.username, 
@@ -290,18 +292,21 @@ async def get_site_stock_summary(
     calculator = StockCalculator()
     summary = calculator.get_site_stock_summary(db, site_id, start_date, end_date, supplier_name, entry_type)
     
-    # NEW: DEBOUNCED LOGGING (Logs only once every 30 seconds per user, prevents spam!)
-    current_time = time.time()
-    cache_key = f"{current_user.id}_report_pull"
-    
-    if current_time - REPORT_LOG_CACHE.get(cache_key, 0) > 30:
-        log_activity(
-            db, 
-            current_user.username, 
-            "Report Generated", 
-            "Pulled comprehensive Stock Ledger & Balances report."
-        )
-        REPORT_LOG_CACHE[cache_key] = current_time
+    # NEW: THREAD-LOCKED DEBOUNCER 
+    # This forces the simultaneous requests to stand in line.
+    with REPORT_LOG_LOCK:
+        current_time = time.time()
+        cache_key = f"{current_user.id}_report_pull"
+        
+        # Only log if it has been more than 30 seconds since this user last pulled a report
+        if current_time - REPORT_LOG_CACHE.get(cache_key, 0) > 30:
+            REPORT_LOG_CACHE[cache_key] = current_time
+            log_activity(
+                db, 
+                current_user.username, 
+                "Report Viewed", 
+                "Viewed Stock Ledger & Balances report."
+            )
     
     return summary
 

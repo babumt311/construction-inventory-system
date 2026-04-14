@@ -17,7 +17,7 @@ from app.dependencies import (
     log_audit_action
 )
 from app.utils.stock_calculator import StockCalculator
-from app.utils.logger import log_activity # IMPORTED LOGGER
+from app.utils.logger import log_activity
 
 router = APIRouter(prefix="/stock", tags=["stock"])
 logger = logging.getLogger(__name__)
@@ -197,9 +197,18 @@ async def update_stock_entry(
     db.add(entry)
     db.commit()
     db.refresh(entry)
+
+    # UPDATED: Fetch names for a highly descriptive audit log
+    material = crud.crud_material.get(db, id=entry.material_id)
+    mat_name = material.name if material else f"ID {entry.material_id}"
+    site_name = site.name if site else "Unknown Site"
     
-    # SYSTEM LOGGING
-    log_activity(db, current_user.username, "Stock Update", f"Updated stock entry ID {entry_id}.")
+    log_activity(
+        db, 
+        current_user.username, 
+        "Stock Update", 
+        f"Updated {entry.entry_type} entry to {entry.quantity} units for Material '{mat_name}' at Site '{site_name}'."
+    )
     
     return entry
 
@@ -213,12 +222,28 @@ async def delete_stock_entry(
     if current_user.role not in [schemas.UserRole.ADMIN, schemas.UserRole.OWNER]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires admin or owner role")
     
-    entry = crud.crud_stock_entry.delete(db, id=entry_id)
+    # Grab details BEFORE deleting for the log
+    entry = crud.crud_stock_entry.get(db, id=entry_id)
     if not entry:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stock entry not found")
+        
+    site = crud.crud_site.get(db, id=entry.site_id)
+    material = crud.crud_material.get(db, id=entry.material_id)
+    site_name = site.name if site else "Unknown Site"
+    mat_name = material.name if material else "Unknown Material"
+    qty = entry.quantity
+    e_type = entry.entry_type
+
+    # Proceed with deletion
+    crud.crud_stock_entry.delete(db, id=entry_id)
     
-    # SYSTEM LOGGING
-    log_activity(db, current_user.username, "Stock Deletion", f"Deleted stock entry ID {entry_id}.")
+    # UPDATED: Detailed Deletion Log
+    log_activity(
+        db, 
+        current_user.username, 
+        "Stock Deletion", 
+        f"Deleted {e_type} entry of {qty} units for Material '{mat_name}' at Site '{site_name}'."
+    )
     
     return {"message": "Stock entry deleted successfully"}
 
@@ -262,6 +287,15 @@ async def get_site_stock_summary(
     check_project_access(current_user, site.project_id, db)
     calculator = StockCalculator()
     summary = calculator.get_site_stock_summary(db, site_id, start_date, end_date, supplier_name, entry_type)
+    
+    # NEW: Log when a user pulls/views a Stock Report
+    log_activity(
+        db, 
+        current_user.username, 
+        "Report Generated", 
+        f"Pulled Stock Ledger/Report for Site '{site.name}'."
+    )
+    
     return summary
 
 @router.post("/generate-daily-report/{site_id}")
@@ -286,7 +320,6 @@ async def generate_daily_stock_report(
     calculator = StockCalculator()
     reports = calculator.generate_daily_report(db, site_id, report_date)
     
-    # SYSTEM LOGGING
     log_activity(db, current_user.username, "Report Generation", f"Generated {len(reports)} daily stock reports for Site '{site.name}'.")
     
     return {

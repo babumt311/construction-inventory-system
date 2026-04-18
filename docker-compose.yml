@@ -156,15 +156,20 @@ services:
     container_name: construction_frontend
     depends_on:
       - backend
-    ports:
-      - "80:8080"
-      - "443:443"
+    expose:
+      - "8080"
+   #  - "443:443"
     environment:
       - NODE_ENV=production
     volumes:
       - /mnt/docker-data/logs/nginx:/var/log/nginx
-      - ./ssl:/etc/nginx/ssl:ro
-    restart: always
+    # - ./ssl:/etc/nginx/ssl:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - construction_network
 

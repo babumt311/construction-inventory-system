@@ -45,7 +45,7 @@ def _save_data(data):
 # ==========================================
 # PROJECTS API
 # ==========================================
-@router.post("/", response_model=schemas.ProjectInDB)
+@router.post("", response_model=schemas.ProjectInDB)
 async def create_project(
     project_in: schemas.ProjectCreate,
     db: Session = Depends(get_db),
@@ -59,7 +59,7 @@ async def create_project(
     project = crud.crud_project.create(db, obj_in=project_in)
     return project
 
-@router.get("/", response_model=List[schemas.ProjectInDB])
+@router.get("", response_model=List[schemas.ProjectInDB])
 async def read_projects(
     pagination: PaginationParams = Depends(),
     status_filter: Optional[str] = Query(None),

@@ -46,7 +46,7 @@
             
             <div class="col-md-3">
               <label class="form-label fw-bold small text-muted">Project *</label>
-              <ng-select [items]="projects" bindLabel="name" bindValue="id" placeholder="Select Project" formControlName="project_id" (change)="onProjectChange($event ? $event.id : null)" [ngClass]="{'is-invalid': stockForm.get('project_id')?.invalid && stockForm.get('project_id')?.touched}"></ng-select>
+              <ng-select [items]="projects" bindLabel="name" bindValue="id" placeholder="Select Project" formControlName="project_id" (change)="onProjectChange()" [ngClass]="{'is-invalid': stockForm.get('project_id')?.invalid && stockForm.get('project_id')?.touched}"></ng-select>
             </div>
 
             <div class="col-md-3">
@@ -61,7 +61,7 @@
 
             <div class="col-md-3" *ngIf="stockForm.get('entry_type')?.value !== 'transfer'">
               <label class="form-label fw-bold small text-muted">Site *</label>
-              <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Site" formControlName="site_id" (change)="onSiteChange($event ? $event.id : null)" [ngClass]="{'is-invalid': stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched}"></ng-select>
+              <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Site" formControlName="site_id" (change)="onSiteChange()" [ngClass]="{'is-invalid': stockForm.get('site_id')?.invalid && stockForm.get('site_id')?.touched}"></ng-select>
             </div>
 
             <ng-container *ngIf="stockForm.get('entry_type')?.value === 'transfer'">
@@ -71,7 +71,7 @@
               </div>
               <div class="col-md-3">
                 <label class="form-label fw-bold small text-muted">To Site *</label>
-                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Destination" formControlName="to_site_id" (change)="onSiteChange($event ? $event.id : null)" [ngClass]="{'is-invalid': stockForm.get('to_site_id')?.invalid && stockForm.get('to_site_id')?.touched}"></ng-select>
+                <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="Select Destination" formControlName="to_site_id" (change)="onSiteChange()" [ngClass]="{'is-invalid': stockForm.get('to_site_id')?.invalid && stockForm.get('to_site_id')?.touched}"></ng-select>
               </div>
             </ng-container>
 
@@ -234,7 +234,10 @@
             
             <tr mat-header-row *matHeaderRowDef="stockColumns"></tr><tr mat-row *matRowDef="let row; columns: stockColumns;" class="border-bottom"></tr>
           </table>
-          <div class="text-center py-4" *ngIf="stockDataSource.data.length === 0 && selectedSiteId">No transactions yet.</div>
+          <div class="text-center py-4 text-muted fw-bold" *ngIf="stockDataSource.data.length === 0 && selectedSiteId && !loadingStockEntries">
+            <i class="fas fa-box-open fa-2x mb-2 opacity-50"></i><br>
+            No transactions yet.
+          </div>
         </div>
         <mat-paginator #stockPaginator [pageSizeOptions]="[10, 25]" showFirstLastButtons class="border-top" [hidden]="!selectedSiteId || stockDataSource.data.length === 0"></mat-paginator>
       </div>

@@ -1,18 +1,16 @@
 <div class="container-fluid py-4">
   
-  <div class="d-flex justify-content-between align-items-start mb-4">
-    
-    <div class="d-flex align-items-start gap-3">
-      <button class="btn btn-outline-secondary shadow-sm mt-1" routerLink="/dashboard" style="white-space: nowrap;">
-        <i class="fas fa-arrow-left me-2"></i>Back
-      </button>
-      <div>
-        <h2 class="mb-1 fw-bold text-dark"><i class="fas fa-chart-line me-2 text-primary"></i>Stock Reports</h2>
-        <p class="text-muted mb-0">View and analyze current stock levels across sites</p>
-      </div>
+  <div class="mb-3">
+    <button class="btn btn-outline-secondary btn-sm fw-bold shadow-sm" routerLink="/dashboard">
+      <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+    </button>
+  </div>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1 fw-bold text-dark"><i class="fas fa-chart-line me-2 text-primary"></i>Stock Reports</h2>
+      <p class="text-muted mb-0">View and analyze current stock levels across sites</p>
     </div>
-
-    <div class="d-flex gap-2 mt-1">
+    <div class="d-flex gap-2">
       <button class="btn btn-outline-secondary fw-bold" (click)="toggleViewMode()">
         <i class="fas me-2" [class.fa-th-large]="viewMode === 'table'" [class.fa-list]="viewMode === 'cards'"></i>
         {{ viewMode === 'table' ? 'Switch to Cards' : 'Switch to Table' }}
@@ -24,10 +22,461 @@
         <i class="fas fa-sync-alt me-2" [class.fa-spin]="loading"></i>Refresh
       </button>
     </div>
-    
   </div>
 
   <div class="card shadow-sm border-0 rounded-3 mb-4">
-    ```
+    <div class="card-body p-4">
+      <form [formGroup]="filterForm">
+        
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-muted">Project</label>
+            <ng-select [items]="projects" bindLabel="name" bindValue="id" placeholder="All Projects" formControlName="project_id"></ng-select>
+          </div>
+          
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-muted">Site</label>
+            <ng-select [items]="sites" bindLabel="name" bindValue="id" placeholder="All Sites" formControlName="site_id"></ng-select>
+          </div>
+          
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-muted">Category</label>
+            <ng-select [items]="categories" bindLabel="name" bindValue="id" placeholder="All Categories" formControlName="category_id" (change)="onCategoryChange($event ? $event.id : null)"></ng-select>
+          </div>
 
-By placing it inside the `d-flex` container with a `gap-3`, it guarantees the button will sit safely next to your heading, matching the structure of your other pages perfectly.
+          <div class="col-md-3">
+            <label class="form-label small fw-bold text-muted">Material</label>
+            <ng-select [items]="filteredMaterials" bindLabel="name" bindValue="id" placeholder="All Materials" formControlName="material_id"></ng-select>
+          </div>
+        </div>
+
+        <div class="row g-3 border-top pt-2">
+          
+          <ng-container *ngIf="viewMode === 'table'">
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-muted">Transaction Type</label>
+              <select class="form-select bg-white" formControlName="entry_type">
+                <option value="">All Transactions</option>
+                <option value="received">Received (Delivery IN)</option>
+                <option value="used">Used (Consumed OUT)</option>
+                <option value="transfer">Site-to-Site Transfer</option>
+                <option value="returned_supplier">Returned to Supplier (OUT)</option>
+              </select>
+            </div>
+
+            <div class="col-md-3" *ngIf="filterForm.get('entry_type')?.value === 'received'">
+              <label class="form-label small fw-bold text-muted">Supplier Search</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0" formControlName="supplier_name" placeholder="Search supplier...">
+              </div>
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label small fw-bold text-muted">Start Date</label>
+              <input type="date" class="form-control" formControlName="start_date">
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label small fw-bold text-muted">End Date</label>
+              <input type="date" class="form-control" formControlName="end_date" [min]="filterForm.get('start_date')?.value">
+            </div>
+            
+            <div class="col-md-2 d-flex align-items-end pb-2">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="negativeOnly" formControlName="show_negative_only">
+                <label class="form-check-label fw-bold text-danger" for="negativeOnly">Negative Only</label>
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="viewMode === 'cards'">
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted"><i class="far fa-calendar-check me-1"></i> Stock As Of Date</label>
+              <input type="date" class="form-control" formControlName="as_of_date" title="Leave blank for Current Stock">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-muted">Supplier Search</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0" formControlName="supplier_name" placeholder="Search supplier...">
+              </div>
+            </div>
+          </ng-container>
+
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0 rounded-3 border-start border-success border-4 h-100">
+        <div class="card-body p-4">
+          <h6 class="text-success fw-bold text-uppercase mb-4"><i class="fas fa-arrow-down me-2"></i>Total Material Received</h6>
+          <div class="row text-center">
+            <div class="col-6 border-end">
+              <p class="text-muted small fw-bold mb-1">TOTAL QTY</p>
+              <h2 class="fw-bold mb-0 text-dark">{{ totalReceivedQty | number:'1.2-2' }}</h2>
+            </div>
+            <div class="col-6">
+              <p class="text-muted small fw-bold mb-1">TOTAL COST VALUE</p>
+              <h2 class="fw-bold mb-0 text-success">₹{{ totalReceivedCost | number:'1.2-2' }}</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0 rounded-3 border-start border-danger border-4 h-100">
+        <div class="card-body p-4">
+          <h6 class="text-danger fw-bold text-uppercase mb-4"><i class="fas fa-arrow-up me-2"></i>Total Material Used</h6>
+          <div class="row text-center">
+            <div class="col-6 border-end">
+              <p class="text-muted small fw-bold mb-1">TOTAL QTY</p>
+              <h2 class="fw-bold mb-0 text-dark">{{ totalUsedQty | number:'1.2-2' }}</h2>
+            </div>
+            <div class="col-6">
+              <p class="text-muted small fw-bold mb-1">TOTAL COST VALUE</p>
+              <h2 class="fw-bold mb-0 text-danger">₹{{ totalUsedCost | number:'1.2-2' }}</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 rounded-3" *ngIf="viewMode === 'table'">
+    <div class="card-body p-0">
+      
+      <div class="text-center py-5 my-5" *ngIf="loading">
+        <div class="spinner-border text-primary mb-3"></div>
+        <h5 class="text-muted">Generating Report...</h5>
+      </div>
+
+      <div class="text-center py-5 my-5" *ngIf="!loading && dataSource.data.length === 0">
+        <i class="fas fa-clipboard-list fa-3x text-muted opacity-25 mb-3"></i>
+        <h5 class="text-muted fw-bold">No Data Found</h5>
+        <p class="text-muted small">Adjust your filters to see stock balances.</p>
+      </div>
+
+      <div class="table-responsive" [hidden]="loading || dataSource.data.length === 0">
+        <table mat-table [dataSource]="dataSource" matSort class="table table-hover align-middle mb-0 text-nowrap" cdkDropList cdkDropListOrientation="horizontal" (cdkDropListDropped)="drop($event)">
+          
+          <ng-container matColumnDef="material" sticky>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag [cdkDragDisabled]="true" class="bg-light fw-bold text-muted text-uppercase py-3 z-3 border-end ps-4">Material</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 bg-white border-end shadow-sm position-relative z-1 pe-4 ps-4">
+              <div>
+                <strong class="d-block text-dark">{{ balance.material_name }}</strong>
+                <small class="text-muted">ID: {{ balance.material_id }}</small>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 cursor-move ps-4">Category</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 ps-4">
+              <span class="badge bg-secondary rounded-pill px-3 py-2 text-white shadow-sm">
+                {{ balance.category }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="project">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-nowrap cursor-move ps-4">Project</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-nowrap ps-4">
+              <span class="badge bg-light text-dark border rounded-pill px-3 py-2">
+                <i class="fas fa-building text-muted me-1"></i> {{ getProjectNameForSite(balance.site_id) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="site">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 cursor-move ps-4">Site</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 ps-4">
+              <span class="badge bg-light text-dark border rounded-pill px-3 py-2">
+                <i class="fas fa-map-marker-alt text-danger me-1"></i> {{ balance.site_name }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="supplier_name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 cursor-move ps-4">Supplier</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-dark fw-semibold ps-4">
+              <i class="fas fa-truck text-danger me-2" *ngIf="balance.supplier_name && balance.supplier_name !== '-'"></i>
+              {{ balance.supplier_name || '-' }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="invoice_no">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 cursor-move ps-4">Invoice No</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 ps-4">
+              <span class="badge bg-light text-dark border px-2 py-1" *ngIf="balance.invoice_no && balance.invoice_no !== '-'">{{ balance.invoice_no }}</span>
+              <span *ngIf="!balance.invoice_no || balance.invoice_no === '-'">-</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="invoice_date">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 cursor-move ps-4">Invoice Date</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-muted ps-4">
+              <span *ngIf="balance.invoice_date"><i class="far fa-file-alt me-1"></i> {{ balance.invoice_date | date:'M/d/yy' }}</span>
+              <span *ngIf="!balance.invoice_date">-</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="current_balance">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-end cursor-move ps-4">Current Balance</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-end ps-4">
+              <div class="d-flex align-items-center justify-content-end gap-3">
+                <span class="fw-bold fs-5 text-dark">{{ balance.current_balance | number:'1.2-2' }}</span>
+                <span class="badge rounded-pill px-3 py-2" [ngClass]="'bg-' + getStockStatus(balance)">{{ getStockStatusText(balance) }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="opening_balance">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-end cursor-move ps-4">Opening</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-end text-muted ps-4">{{ balance.opening_balance | number:'1.2-2' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_received">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-end cursor-move ps-4">Received Qty</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-end text-success fw-bold ps-4"><i class="fas fa-arrow-down me-1"></i> {{ balance.total_received | number:'1.2-2' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="received_cost">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-end cursor-move ps-4">Recv. Cost</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-end text-success fw-bold ps-4">₹{{ balance.received_value | number:'1.2-2' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_used">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-end cursor-move ps-4">Consumed Qty</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-end text-danger fw-bold ps-4"><i class="fas fa-arrow-up me-1"></i> {{ balance.total_used | number:'1.2-2' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="used_cost">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-end cursor-move ps-4">Consumed Cost</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-end text-danger fw-bold ps-4">₹{{ balance.used_value | number:'1.2-2' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_transfer_out">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-end cursor-move ps-4">Sent to Site</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-end text-dark fw-bold ps-4"><i class="fas fa-sign-out-alt me-1"></i> {{ balance.total_transfer_out | number:'1.2-2' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_transfer_in">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-end cursor-move ps-4">Received from Site</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-end text-primary fw-bold ps-4"><i class="fas fa-sign-in-alt me-1"></i> {{ balance.total_transfer_in | number:'1.2-2' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_returned_supplier">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-end cursor-move ps-4">Ret. (Supplier)</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-end text-dark fw-bold ps-4"><i class="fas fa-undo me-1"></i> {{ balance.total_returned_supplier | number:'1.2-2' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="updated_at">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 cursor-move ps-4">Date</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-muted text-nowrap ps-4"><i class="far fa-calendar-alt me-1"></i> {{ getFormattedDate(balance) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef cdkDrag class="bg-light fw-bold text-muted text-uppercase py-3 text-center ps-4 cursor-move">Actions</th>
+            <td mat-cell *matCellDef="let balance" class="py-3 text-center ps-4"><button class="btn btn-sm btn-outline-info rounded-pill px-3 fw-bold text-nowrap" (click)="showMaterialDetails(balance)"><i class="fas fa-chart-line me-1"></i> History</button></td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns" cdkDropList cdkDropListOrientation="horizontal" (cdkDropListDropped)="drop($event)"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="border-bottom"></tr>
+        </table>
+      </div>
+
+      <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons class="border-top" [hidden]="loading || dataSource.data.length === 0"></mat-paginator>
+    </div>
+  </div>
+
+  <div class="row g-4" *ngIf="viewMode === 'cards' && dataSource.data.length > 0">
+    <div class="col-md-4 col-xl-3" *ngFor="let balance of mergedCardsData">
+      <div class="card shadow-sm border-0 rounded-3 h-100 stock-card-hover">
+        <div class="card-body p-4 d-flex flex-column">
+          
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <div class="d-flex align-items-center">
+              <div>
+                <h5 class="fw-bold mb-1 text-dark text-truncate" style="max-width: 150px;" title="{{ balance.material_name }}">{{ balance.material_name }}</h5>
+                <span class="badge bg-secondary rounded-pill px-3 py-2 text-white shadow-sm">{{ balance.category }}</span>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-light text-info rounded-circle flex-shrink-0" (click)="showMaterialDetails(balance)"><i class="fas fa-chart-line"></i></button>
+          </div>
+          
+          <div class="text-center py-3 bg-light rounded-3 mb-3 border">
+            <p class="text-muted small fw-bold mb-1 text-uppercase">Current Stock</p>
+            <h1 class="display-4 fw-bold mb-0" [ngClass]="'text-' + getStockStatus(balance)">{{ balance.current_balance | number:'1.2-2' }}</h1>
+            <span class="badge rounded-pill px-3 py-2 mt-2" [ngClass]="'bg-' + getStockStatus(balance)">{{ getStockStatusText(balance) }}</span>
+          </div>
+
+          <div class="row text-center mt-auto">
+            <div class="col-6 border-end">
+              <p class="text-muted small fw-bold mb-1"><i class="fas fa-arrow-down text-success me-1"></i> IN</p>
+              <h5 class="fw-bold text-success mb-0">{{ balance.total_received | number:'1.2-2' }}</h5>
+            </div>
+            <div class="col-6">
+              <p class="text-muted small fw-bold mb-1"><i class="fas fa-arrow-up text-danger me-1"></i> OUT</p>
+              <h5 class="fw-bold text-danger mb-0">{{ balance.total_used | number:'1.2-2' }}</h5>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<ng-template #materialDetails>
+  <div class="modal-header bg-light border-bottom-0 py-3 px-4">
+    <h5 class="modal-title fw-bold text-dark">
+      <div class="avatar bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
+        <i class="fas fa-box"></i>
+      </div>
+      Stock History
+    </h5>
+    <button type="button" class="btn-close" (click)="dialog.closeAll()"></button>
+  </div>
+  
+  <div class="modal-body p-4 bg-light">
+    
+    <div class="row g-4 mb-4">
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+          <div class="card-body p-4">
+            <h6 class="fw-bold text-primary mb-3 text-uppercase border-bottom pb-2">Material Details</h6>
+            
+            <div class="mb-2"><strong class="text-dark w-50 d-inline-block">Name:</strong> <span class="text-muted">{{ selectedMaterial?.name }}</span></div>
+            <div class="mb-2"><strong class="text-dark w-50 d-inline-block">Category:</strong> <span class="badge bg-secondary rounded-pill px-3 text-white">{{ getCategoryName(selectedMaterial?.category_id) }}</span></div>
+            <div class="mb-2"><strong class="text-dark w-50 d-inline-block">Unit:</strong> <span class="text-muted">{{ selectedMaterial?.unit || 'N/A' }}</span></div>
+            <div class="mb-0"><strong class="text-dark w-50 d-inline-block">Standard Cost:</strong> <span class="text-success fw-bold">₹{{ selectedMaterial?.standard_cost | number:'1.2-2' }}</span></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100 bg-primary bg-opacity-10 border border-primary border-opacity-25">
+          <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
+            <h6 class="fw-bold text-primary mb-3 text-uppercase">Total Aggregate Stock</h6>
+            <h1 class="display-3 text-primary fw-bold mb-0">{{ getCurrentStock(selectedMaterial?.id) | number:'1.2-2' }}</h1>
+            <div class="mt-2">
+              <span class="badge bg-primary rounded-pill px-3 py-2 fs-6">Combined Sites</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card border-0 shadow-sm rounded-3 mb-4" *ngIf="selectedMaterialHistory.length > 0">
+      <div class="card-body p-4">
+        <h6 class="fw-bold text-dark mb-3 text-uppercase border-bottom pb-2">Movement Graph (Last 30 Days)</h6>
+        <div class="chart-container" style="height: 300px;">
+          <canvas id="materialChart"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-body p-0">
+        <div class="p-3 bg-white border-bottom">
+          <h6 class="fw-bold text-dark mb-0 text-uppercase">Recent Transactions Ledger</h6>
+        </div>
+        
+        <div class="text-center py-4" *ngIf="isLoadingHistory">
+          <div class="spinner-border text-primary" role="status"></div>
+        </div>
+        
+        <div class="table-responsive" *ngIf="!isLoadingHistory">
+          <table class="table table-hover align-middle mb-0 text-nowrap">
+            <thead class="bg-light">
+              <tr>
+                <th class="py-3 px-4 text-muted small fw-bold">Date</th>
+                <th class="py-3 text-muted small fw-bold">Type</th>
+                <th class="py-3 text-end text-muted small fw-bold">Qty</th>
+                <th class="py-3 text-muted small fw-bold">Supplier</th>
+                <th class="py-3 px-4 text-muted small fw-bold">Invoice Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let entry of selectedMaterialHistory.slice(0, 10)">
+                <td class="py-3 px-4 text-muted"><i class="far fa-clock me-1"></i> {{ entry.entry_date | date:'MMM d, y, h:mm a' }}</td>
+                <td class="py-3">
+                  <span class="badge" [ngClass]="getEntryBadge(entry.entry_type, entry.remarks)">
+                    {{ formatEntryType(entry.entry_type, entry.remarks) }}
+                  </span>
+                </td>
+                <td class="text-end fw-bold" [ngClass]="{'text-success': isEntryIn(entry), 'text-danger': !isEntryIn(entry)}">
+                  {{ isEntryIn(entry) ? '+' : '-' }}{{ entry.quantity | number:'1.2-2' }}
+                </td>
+                <td class="py-3">
+                  <i class="fas fa-truck text-muted me-1" *ngIf="entry.supplier_name"></i>
+                  {{ entry.supplier_name || '-' }}
+                </td>
+                <td class="py-3 px-4">
+                  <span class="badge bg-light text-dark border" *ngIf="entry.invoice_no">{{ entry.invoice_no }}</span>
+                  <span *ngIf="!entry.invoice_no">-</span>
+                </td>
+              </tr>
+              <tr *ngIf="selectedMaterialHistory.length === 0">
+                <td colspan="5" class="text-center py-4 text-muted">No transactions found in this time period.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+  <div class="modal-footer bg-white border-top-0 py-3 px-4">
+    <button type="button" class="btn btn-light fw-bold px-4" (click)="dialog.closeAll()">Close</button>
+  </div>
+</ng-template>
+
+<div class="modal" tabindex="-1" [class.show]="showExportModal" [style.display]="showExportModal ? 'block' : 'none'">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header bg-primary text-white border-bottom-0 py-3 px-4 rounded-top-4">
+        <h5 class="modal-title fw-bold"><i class="fas fa-file-excel me-2"></i>Export Report</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeExportModal()"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+        <p class="text-muted mb-4">Select and arrange the columns you want to include in your Enterprise Excel export.</p>
+        
+        <div class="list-group shadow-sm mb-4" style="max-height: 400px; overflow-y: auto;">
+          <div class="list-group-item d-flex justify-content-between align-items-center py-3 border-light" *ngFor="let col of exportColumns; let i = index">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" [id]="'col-' + i" [(ngModel)]="col.selected">
+              <label class="form-check-label fw-bold text-dark" [for]="'col-' + i">{{ col.label }}</label>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-sm btn-light border text-muted" (click)="moveColumn(i, -1)" [disabled]="i === 0"><i class="fas fa-chevron-up"></i></button>
+              <button class="btn btn-sm btn-light border text-muted" (click)="moveColumn(i, 1)" [disabled]="i === exportColumns.length - 1"><i class="fas fa-chevron-down"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-top pt-3">
+          <div class="form-check form-switch bg-white border p-3 rounded-3 shadow-sm d-flex align-items-center justify-content-between">
+            <label class="form-check-label fw-bold text-dark mb-0 ms-2" for="includeTotals">
+              <i class="fas fa-calculator text-primary me-2"></i>Include Totals Row
+            </label>
+            <input class="form-check-input fs-5 m-0" type="checkbox" id="includeTotals" [(ngModel)]="includeExportTotals">
+          </div>
+        </div>
+        </div>
+      <div class="modal-footer bg-white border-top-0 py-3 px-4 rounded-bottom-4">
+        <button type="button" class="btn btn-light fw-bold px-4" (click)="closeExportModal()">Cancel</button>
+        <button type="button" class="btn btn-success fw-bold px-4" (click)="confirmAndExport()">
+          <i class="fas fa-download me-2"></i>Download Excel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="showExportModal"></div>

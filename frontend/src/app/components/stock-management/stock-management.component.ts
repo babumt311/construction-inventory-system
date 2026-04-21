@@ -27,13 +27,13 @@ export class StockManagementComponent implements OnInit {
   categories: any[] = [];
   materials: any[] = [];
 
-  // --- NEW: Cache for Ng-Select to prevent infinite redraw loops ---
   private materialCache: { [key: string]: any[] } = {};
 
   stockColumns: string[] = ['entry_date', 'material_name', 'entry_type', 'quantity', 'supplier_name', 'invoice_no', 'actions'];
   stockDataSource = new MatTableDataSource<any>();
   @ViewChild('stockPaginator') stockPaginator!: MatPaginator;
   @ViewChild('stockSort') stockSort!: MatSort;
+  
   selectedSiteId: number | null = null;
   loadingStockEntries = false;
   submittingStock = false;
@@ -89,12 +89,7 @@ export class StockManagementComponent implements OnInit {
       if (type !== 'received') {
         const itemsArray = this.stockForm.get('items') as FormArray;
         itemsArray.controls.forEach(control => {
-          control.patchValue({
-            unit_price: 0,
-            tax_percent: 0,
-            tax_amount: 0,
-            total_cost: 0
-          });
+          control.patchValue({ unit_price: 0, tax_percent: 0, tax_amount: 0, total_cost: 0 });
         });
       }
 
@@ -145,9 +140,7 @@ export class StockManagementComponent implements OnInit {
     if (savedTab && ['stock', 'category', 'material'].includes(savedTab)) this.switchTab(savedTab as 'stock' | 'category' | 'material');
   }
 
-  get isReceivedType(): boolean {
-    return this.stockForm.get('entry_type')?.value === 'received';
-  }
+  get isReceivedType(): boolean { return this.stockForm.get('entry_type')?.value === 'received'; }
 
   switchTab(tab: 'stock' | 'category' | 'material'): void {
     this.activeTab = tab;
@@ -159,9 +152,7 @@ export class StockManagementComponent implements OnInit {
     });
   }
 
-  get items(): FormArray {
-    return this.stockForm.get('items') as FormArray;
-  }
+  get items(): FormArray { return this.stockForm.get('items') as FormArray; }
 
   addItem(): void {
     const itemGroup = this.fb.group({
@@ -174,7 +165,6 @@ export class StockManagementComponent implements OnInit {
       total_cost: [{ value: 0, disabled: true }]  
     });
 
-    // 1. If Material changes -> Auto Select Category
     itemGroup.get('material_id')?.valueChanges.subscribe(matId => {
       if (matId) {
         const selectedMat = this.materials.find(m => m.id === Number(matId));
@@ -184,7 +174,6 @@ export class StockManagementComponent implements OnInit {
       }
     });
 
-    // 2. If Category changes -> Auto Clear Material if they don't match
     itemGroup.get('category_id')?.valueChanges.subscribe(catId => {
       if (catId) {
         const currentMatId = itemGroup.get('material_id')?.value;
@@ -197,12 +186,10 @@ export class StockManagementComponent implements OnInit {
       }
     });
     
-    // Auto-calculate costs
     itemGroup.valueChanges.subscribe(val => {
       const qty = val.quantity || 0;
       const price = val.unit_price || 0;
       const taxPct = val.tax_percent || 0;
-      
       const taxAmt = price * (taxPct / 100);
       const total = (price + taxAmt) * qty;
 
@@ -216,30 +203,24 @@ export class StockManagementComponent implements OnInit {
   }
 
   removeItem(index: number): void {
-    if (this.items.length > 1) {
-      this.items.removeAt(index);
-    } else {
-      this.toastr.warning('You must have at least one material entry.');
-    }
+    if (this.items.length > 1) { this.items.removeAt(index); } 
+    else { this.toastr.warning('You must have at least one material entry.'); }
   }
 
   loadProjects(): void { this.projectService.getProjects().subscribe(res => this.projects = res); }
   
-  // --- FIXED: Cache ensures ng-select doesn't redraw infinitely ---
   getFilteredMaterials(categoryId: any): any[] {
     const key = categoryId ? String(categoryId) : 'all';
-    
     if (!this.materialCache[key]) {
-      this.materialCache[key] = categoryId 
-        ? this.materials.filter(m => m.category_id === Number(categoryId))
-        : this.materials;
+      this.materialCache[key] = categoryId ? this.materials.filter(m => m.category_id === Number(categoryId)) : this.materials;
     }
-    
     return this.materialCache[key];
   }
 
-  onProjectChange(projectId: any): void {
+  // FIXED: Robust form reading
+  onProjectChange(): void {
     if (this.isEditingStock) return; 
+    const projectId = this.stockForm.get('project_id')?.value;
     this.sites = []; 
     this.stockForm.patchValue({ site_id: null, from_site_id: null, to_site_id: null }); 
     this.selectedSiteId = null; 
@@ -247,7 +228,9 @@ export class StockManagementComponent implements OnInit {
     if (projectId) this.projectService.getProjectSites(Number(projectId)).subscribe(res => this.sites = res);
   }
 
-  onSiteChange(siteId: any): void { 
+  // FIXED: Explicitly read from form to prevent ng-select bugs
+  onSiteChange(): void { 
+    const siteId = this.stockForm.get('site_id')?.value;
     if (siteId) { 
       this.selectedSiteId = Number(siteId); 
       this.loadStockEntries(); 
@@ -283,7 +266,6 @@ export class StockManagementComponent implements OnInit {
       total_cost: [{ value: entry.total_cost, disabled: true }]
     });
 
-    // Apply the same smart dropdown logic to the Edit Row
     itemGroup.get('material_id')?.valueChanges.subscribe(matId => {
       if (matId) {
         const selectedMat = this.materials.find(m => m.id === Number(matId));
@@ -311,17 +293,11 @@ export class StockManagementComponent implements OnInit {
       const taxPct = val.tax_percent || 0;
       const taxAmt = price * (taxPct / 100);
       const total = (price + taxAmt) * qty;
-
-      itemGroup.patchValue({
-        tax_amount: parseFloat(taxAmt.toFixed(2)),
-        total_cost: parseFloat(total.toFixed(2))
-      }, { emitEvent: false });
+      itemGroup.patchValue({ tax_amount: parseFloat(taxAmt.toFixed(2)), total_cost: parseFloat(total.toFixed(2)) }, { emitEvent: false });
     });
 
     const selectedMat = this.materials.find(m => m.id === Number(entry.material_id));
-    if (selectedMat && selectedMat.category_id) {
-      itemGroup.patchValue({ category_id: selectedMat.category_id }, { emitEvent: false });
-    }
+    if (selectedMat && selectedMat.category_id) { itemGroup.patchValue({ category_id: selectedMat.category_id }, { emitEvent: false }); }
 
     this.items.push(itemGroup);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -421,6 +397,9 @@ export class StockManagementComponent implements OnInit {
         this.stockForm.reset({ project_id: currentProject, site_id: currentSite, entry_type: 'received' });
         this.items.clear();
         this.addItem(); 
+        
+        // Force sync site ID before loading
+        this.selectedSiteId = currentSite;
         this.loadStockEntries();
         this.submittingStock = false;
       },
@@ -431,20 +410,36 @@ export class StockManagementComponent implements OnInit {
     });
   }
 
+  // FIXED: Bulletproof loading function
   loadStockEntries(): void {
-    if (!this.selectedSiteId) return;
+    const activeSite = this.selectedSiteId || this.stockForm.get('site_id')?.value;
+    if (!activeSite) return;
+    
+    this.selectedSiteId = Number(activeSite);
     this.loadingStockEntries = true;
+    
     this.stockService.getStockEntries({ site_id: this.selectedSiteId }).subscribe({
-      next: (entries) => {
-        const mapped = entries.map(e => { 
+      next: (entries: any) => {
+        // Fallback in case API wraps the array
+        const dataArray = Array.isArray(entries) ? entries : (entries.data || []);
+        
+        const mapped = dataArray.map((e: any) => { 
           const mat = this.materials.find(m => m.id === e.material_id); 
           return { ...e, material_name: mat ? mat.name : 'Unknown' }; 
         });
+        
         this.stockDataSource.data = mapped;
-        setTimeout(() => this.stockDataSource.paginator = this.stockPaginator);
+        setTimeout(() => {
+          if (this.stockPaginator) this.stockDataSource.paginator = this.stockPaginator;
+          if (this.stockSort) this.stockDataSource.sort = this.stockSort;
+        });
         this.loadingStockEntries = false;
       },
-      error: () => { this.loadingStockEntries = false; }
+      error: (err) => { 
+        console.error("Failed to load ledger:", err);
+        this.stockDataSource.data = [];
+        this.loadingStockEntries = false; 
+      }
     });
   }
 
@@ -458,6 +453,7 @@ export class StockManagementComponent implements OnInit {
   }
 
   formatEntryType(type: string, remarks?: string): string {
+    if (!type) return 'UNKNOWN';
     if (type === 'used' && remarks?.includes('Transfer OUT')) return 'SENT TO SITE';
     if (type === 'returned_received' && remarks?.includes('Transfer IN')) return 'RECEIVED FROM SITE';
     if (type === 'returned_received') return 'RETURNED FROM SITE';
@@ -524,7 +520,7 @@ export class StockManagementComponent implements OnInit {
   loadMaterials(): void { 
     this.materialService.getMaterials().subscribe(res => { 
       this.materials = res; 
-      this.materialCache = {}; // Reset cache when materials reload
+      this.materialCache = {}; 
       this.materialDataSource.data = res; 
       this.materialDataSource.filterPredicate = (data: any, filter: string): boolean => { 
         return data.name.toLowerCase().includes(filter) || (data.description && data.description.toLowerCase().includes(filter)); 

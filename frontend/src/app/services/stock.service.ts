@@ -16,9 +16,9 @@ import {
 export class StockService {
   constructor(private api: ApiService) {}
 
-  // Stock Entry Management
+  // Stock Entry Management - ADDED TRAILING SLASHES HERE
   getStockEntries(params?: any): Observable<StockEntry[]> {
-    return this.api.get<StockEntry[]>('stock/entries', params);
+    return this.api.get<StockEntry[]>('stock/entries/', params);
   }
 
   getStockEntry(id: number): Observable<StockEntry> {
@@ -26,7 +26,7 @@ export class StockService {
   }
 
   createStockEntry(entry: StockEntryCreateRequest): Observable<StockEntry> {
-    return this.api.post<StockEntry>('stock/entries', entry);
+    return this.api.post<StockEntry>('stock/entries/', entry);
   }
 
   updateStockEntry(id: number, entry: Partial<StockEntry>): Observable<StockEntry> {
@@ -46,7 +46,7 @@ export class StockService {
     return this.api.get<StockBalance>('stock/balance', params);
   }
 
-  // --- ENTERPRISE FIX: Safely pass parameters as a plain object ---
+  // Enterprise Fix: Safely pass parameters as a plain object
   getSiteStockSummary(siteId: number, filters?: any) {
     const queryParams: any = {};
     

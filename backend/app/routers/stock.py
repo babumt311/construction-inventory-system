@@ -21,7 +21,7 @@ from app.utils.stock_calculator import StockCalculator
 router = APIRouter(prefix="/stock", tags=["stock"])
 logger = logging.getLogger(__name__)
 
-@router.post("/entries/", response_model=schemas.StockEntryInDB)
+@router.post("/entries", response_model=schemas.StockEntryInDB)
 async def create_stock_entry(
     stock_in: schemas.StockEntryCreate,
     db: Session = Depends(get_db),
@@ -108,7 +108,7 @@ async def create_stock_entry(
     
     return stock_entry
 
-@router.get("/entries/", response_model=List[schemas.StockEntryInDB])
+@router.get("/entries", response_model=List[schemas.StockEntryInDB])
 async def read_stock_entries(
     site_id: Optional[int] = Query(None),
     material_id: Optional[int] = Query(None),

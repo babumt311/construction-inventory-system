@@ -11,6 +11,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 import logging
+from pydantic import BaseModel
 from app import schemas, crud, models
 from app.database import get_db
 from app.dependencies import (
@@ -27,6 +28,11 @@ logger = logging.getLogger(__name__)
 # Cache dictionary and Thread Lock to prevent async race conditions
 REPORT_LOG_CACHE = {}
 REPORT_LOG_LOCK = threading.Lock()
+
+# SUPPLIER SCHEMA 
+class SupplierSchema(BaseModel):
+    name: str
+    contact_info: Optional[str] = None
 
 @router.post("/entries/", response_model=schemas.StockEntryInDB)
 async def create_stock_entry(
@@ -373,3 +379,35 @@ async def log_excel_export(
     )
     
     return {"message": "Export logged successfully"}
+
+# --- NEW SUPPLIER ENDPOINTS ---
+
+@router.get("/suppliers/")
+def get_suppliers(db: Session = Depends(get_db)):
+    return db.query(models.Supplier).order_by(models.Supplier.name).all()
+
+@router.post("/suppliers/")
+def create_supplier(supplier: SupplierSchema, db: Session = Depends(get_db)):
+    new_sup = models.Supplier(name=supplier.name, contact_info=supplier.contact_info)
+    db.add(new_sup)
+    db.commit()
+    return new_sup
+
+@router.put("/suppliers/{sup_id}")
+def update_supplier(sup_id: int, supplier: SupplierSchema, db: Session = Depends(get_db)):
+    sup = db.query(models.Supplier).filter(models.Supplier.id == sup_id).first()
+    if not sup:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    sup.name = supplier.name
+    sup.contact_info = supplier.contact_info
+    db.commit()
+    return sup
+
+@router.delete("/suppliers/{sup_id}")
+def delete_supplier(sup_id: int, db: Session = Depends(get_db)):
+    sup = db.query(models.Supplier).filter(models.Supplier.id == sup_id).first()
+    if not sup:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    db.delete(sup)
+    db.commit()
+    return {"message": "deleted"}

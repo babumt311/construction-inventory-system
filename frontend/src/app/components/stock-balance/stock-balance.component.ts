@@ -29,6 +29,8 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   @ViewChild(MatSort) sort!: MatSort;
   @ViewChild('materialDetails') materialDetailsDialog!: TemplateRef<any>;
 
+  todayDate: string = new Date().toISOString().split('T')[0];
+
   projects: Project[] = [];
   sites: Site[] = [];
   categories: any[] = [];

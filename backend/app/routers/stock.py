@@ -292,22 +292,6 @@ async def get_site_stock_summary(
     calculator = StockCalculator()
     summary = calculator.get_site_stock_summary(db, site_id, start_date, end_date, supplier_name, entry_type)
     
-    # NEW: THREAD-LOCKED DEBOUNCER 
-    # This forces the simultaneous requests to stand in line.
-    with REPORT_LOG_LOCK:
-        current_time = time.time()
-        cache_key = f"{current_user.id}_report_pull"
-        
-        # Only log if it has been more than 30 seconds since this user last pulled a report
-        if current_time - REPORT_LOG_CACHE.get(cache_key, 0) > 30:
-            REPORT_LOG_CACHE[cache_key] = current_time
-            log_activity(
-                db, 
-                current_user.username, 
-                "Report Viewed", 
-                "Viewed Stock Ledger & Balances report."
-            )
-    
     return summary
 
 @router.post("/generate-daily-report/{site_id}")
@@ -367,3 +351,25 @@ async def get_daily_reports(
     
     query = query.order_by(models.DailyStockReport.report_date.desc(), models.DailyStockReport.material_id.asc())
     return query.offset(pagination.skip).limit(pagination.size).all()
+
+@router.post("/log-export/{site_id}")
+async def log_excel_export(
+    site_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_dependency)
+) -> Any:
+    if site_id == 0:
+        site_name = "All Sites"
+    else:
+        site = crud.crud_site.get(db, id=site_id)
+        site_name = site.name if site else f"Site ID {site_id}"
+    
+    # SYSTEM LOGGING FOR EXCEL DOWNLOAD
+    log_activity(
+        db, 
+        current_user.username, 
+        "Report Exported", 
+        f"Downloaded Excel Stock Report for '{site_name}'."
+    )
+    
+    return {"message": "Export logged successfully"}

@@ -43,6 +43,17 @@ class User(Base):
     po_entries = relationship("POEntry", back_populates="user")
     stock_entries = relationship("StockEntry", back_populates="user")
 
+# --- NEW SUPPLIER MASTER TABLE ---
+class Supplier(Base):
+    __tablename__ = "suppliers"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), unique=True, index=True, nullable=False)
+    contact_info = Column(String(500), nullable=True)
+    is_active = Column(Boolean, default=True) # Soft delete flag
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+# ---------------------------------
+
 class Category(Base):
     __tablename__ = "categories"
     id = Column(Integer, primary_key=True, index=True)

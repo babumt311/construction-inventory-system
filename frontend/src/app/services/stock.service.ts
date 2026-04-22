@@ -17,7 +17,8 @@ export class StockService {
 
   // Stock Entry Management
   getStockEntries(params?: any): Observable<StockEntry[]> {
-    return this.api.get<StockEntry[]>('stock/entries', params);
+    // FIXED: Added trailing slash to match backend @router.get("/entries/")
+    return this.api.get<StockEntry[]>('stock/entries/', params);
   }
 
   getStockEntry(id: number): Observable<StockEntry> {
@@ -25,7 +26,8 @@ export class StockService {
   }
 
   createStockEntry(entry: StockEntryCreateRequest): Observable<StockEntry> {
-    return this.api.post<StockEntry>('stock/entries', entry);
+    // FIXED: Added trailing slash to match backend @router.post("/entries/")
+    return this.api.post<StockEntry>('stock/entries/', entry);
   }
 
   updateStockEntry(id: number, entry: Partial<StockEntry>): Observable<StockEntry> {
@@ -54,15 +56,6 @@ export class StockService {
     return this.api.get<DailyStockReport[]>(`stock/daily-reports/${siteId}`, params);
   }
 
- // generateDailyReport(siteId: number, reportDate?: Date): Observable<any> {
- //   const params: any = {};
- //   if (reportDate) {
- //     params.report_date = reportDate.toISOString().split('T')[0];
- //   }
- //   return this.api.post<any>(`stock/generate-daily-report/${siteId}`, {}, params);
-// }
-
-
   generateDailyReport(siteId: number, reportDate?: Date): Observable<any> {
     let url = `stock/generate-daily-report/${siteId}`;
 
@@ -75,7 +68,6 @@ export class StockService {
     // Now call .post() with only 2 arguments: (URL, Body)
     return this.api.post<any>(url, {});
   }
-
 
   // Excel Upload for Stock Entries
   uploadStockEntries(file: File, siteId: number): Observable<any> {

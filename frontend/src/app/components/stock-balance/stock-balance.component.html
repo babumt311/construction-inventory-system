@@ -73,12 +73,12 @@
 
             <div class="col-md-2">
               <label class="form-label small fw-bold text-muted">Start Date</label>
-              <input type="date" class="form-control" formControlName="start_date">
+              <input type="date" class="form-control" formControlName="start_date" [max]="todayDate">
             </div>
 
             <div class="col-md-2">
               <label class="form-label small fw-bold text-muted">End Date</label>
-              <input type="date" class="form-control" formControlName="end_date" [min]="filterForm.get('start_date')?.value">
+              <input type="date" class="form-control" formControlName="end_date" [min]="filterForm.get('start_date')?.value" [max]="todayDate">
             </div>
             
             <div class="col-md-2 d-flex align-items-end pb-2">
@@ -92,7 +92,7 @@
           <ng-container *ngIf="viewMode === 'cards'">
             <div class="col-md-4">
               <label class="form-label small fw-bold text-muted"><i class="far fa-calendar-check me-1"></i> Stock As Of Date</label>
-              <input type="date" class="form-control" formControlName="as_of_date" title="Leave blank for Current Stock">
+              <input type="date" class="form-control" formControlName="as_of_date" title="Leave blank for Current Stock" [max]="todayDate">
             </div>
             
             <div class="col-md-4">

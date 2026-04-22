@@ -16,16 +16,18 @@ import { ProjectService } from '../../services/project.service';
 })
 export class StockManagementComponent implements OnInit {
   
-  activeTab: 'stock' | 'category' | 'material' = 'stock';
+  activeTab: 'stock' | 'category' | 'material' | 'supplier' = 'stock';
   
   stockForm: FormGroup;
   categoryForm: FormGroup;
   materialForm: FormGroup;
+  supplierForm: FormGroup;
 
   projects: any[] = [];
   sites: any[] = [];
   categories: any[] = [];
   materials: any[] = [];
+  suppliers: any[] = [];
 
   private materialCache: { [key: string]: any[] } = {};
 
@@ -57,6 +59,14 @@ export class StockManagementComponent implements OnInit {
   editingMaterialId: number | null = null;
   submittingMaterial = false;
   materialSearchTerm = '';
+
+  supplierColumns: string[] = ['name', 'contact_info', 'actions'];
+  supplierDataSource = new MatTableDataSource<any>();
+  @ViewChild('supplierPaginator') supplierPaginator!: MatPaginator;
+  @ViewChild('supplierSort') supplierSort!: MatSort;
+  isEditingSupplier = false;
+  editingSupplierId: number | null = null;
+  submittingSupplier = false;
 
   constructor(
     private fb: FormBuilder,
@@ -128,27 +138,32 @@ export class StockManagementComponent implements OnInit {
 
     this.categoryForm = this.fb.group({ name: [null, Validators.required], description: [null] });
     this.materialForm = this.fb.group({ name: [null, Validators.required], category_id: [null, Validators.required], unit: ['Bags'], description: [null] });
+    this.supplierForm = this.fb.group({ name: [null, Validators.required], contact_info: [null] });
   }
 
   ngOnInit(): void {
     this.loadProjects(); 
     this.loadCategories(); 
     this.loadMaterials();
+    this.loadSuppliers();
     this.addItem(); 
     
     const savedTab = sessionStorage.getItem('activeInventoryTab');
-    if (savedTab && ['stock', 'category', 'material'].includes(savedTab)) this.switchTab(savedTab as 'stock' | 'category' | 'material');
+    if (savedTab && ['stock', 'category', 'material', 'supplier'].includes(savedTab)) {
+      this.switchTab(savedTab as any);
+    }
   }
 
   get isReceivedType(): boolean { return this.stockForm.get('entry_type')?.value === 'received'; }
 
-  switchTab(tab: 'stock' | 'category' | 'material'): void {
+  switchTab(tab: 'stock' | 'category' | 'material' | 'supplier'): void {
     this.activeTab = tab;
     sessionStorage.setItem('activeInventoryTab', tab);
     setTimeout(() => {
       if (tab === 'stock') { this.stockDataSource.paginator = this.stockPaginator; this.stockDataSource.sort = this.stockSort; }
       else if (tab === 'category') { this.categoryDataSource.paginator = this.categoryPaginator; this.categoryDataSource.sort = this.categorySort; }
       else if (tab === 'material') { this.materialDataSource.paginator = this.materialPaginator; this.materialDataSource.sort = this.materialSort; }
+      else if (tab === 'supplier') { this.supplierDataSource.paginator = this.supplierPaginator; this.supplierDataSource.sort = this.supplierSort; }
     });
   }
 
@@ -325,8 +340,6 @@ export class StockManagementComponent implements OnInit {
 
     if (this.isEditingStock && this.editingStockId) {
       const item = formValue.items[0]; 
-      
-      // STRICT PAYLOAD PARSING FOR EDITS
       const updatePayload = {
         site_id: Number(formValue.site_id),
         supplier_name: formValue.supplier_name || null,
@@ -361,7 +374,6 @@ export class StockManagementComponent implements OnInit {
     const apiRequests: any[] = [];
 
     formValue.items.forEach((item: any) => {
-      // STRICT PAYLOAD PARSING FOR NEW ENTRIES
       const basePayload = {
         project_id: Number(formValue.project_id),
         supplier_name: formValue.supplier_name || null, 
@@ -397,13 +409,18 @@ export class StockManagementComponent implements OnInit {
     forkJoin(apiRequests).subscribe({
       next: () => {
         this.toastr.success(`Successfully saved ${formValue.items.length} material entries!`);
+        
+        // Auto-add new supplier if typed
+        if (formValue.supplier_name && !this.suppliers.some(s => s.name === formValue.supplier_name)) {
+          this.stockService.createSupplier({ name: formValue.supplier_name }).subscribe(() => this.loadSuppliers());
+        }
+
         const currentProject = formValue.project_id;
         const currentSite = formValue.site_id;
         this.stockForm.reset({ project_id: currentProject, site_id: currentSite, entry_type: 'received' });
         this.items.clear();
         this.addItem(); 
         
-        // Force sync site ID before loading
         this.selectedSiteId = currentSite;
         this.loadStockEntries();
         this.submittingStock = false;
@@ -581,5 +598,72 @@ export class StockManagementComponent implements OnInit {
   applyMaterialSearch(): void { 
     this.materialDataSource.filter = this.materialSearchTerm.trim().toLowerCase(); 
     if (this.materialDataSource.paginator) { this.materialDataSource.paginator.firstPage(); } 
+  }
+
+  // --- SUPPLIER LOGIC ---
+  loadSuppliers(): void {
+    this.stockService.getSuppliers().subscribe({
+      next: (res) => {
+        this.suppliers = res;
+        this.supplierDataSource.data = res;
+        if (this.activeTab === 'supplier') {
+          this.supplierDataSource.paginator = this.supplierPaginator;
+          this.supplierDataSource.sort = this.supplierSort;
+        }
+      }
+    });
+  }
+
+  submitSupplier(): void {
+    if (this.supplierForm.invalid) { 
+      this.supplierForm.markAllAsTouched(); 
+      return; 
+    }
+    this.submittingSupplier = true;
+    const payload = this.supplierForm.value;
+    
+    const request = this.isEditingSupplier && this.editingSupplierId 
+      ? this.stockService.updateSupplier(this.editingSupplierId, payload) 
+      : this.stockService.createSupplier(payload);
+
+    request.subscribe({
+      next: () => {
+        this.toastr.success(this.isEditingSupplier ? 'Supplier updated!' : 'Supplier created!');
+        this.loadSuppliers();
+        this.resetSupplierForm();
+        this.submittingSupplier = false;
+      },
+      error: () => {
+        this.toastr.error('Failed to save supplier.');
+        this.submittingSupplier = false;
+      }
+    });
+  }
+
+  editSupplier(supplier: any): void {
+    this.isEditingSupplier = true;
+    this.editingSupplierId = supplier.id;
+    this.supplierForm.patchValue({
+      name: supplier.name,
+      contact_info: supplier.contact_info
+    });
+  }
+
+  deleteSupplier(id: number): void {
+    if (confirm('Are you sure you want to delete this supplier?')) {
+      this.stockService.deleteSupplier(id).subscribe({
+        next: () => {
+          this.toastr.success('Supplier deleted.');
+          this.loadSuppliers();
+        },
+        error: () => this.toastr.error('Failed to delete supplier.')
+      });
+    }
+  }
+
+  resetSupplierForm(): void {
+    this.isEditingSupplier = false;
+    this.editingSupplierId = null;
+    this.supplierForm.reset();
   }
 }

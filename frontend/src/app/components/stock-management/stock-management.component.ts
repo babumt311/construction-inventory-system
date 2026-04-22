@@ -217,7 +217,6 @@ export class StockManagementComponent implements OnInit {
     return this.materialCache[key];
   }
 
-  // FIXED: Robust form reading
   onProjectChange(): void {
     if (this.isEditingStock) return; 
     const projectId = this.stockForm.get('project_id')?.value;
@@ -228,7 +227,6 @@ export class StockManagementComponent implements OnInit {
     if (projectId) this.projectService.getProjectSites(Number(projectId)).subscribe(res => this.sites = res);
   }
 
-  // FIXED: Explicitly read from form to prevent ng-select bugs
   onSiteChange(): void { 
     const siteId = this.stockForm.get('site_id')?.value;
     if (siteId) { 
@@ -327,16 +325,20 @@ export class StockManagementComponent implements OnInit {
 
     if (this.isEditingStock && this.editingStockId) {
       const item = formValue.items[0]; 
+      
+      // STRICT PAYLOAD PARSING FOR EDITS
       const updatePayload = {
-        site_id: formValue.site_id,
+        site_id: Number(formValue.site_id),
         supplier_name: formValue.supplier_name || null,
         invoice_no: formValue.invoice_no || null,
         invoice_date: formValue.invoice_date || null,
         reference_no: formValue.invoice_no || null,
-        material_id: item.material_id,
-        quantity: item.quantity,
-        unit_cost: item.unit_price,
-        total_cost: item.total_cost,
+        material_id: Number(item.material_id),
+        quantity: Number(item.quantity),
+        unit_cost: Number(item.unit_price) || 0,
+        tax_percent: Number(item.tax_percent) || 0,
+        tax_amount: Number(item.tax_amount) || 0,
+        total_cost: Number(item.total_cost) || 0,
         entry_type: formValue.entry_type,
         remarks: formValue.remarks
       };
@@ -359,16 +361,19 @@ export class StockManagementComponent implements OnInit {
     const apiRequests: any[] = [];
 
     formValue.items.forEach((item: any) => {
+      // STRICT PAYLOAD PARSING FOR NEW ENTRIES
       const basePayload = {
-        project_id: formValue.project_id,
+        project_id: Number(formValue.project_id),
         supplier_name: formValue.supplier_name || null, 
         invoice_no: formValue.invoice_no || null,       
         invoice_date: formValue.invoice_date || null,   
         reference_no: formValue.invoice_no || null,     
-        material_id: item.material_id,
-        quantity: item.quantity,
-        unit_cost: item.unit_price,
-        total_cost: item.total_cost
+        material_id: Number(item.material_id),
+        quantity: Number(item.quantity),
+        unit_cost: Number(item.unit_price) || 0,
+        tax_percent: Number(item.tax_percent) || 0,
+        tax_amount: Number(item.tax_amount) || 0,
+        total_cost: Number(item.total_cost) || 0
       };
 
       if (formValue.entry_type === 'transfer') {
@@ -384,7 +389,7 @@ export class StockManagementComponent implements OnInit {
         apiRequests.push(this.stockService.createStockEntry(payloadOut));
         apiRequests.push(this.stockService.createStockEntry(payloadIn));
       } else {
-        const payload: any = { ...basePayload, site_id: formValue.site_id, entry_type: formValue.entry_type, remarks: formValue.remarks };
+        const payload: any = { ...basePayload, site_id: Number(formValue.site_id), entry_type: formValue.entry_type, remarks: formValue.remarks };
         apiRequests.push(this.stockService.createStockEntry(payload));
       }
     });
@@ -410,7 +415,6 @@ export class StockManagementComponent implements OnInit {
     });
   }
 
-  // FIXED: Bulletproof loading function
   loadStockEntries(): void {
     const activeSite = this.selectedSiteId || this.stockForm.get('site_id')?.value;
     if (!activeSite) return;
@@ -420,7 +424,6 @@ export class StockManagementComponent implements OnInit {
     
     this.stockService.getStockEntries({ site_id: this.selectedSiteId }).subscribe({
       next: (entries: any) => {
-        // Fallback in case API wraps the array
         const dataArray = Array.isArray(entries) ? entries : (entries.data || []);
         
         const mapped = dataArray.map((e: any) => { 

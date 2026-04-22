@@ -81,6 +81,11 @@ export class StockService {
     return this.api.uploadFile('uploads/stock', file, { site_id: siteId });
   }
 
+  // Log Excel Export
+  logExcelExport(siteId: number): Observable<any> {
+    return this.api.post<any>(`stock/log-export/${siteId}`, {});
+  }
+
   // CLI Methods
   calculateStock(siteId: number, materialId: number): Observable<any> {
     return this.api.get<any>(`stock/cli/calculate/${siteId}/${materialId}`);

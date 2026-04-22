@@ -34,6 +34,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
   categories: any[] = [];
   materials: Material[] = [];
   filteredMaterials: Material[] = []; 
+  suppliers: any[] = []; // NEW: Array to hold master suppliers list
   
   allTimeBalances: any[] = []; 
   
@@ -112,6 +113,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     this.loadCategories(); 
     this.loadMaterials();
     this.loadProjectsAndInitialData();
+    this.loadSuppliers(); // NEW: Load suppliers on init
 
     this.filterForm.get('start_date')?.valueChanges.subscribe(startDate => {
       const endDate = this.filterForm.get('end_date')?.value;
@@ -225,6 +227,11 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
 
   loadCategories(): void { this.materialService.getCategories().subscribe(c => this.categories = c); }
   loadMaterials(): void { this.materialService.getMaterials().subscribe(m => { this.materials = m; this.filteredMaterials = m; }); }
+  
+  // NEW: Fetch master list of suppliers
+  loadSuppliers(): void {
+    this.stockService.getSuppliers().subscribe(s => this.suppliers = s);
+  }
 
   loadSitesAndFetchData(projectId: any): void {
     this.sites = [];
@@ -607,7 +614,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const dateStr = new Date().toISOString().split('T')[0];
     saveAs(blob, `Stock_Ledger_Report_${dateStr}.xlsx`);
 
-    // --- ADDED SYSTEM LOGGING HERE ---
     const activeSiteId = this.filterForm.value.site_id || (data.length > 0 ? data[0].site_id : 0);
     this.stockService.logExcelExport(activeSiteId).subscribe();
 

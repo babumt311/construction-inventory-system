@@ -94,7 +94,6 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       }
     };
 
-    // FIXED: Initialized with null instead of '' for ng-select compatibility
     this.filterForm = this.fb.group({
       project_id: [null],
       site_id: [null],
@@ -104,7 +103,7 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
       end_date: [null],
       as_of_date: [null],
       supplier_name: [null],
-      entry_type: [''], // Native select, empty string is fine here   
+      entry_type: [''],    
       show_negative_only: [false]
     });
   }
@@ -607,6 +606,10 @@ export class StockBalanceComponent implements OnInit, OnDestroy {
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const dateStr = new Date().toISOString().split('T')[0];
     saveAs(blob, `Stock_Ledger_Report_${dateStr}.xlsx`);
+
+    // --- ADDED SYSTEM LOGGING HERE ---
+    const activeSiteId = this.filterForm.value.site_id || (data.length > 0 ? data[0].site_id : 0);
+    this.stockService.logExcelExport(activeSiteId).subscribe();
 
     this.toastr.success('Professional Report downloaded!');
     this.closeExportModal();

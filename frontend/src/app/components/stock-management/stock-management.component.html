@@ -27,6 +27,11 @@
         <i class="fas fa-box-open me-2" [class.text-primary]="activeTab === 'material'"></i> Materials Master
       </a>
     </li>
+    <li class="nav-item">
+      <a class="nav-link fw-bold px-4 py-3" [class.active]="activeTab === 'supplier'" (click)="switchTab('supplier')" style="cursor: pointer; font-size: 1.1rem;">
+        <i class="fas fa-truck me-2" [class.text-primary]="activeTab === 'supplier'"></i> Suppliers
+      </a>
+    </li>
   </ul>
 
   <div *ngIf="activeTab === 'stock'" class="animate__animated animate__fadeIn">
@@ -78,7 +83,7 @@
             <ng-container *ngIf="stockForm.get('entry_type')?.value === 'received'">
               <div class="col-md-4 mt-3">
                 <label class="form-label fw-bold small text-muted">Supplier Name *</label>
-                <input type="text" class="form-control" formControlName="supplier_name" [class.is-invalid]="stockForm.get('supplier_name')?.invalid && stockForm.get('supplier_name')?.touched" placeholder="Enter Supplier Name">
+                <ng-select [items]="suppliers" bindLabel="name" bindValue="name" [addTag]="true" placeholder="Select or type new Supplier..." formControlName="supplier_name" [ngClass]="{'is-invalid': stockForm.get('supplier_name')?.invalid && stockForm.get('supplier_name')?.touched}"></ng-select>
               </div>
 
               <div class="col-md-4 mt-3">
@@ -348,4 +353,65 @@
       </div>
     </div>
   </div>
+
+  <div *ngIf="activeTab === 'supplier'" class="row g-4 animate__animated animate__fadeIn">
+    <div class="col-lg-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-light py-3 border-bottom-0">
+          <h5 class="fw-bold mb-0 text-primary">
+            <i class="fas" [class.fa-plus-circle]="!isEditingSupplier" [class.fa-edit]="isEditingSupplier"></i> 
+            {{ isEditingSupplier ? 'Edit Supplier' : 'Add New Supplier' }}
+          </h5>
+        </div>
+        <div class="card-body p-4 pt-3">
+          <form [formGroup]="supplierForm" (ngSubmit)="submitSupplier()">
+            <div class="mb-3">
+              <label class="form-label fw-bold small text-muted">Supplier Name *</label>
+              <input type="text" class="form-control" formControlName="name" [class.is-invalid]="supplierForm.get('name')?.invalid && supplierForm.get('name')?.touched" placeholder="Company Name">
+            </div>
+            <div class="mb-4">
+              <label class="form-label fw-bold small text-muted">Contact Info / Phone</label>
+              <input type="text" class="form-control" formControlName="contact_info" placeholder="Phone or Email">
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary w-50 fw-bold" *ngIf="isEditingSupplier" (click)="resetSupplierForm()">Cancel</button>
+              <button type="submit" class="btn btn-primary fw-bold" [ngClass]="isEditingSupplier ? 'w-50' : 'w-100'" [disabled]="submittingSupplier || supplierForm.invalid">
+                <i class="fas fa-save me-2"></i>{{ isEditingSupplier ? 'Update' : 'Save' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table mat-table [dataSource]="supplierDataSource" #supplierSort="matSort" matSort class="table table-hover align-middle mb-0">
+              <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header class="bg-light fw-bold text-muted px-4 py-3">Supplier Name</th>
+                <td mat-cell *matCellDef="let element" class="px-4 fw-bold text-dark">{{ element.name }}</td>
+              </ng-container>
+              <ng-container matColumnDef="contact_info">
+                <th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted px-4 py-3">Contact Details</th>
+                <td mat-cell *matCellDef="let element" class="px-4 text-muted">{{ element.contact_info || '-' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef class="bg-light fw-bold text-muted px-4 py-3 text-end">Actions</th>
+                <td mat-cell *matCellDef="let element" class="px-4 text-end">
+                  <button class="btn btn-sm btn-light text-primary me-2" (click)="editSupplier(element)"><i class="fas fa-edit"></i></button>
+                  <button class="btn btn-sm btn-light text-danger" (click)="deleteSupplier(element.id)"><i class="fas fa-trash-alt"></i></button>
+                </td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="supplierColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: supplierColumns;" class="border-bottom"></tr>
+            </table>
+          </div>
+          <mat-paginator #supplierPaginator [pageSizeOptions]="[10, 25]" showFirstLastButtons class="border-top"></mat-paginator>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>

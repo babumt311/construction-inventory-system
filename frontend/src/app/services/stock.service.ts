@@ -16,7 +16,7 @@ import {
 export class StockService {
   constructor(private api: ApiService) {}
 
-  // Stock Entry Management - ADDED TRAILING SLASHES HERE
+  // Stock Entry Management
   getStockEntries(params?: any): Observable<StockEntry[]> {
     return this.api.get<StockEntry[]>('stock/entries/', params);
   }
@@ -89,5 +89,22 @@ export class StockService {
   // CLI Methods
   calculateStock(siteId: number, materialId: number): Observable<any> {
     return this.api.get<any>(`stock/cli/calculate/${siteId}/${materialId}`);
+  }
+
+  // --- SUPPLIERS API ---
+  getSuppliers(): Observable<any[]> {
+    return this.api.get<any[]>('stock/suppliers/');
+  }
+
+  createSupplier(data: any): Observable<any> {
+    return this.api.post<any>('stock/suppliers/', data);
+  }
+
+  updateSupplier(id: number, data: any): Observable<any> {
+    return this.api.put<any>(`stock/suppliers/${id}`, data);
+  }
+
+  deleteSupplier(id: number): Observable<any> {
+    return this.api.delete<any>(`stock/suppliers/${id}`);
   }
 }
